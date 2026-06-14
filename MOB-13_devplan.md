@@ -102,7 +102,7 @@ MOB_JOB_ATTRIBUTE_VALUE                          -- 1 ligne par (mission, attrib
 | **MOB-13.7** | DI : `IJobAttributeOverlay` enregistré (`Program.cs`) | ✅ livré |
 | **MOB-13.8** | Sélection du contrat : `GET/POST api/Contract/{jobId}` → `MOB_JOB_CONTRACT` ; use cases `ClListContractsUseCase`/`ClSelectContractUseCase` + DTO `ClContractChoiceDto` | ✅ livré (DTO propres, **pas** les `ClContractType*Model` legacy) |
 | **MOB-13.9** | Nettoyage/validation | ✅ livré — `Save` ne crée plus de lignes vides (obs. 1) ; le PATCH rejette les attributs hors contrat au lieu de les ignorer. *(Required à l'enregistrement final = différé, dépend de l'étape « finalize/transfert facturation », cf. 13.12.)* |
-| **MOB-13.10** | Tests xUnit + FluentAssertions (use cases + overlay) | ⏸ **en pause** — bloqué par le build global (WIP Orders : `IBreakInterruptReasonQueryService` absent). Repris après décision de découplage Vector↔Orders. |
+| **MOB-13.10** | Tests xUnit + FluentAssertions (overlay) | ✅ livré — projet `CaSoft.Erp.USVector.Tests` (EF InMemory), **11 tests verts** : BuildContractType (global/lié, options, défaut, fusion multi+baseline dédoublonnée), Save (scalaire, skip-empty, multi hors-ERP, update), sélection de contrat (upsert/inconnu). |
 | **MOB-13.11** | `InstantUpdate` | ✅ **couvert sans code** — flag exposé dans `FormStructure` ; le front déclenche le `PATCH JobEdit` existant sur le champ concerné. |
 
 ### Écarts vs plan initial (actés)
@@ -153,10 +153,8 @@ GET/POST api/Contract/{jobId}
 
 ## 8. Reste à faire
 
-Ossature (13.1→13.9) **livrée et déployée**. Reste :
+Ossature (13.1→13.10) **livrée et déployée**. Reste :
 - **13.2 (vrai catalogue)** — donnée métier, alimentée par l'utilisateur (déjà : STANDARD + ART80).
-- **13.10 (tests)** — ⏸ en pause : nécessite un build vert (cf. découplage Vector↔Orders, direction
-  **HTTP** retenue le 2026-06-14 — devplan séparé).
 - **13.12 (purge des valeurs orphelines)** — au changement de contrat, les valeurs overlay hors
   du nouveau périmètre sont **conservées** (PAS de purge auto). La purge est une **action explicite** :
   déclenchée par un utilisateur disposant du rôle adéquat, OU à une étape précise du workflow mission
