@@ -117,7 +117,8 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
-    c.SwaggerEndpoint("/swagger/v2/swagger.json", "USVector API v2");
+    // Endpoint relatif : fonctionne à la racine ET sous un sous-chemin IIS (path base)
+    c.SwaggerEndpoint("v2/swagger.json", "USVector API v2");
     c.RoutePrefix = "swagger";
 });
 
