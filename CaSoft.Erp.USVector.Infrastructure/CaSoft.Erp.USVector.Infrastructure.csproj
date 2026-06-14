@@ -13,8 +13,8 @@
     <ProjectReference Include="..\CaSoft.Erp.USVector.Application\CaSoft.Erp.USVector.Application.vbproj" />
     <ProjectReference Include="..\CaSoft.Erp.USVector.Domain\CaSoft.Erp.USVector.Domain.vbproj" />
     <ProjectReference Include="..\CaSoft.Erp.USVector.Contracts\CaSoft.Erp.USVector.Contracts.vbproj" />
-    <ProjectReference Include="..\..\Erp.Orders\Orders.Application\Orders.Application.vbproj" />
-    <ProjectReference Include="..\..\Erp.Orders\Orders.Infrastructure\Orders.Infrastructure.csproj" />
+    <!-- Découplage 4a : plus de référence projet à Orders. Les données de référence ERP
+         sont lues via Orders.Api (HTTP) — cf. ErpApi/HttpErpReadApiClient. -->
   </ItemGroup>
 
   <PropertyGroup>

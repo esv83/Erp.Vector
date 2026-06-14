@@ -1,8 +1,8 @@
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Dto;
 using CaSoft.Erp.USVector.Domain;
+using CaSoft.Erp.USVector.Infrastructure.ErpApi;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
-using CaSoft.Orders.Application;
 // ICrewRepository existe côté ERP et côté mobile : on désambiguïse explicitement.
 using IMobileCrewRepository = CaSoft.Erp.USVector.Application.Port.ICrewRepository;
 
@@ -10,20 +10,20 @@ namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Erp;
 
 /// <summary>
 /// MOB-5 — Implémentation ERP-backed de la partie liste de <see cref="ICrewRepository"/>.
-/// La liste des missions vient de l'ERP (in-process via <see cref="IMissionQueryService"/>),
-/// les flags opérationnels (ack/terminé) de la BD Mobile (<c>MOB_MISSION_STATE</c>).
+/// La liste des missions vient d'Orders.Api (HTTP, découplage 4a), les flags opérationnels
+/// (ack/terminé) de la BD Mobile (<c>MOB_MISSION_STATE</c>).
 ///
 /// Les autres membres (résolution équipage, conducteur…) restent à implémenter en MOB-4/MOB-11.
 /// </summary>
 public class CrewRepository : IMobileCrewRepository
 {
-    private readonly IMissionQueryService _missionQuery;
+    private readonly IErpReadApiClient _erp;
     private readonly MobileDbContext _mobileDb;
     private readonly ISignatureRepository _signatures;
 
-    public CrewRepository(IMissionQueryService missionQuery, MobileDbContext mobileDb, ISignatureRepository signatures)
+    public CrewRepository(IErpReadApiClient erp, MobileDbContext mobileDb, ISignatureRepository signatures)
     {
-        _missionQuery = missionQuery;
+        _erp = erp;
         _mobileDb = mobileDb;
         _signatures = signatures;
     }
@@ -38,21 +38,13 @@ public class CrewRepository : IMobileCrewRepository
 
         var crewSet = gCrewIds.ToHashSet();
 
-        // Fenêtre du jour. L'ERP exige une plage From/To ; on liste les missions
-        // affectées puis on filtre sur les équipages du personnel (pas de filtre crew natif).
+        // Fenêtre du jour. Orders.Api liste les missions affectées ; on filtre ensuite
+        // sur les équipages du personnel (pas de filtre crew natif).
         var today = DateTime.Today;
-        var query = new ClListMissionsQuery
-        {
-            From = today,
-            To = today.AddDays(1).AddTicks(-1),
-            UnassignedOnly = false,
-            IncludeCancelled = false,
-            Take = 500
-        };
 
         // Pont sync/async : le contrat legacy ICrewRepository est synchrone.
-        // Sûr hors SynchronizationContext (ASP.NET Core). À revisiter si le port passe en async.
-        var missions = _missionQuery.ListAsync(query, CancellationToken.None).GetAwaiter().GetResult();
+        var missions = _erp.ListMissionsAsync(today, today.AddDays(1).AddTicks(-1), 500, CancellationToken.None)
+            .GetAwaiter().GetResult();
 
         // Union des missions des crews du personnel (dédupliquée par mission).
         var crewMissions = missions

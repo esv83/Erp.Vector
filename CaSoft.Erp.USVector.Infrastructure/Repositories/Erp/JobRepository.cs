@@ -1,46 +1,38 @@
-using CaSoft.Beneficiary.Application;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Dto;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
-using CaSoft.Orders.Application;
+using CaSoft.Erp.USVector.Infrastructure.ErpApi;
 
 namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Erp;
 
 /// <summary>
-/// MOB-6 — Implémentation ERP-backed de <see cref="IJobRepository"/> pour le détail mission.
+/// MOB-6 — Implémentation de <see cref="IJobRepository"/> pour le détail mission.
 ///
-/// <para><b>GetJob</b> compose le détail à partir de l'ERP (in-process, lecture seule) :
-/// <see cref="IMissionDetailQueryService"/> (mission + adresses pickup/dropoff résolues, MIS-2),
-/// <see cref="IOrderQueryService"/> (mode/sens/fréquence/rdv de la commande) et
-/// <see cref="IBeneficiaryQueryService"/> (identité patient). Le flag de présence de signature
-/// (MOB-8) vient de la BD Mobile via <see cref="ISignatureRepository"/>.</para>
+/// <para>Données de référence ERP lues via <see cref="IErpReadApiClient"/> (Orders.Api en HTTP,
+/// découplage 4a) : détail mission, commande (mode/sens/fréquence), identité bénéficiaire.
+/// Le flag de présence de signature (MOB-8) vient de la BD Mobile via <see cref="ISignatureRepository"/>.</para>
 ///
-/// <para>La timeline opérationnelle (GetJobTime/SaveJobTime) reste purement BD Mobile : déléguée
-/// au <see cref="IJobTimeRepository"/> réel (MOB-2/MOB-7), avec création paresseuse de la ligne.</para>
+/// <para>La timeline opérationnelle (GetJobTime/SaveJobTime) reste BD Mobile (<see cref="IJobTimeRepository"/>).
+/// Les attributs dynamiques (MOB-13) sont gérés par <see cref="IJobAttributeOverlay"/>.</para>
 ///
-/// <para>Édition mission + facturation dynamique (Save/UpdateCommande/Invoicing) : différées MOB-13.</para>
+/// <para>Pont sync/async : le contrat legacy IJobRepository est synchrone. Sûr hors
+/// SynchronizationContext (ASP.NET Core).</para>
 /// </summary>
 public class JobRepository : IJobRepository
 {
-    private readonly IMissionDetailQueryService _missionDetail;
-    private readonly IOrderQueryService _orderQuery;
-    private readonly IBeneficiaryQueryService _beneficiaryQuery;
+    private readonly IErpReadApiClient _erp;
     private readonly IJobTimeRepository _jobTimeRepository;
     private readonly ISignatureRepository _signatures;
     private readonly IJobAttributeOverlay _overlay;
 
     public JobRepository(
-        IMissionDetailQueryService missionDetail,
-        IOrderQueryService orderQuery,
-        IBeneficiaryQueryService beneficiaryQuery,
+        IErpReadApiClient erp,
         IJobTimeRepository jobTimeRepository,
         ISignatureRepository signatures,
         IJobAttributeOverlay overlay)
     {
-        _missionDetail = missionDetail;
-        _orderQuery = orderQuery;
-        _beneficiaryQuery = beneficiaryQuery;
+        _erp = erp;
         _jobTimeRepository = jobTimeRepository;
         _signatures = signatures;
         _overlay = overlay;
@@ -48,19 +40,17 @@ public class JobRepository : IJobRepository
 
     public ClJob GetJob(Guid gJobId)
     {
-        // Pont sync/async : le contrat legacy IJobRepository est synchrone.
-        // Sûr hors SynchronizationContext (ASP.NET Core). Cohérent avec CrewRepository (MOB-5).
-        var mission = _missionDetail.GetFullAsync(gJobId, CancellationToken.None).GetAwaiter().GetResult();
+        var mission = _erp.GetMissionFullAsync(gJobId, CancellationToken.None).GetAwaiter().GetResult();
         if (mission is null)
             throw new InvalidOperationException($"Mission {gJobId} introuvable côté ERP.");
 
-        // La commande porte mode de transport, aller/retour, fréquence (itératif), rdv.
-        var order = _orderQuery.GetByIdAsync(mission.OrderId, CancellationToken.None).GetAwaiter().GetResult();
+        // La commande porte mode de transport, aller/retour, fréquence (itératif).
+        var order = _erp.GetOrderAsync(mission.OrderId, CancellationToken.None).GetAwaiter().GetResult();
 
         // Identité patient (le bénéficiaire est rattaché à la commande).
-        ClBeneficiaryDetailDtoOut? beneficiary = null;
+        ErpBeneficiaryDetailDto? beneficiary = null;
         if (order?.Order is not null && order.Order.BeneficiaryId != Guid.Empty)
-            beneficiary = _beneficiaryQuery.GetByIdAsync(order.Order.BeneficiaryId, CancellationToken.None)
+            beneficiary = _erp.GetBeneficiaryAsync(order.Order.BeneficiaryId, CancellationToken.None)
                 .GetAwaiter().GetResult();
 
         var domainMission = BuildMission(gJobId, mission, order);
@@ -90,11 +80,9 @@ public class JobRepository : IJobRepository
         };
 
     public bool IsExist(Guid jobId)
-        => _missionDetail.GetFullAsync(jobId, CancellationToken.None).GetAwaiter().GetResult() is not null;
+        => _erp.GetMissionFullAsync(jobId, CancellationToken.None).GetAwaiter().GetResult() is not null;
 
     // ── Timeline opérationnelle : déléguée à la BD Mobile (MOB-2/MOB-7) ──────────
-    // Création paresseuse : la ligne naît au premier geste de l'ambulancier
-    // (ClUpdateTimeUseCase ne gère pas l'absence).
     public ClJobTimeData GetJobTime(Guid jobId)
         => _jobTimeRepository.GetJobTimeData(jobId)
            ?? ClJobTimeData.GetBuilder().WithId(jobId).Build();
@@ -110,11 +98,10 @@ public class JobRepository : IJobRepository
     public void UpdateCommande(ClUpdateCommandeDto CommandDto) => throw new NotImplementedException("MOB-13.8");
     public IInvoicingRepository Invoicing => throw new NotImplementedException("MOB-13.8");
 
-    // ── Mapping ERP (DTO) → domaine mobile ───────────────────────────────────────
+    // ── Mapping ERP (DTO HTTP) → domaine mobile ──────────────────────────────────
 
-    private ClMission BuildMission(Guid jobId, ClMissionFullDtoOut mission, ClEditOrderDtoOut? order)
+    private ClMission BuildMission(Guid jobId, ErpMissionFullDto mission, ErpOrderEditDto? order)
     {
-        // Corps « order » de la réponse d'édition (champs mode/sens/fréquence/bénéficiaire).
         var body = order?.Order;
 
         var schedule = mission.MissionDate.ToDateTime(mission.SchedulingTime);
@@ -123,7 +110,6 @@ public class JobRepository : IJobRepository
             : null;
 
         // Mode de transport : passthrough de l'id REF_TRANSPORT_MODE ERP (convention MOB-5).
-        // Un code inconnu de l'enum legacy s'affiche « Autre » côté adaptateur.
         var transportMode = new ClTransportMode(
             (ModEnumeration.TransportModeEnumeration)(body?.TransportModeId ?? 0));
 
@@ -145,7 +131,7 @@ public class JobRepository : IJobRepository
             MaxDelay = mission.DelayMaxInMinutes,
             CallTime = null,                  // pas d'équivalent ERP
             IsLastDay = false,                // notion régulation legacy, sans source ERP
-            IsIterativ = body is not null && (int)body.Frequency != 0,
+            IsIterativ = body is not null && body.Frequency != 0,
             TransportMode = transportMode,
             TransportType = transportType,
             Departure = ToAddressLines(mission.Pickup),
@@ -154,7 +140,7 @@ public class JobRepository : IJobRepository
         };
     }
 
-    private static ClJobBeneficiary BuildBeneficiary(ClBeneficiaryDetailDtoOut? dto)
+    private static ClJobBeneficiary BuildBeneficiary(ErpBeneficiaryDetailDto? dto)
     {
         var ben = new ClJobBeneficiary { Phones = new List<string>() };
         if (dto is null) return ben;
@@ -174,7 +160,7 @@ public class JobRepository : IJobRepository
     /// Stage ERP résolu → lignes d'adresse (paragraphe départ/arrivée).
     /// Si la jointure est orpheline (lieu source supprimé), repli sur le <c>Label</c> figé.
     /// </summary>
-    private static List<string> ToAddressLines(ClStageDetailDtoOut? stage)
+    private static List<string> ToAddressLines(ErpStageDto? stage)
     {
         var lines = new List<string>();
         if (stage is null) return lines;

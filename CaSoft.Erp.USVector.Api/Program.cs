@@ -4,7 +4,7 @@ using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Repositories;
 using CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
-using CaSoft.Orders.Infrastructure;
+using CaSoft.Erp.USVector.Infrastructure.ErpApi;
 using EmergencyPlatformConnector;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -32,13 +32,11 @@ if (keycloakEnabled)
 builder.Services.AddDbContext<MobileDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MobileDb")));
 
-// Accès données de référence ERP in-process (OrdersDbContext + query services).
-// Lecture seule côté mobile : missions, équipages, véhicules, personnel, bénéficiaires.
-builder.Services.AddOrdersInfrastructure(
-    builder.Configuration.GetConnectionString("OrdersDb")
-        ?? throw new InvalidOperationException("ConnectionStrings:OrdersDb manquant."),
-    builder.Configuration["AddressApi:BaseUrl"]
-        ?? throw new InvalidOperationException("AddressApi:BaseUrl manquant."));
+// Découplage Vector↔Orders (4a) : données de référence ERP lues via Orders.Api en HTTP
+// (missions, commandes, bénéficiaires, équipages), comme Address.Api. Plus aucune réf projet Orders.
+builder.Services.AddHttpClient<IErpReadApiClient, HttpErpReadApiClient>(c =>
+    c.BaseAddress = new Uri(builder.Configuration["OrdersApi:BaseUrl"]
+        ?? throw new InvalidOperationException("OrdersApi:BaseUrl manquant.")));
 
 // Contrat mobile inchangé : PascalCase comme l'ancienne WebApi (pas de camelCase).
 builder.Services.AddControllers()

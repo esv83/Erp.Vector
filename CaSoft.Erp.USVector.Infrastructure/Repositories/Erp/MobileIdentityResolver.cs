@@ -1,53 +1,31 @@
 using CaSoft.Erp.USVector.Application.Port;
-using CaSoft.Orders.Application;
+using CaSoft.Erp.USVector.Infrastructure.ErpApi;
 
 namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Erp;
 
 /// <summary>
-/// MOB-4a — Implémentation ERP-backed de <see cref="IMobileIdentityResolver"/>.
-/// <para><c>sub</c> Keycloak → PER_ID via <see cref="IPersonnelQueryService"/>
-/// (table de liaison PER_KEYCLOAK_MAP).</para>
-/// <para>PER_ID + date → crews actifs via <see cref="ICrewQueryService"/>
-/// (filtres PersonnelId + VacationDate déjà natifs).</para>
-/// <para>Pont sync/async : le contrat mobile est synchrone. Sûr hors
-/// SynchronizationContext (ASP.NET Core), cohérent avec Crew/JobRepository.</para>
+/// MOB-4a — Implémentation de <see cref="IMobileIdentityResolver"/> via Orders.Api (HTTP, découplage 4a).
+/// <para><c>sub</c> Keycloak → PER_ID (endpoint additif <c>GET /personnel/by-keycloak/{sub}</c>).</para>
+/// <para>PER_ID + date → crews actifs (<c>GET /crews?personnelId=&amp;date=</c>).</para>
+/// <para>Pont sync/async : le contrat mobile est synchrone. Sûr hors SynchronizationContext (ASP.NET Core).</para>
 /// </summary>
 public class MobileIdentityResolver : IMobileIdentityResolver
 {
-    private readonly IPersonnelQueryService _personnel;
-    private readonly ICrewQueryService _crews;
-    private readonly IMissionDetailQueryService _missionDetail;
+    private readonly IErpReadApiClient _erp;
 
-    public MobileIdentityResolver(
-        IPersonnelQueryService personnel,
-        ICrewQueryService crews,
-        IMissionDetailQueryService missionDetail)
-    {
-        _personnel = personnel;
-        _crews = crews;
-        _missionDetail = missionDetail;
-    }
+    public MobileIdentityResolver(IErpReadApiClient erp) => _erp = erp;
 
     public Guid? ResolvePersonnelId(Guid keyCloakSub)
-        => _personnel.GetPersonnelIdByKeyCloakIdAsync(keyCloakSub, CancellationToken.None)
+        => _erp.ResolvePersonnelIdByKeycloakAsync(keyCloakSub, CancellationToken.None)
             .GetAwaiter().GetResult();
 
     public IReadOnlyList<Guid> ResolveActiveCrewIds(Guid personnelId, DateOnly onDate)
-    {
-        var query = new ClListCrewsQuery
-        {
-            PersonnelId = personnelId,
-            VacationDate = onDate,
-            Take = 500
-        };
-
-        var crews = _crews.ListAsync(query, CancellationToken.None).GetAwaiter().GetResult();
-        return crews.Select(c => c.Id).ToList();
-    }
+        => _erp.ListCrewIdsAsync(personnelId, onDate, 500, CancellationToken.None)
+            .GetAwaiter().GetResult();
 
     public bool IsMissionAccessible(Guid personnelId, Guid missionId)
     {
-        var mission = _missionDetail.GetFullAsync(missionId, CancellationToken.None)
+        var mission = _erp.GetMissionFullAsync(missionId, CancellationToken.None)
             .GetAwaiter().GetResult();
 
         if (mission is null || !mission.AssignedCrewId.HasValue)
