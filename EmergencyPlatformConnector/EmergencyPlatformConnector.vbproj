@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>EmergencyPlatformConnector</RootNamespace>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GpsGate.Connector\GpsGate.Connector.vbproj" />
+    <ProjectReference Include="..\CaSoft.Erp.USVector.Application\CaSoft.Erp.USVector.Application.vbproj" />
+  </ItemGroup>
+
+</Project>

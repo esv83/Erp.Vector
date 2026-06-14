@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\CaSoft.Erp.USVector.Domain\CaSoft.Erp.USVector.Domain.vbproj" />
+    <ProjectReference Include="..\CaSoft.Erp.USVector.Contracts\CaSoft.Erp.USVector.Contracts.vbproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <RootNamespace>CaSoft.Erp.USVector.Application</RootNamespace>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Import Include="CaSoft.Framework" />
+    <Import Include="CaSoft.Erp.USVector.Application.Port" />
+    <Import Include="CaSoft.Erp.USVector.Domain" />
+  </ItemGroup>
+
+</Project>
+

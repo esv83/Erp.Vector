@@ -1,0 +1,2 @@
+﻿Friend Interface ISynchronizableList
+End Interface
