@@ -28,19 +28,22 @@ public class JobRepository : IJobRepository
     private readonly IBeneficiaryQueryService _beneficiaryQuery;
     private readonly IJobTimeRepository _jobTimeRepository;
     private readonly ISignatureRepository _signatures;
+    private readonly IJobAttributeOverlay _overlay;
 
     public JobRepository(
         IMissionDetailQueryService missionDetail,
         IOrderQueryService orderQuery,
         IBeneficiaryQueryService beneficiaryQuery,
         IJobTimeRepository jobTimeRepository,
-        ISignatureRepository signatures)
+        ISignatureRepository signatures,
+        IJobAttributeOverlay overlay)
     {
         _missionDetail = missionDetail;
         _orderQuery = orderQuery;
         _beneficiaryQuery = beneficiaryQuery;
         _jobTimeRepository = jobTimeRepository;
         _signatures = signatures;
+        _overlay = overlay;
     }
 
     public ClJob GetJob(Guid gJobId)
@@ -69,11 +72,22 @@ public class JobRepository : IJobRepository
             .WithMission(domainMission)
             .WithBeneficiary(domainBeneficiary)
             .WithTimeData(timeData)
-            // Facturation dynamique différée (MOB-13) : contrat minimal, attributs vides.
-            .WithContractType(new ClContractType())
+            // MOB-13 : attributs dynamiques (overlay BD Mobile). Coordonnées ERP = baseline verrouillée.
+            .WithContractType(_overlay.BuildContractType(gJobId, BuildBaselines(domainBeneficiary)))
             .WithPersistentSource()
             .Build();
     }
+
+    /// <summary>
+    /// Baseline ERP (verrouillée) des attributs multi-valués : on peut ajouter des
+    /// téléphones/e-mails côté mobile, jamais modifier ceux déjà présents dans l'ERP.
+    /// </summary>
+    private static IDictionary<string, IEnumerable<string>> BuildBaselines(ClJobBeneficiary beneficiary)
+        => new Dictionary<string, IEnumerable<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["PHONES"] = beneficiary.Phones ?? new List<string>(),
+            ["MAILS"] = beneficiary.Emails ?? new List<string>(),
+        };
 
     public bool IsExist(Guid jobId)
         => _missionDetail.GetFullAsync(jobId, CancellationToken.None).GetAwaiter().GetResult() is not null;
@@ -88,10 +102,13 @@ public class JobRepository : IJobRepository
     public void SaveJobTime(ClJobTimeData jobTime)
         => _jobTimeRepository.Save(jobTime.JobId, jobTime);
 
-    // ── Édition mission + facturation dynamique : différées MOB-13 ───────────────
-    public void Save(ClJob Job) => throw new NotImplementedException("MOB-13");
-    public void UpdateCommande(ClUpdateCommandeDto CommandDto) => throw new NotImplementedException("MOB-13");
-    public IInvoicingRepository Invoicing => throw new NotImplementedException("MOB-13");
+    // ── Édition des attributs : overlay BD Mobile (MOB-13) ───────────────────────
+    public void Save(ClJob Job)
+        => _overlay.Save(Job.Id, Job.ContractType, BuildBaselines(Job.Beneficiary));
+
+    // Écriture commande ERP + sélection de contrat (liste) : hors ossature (MOB-13.8).
+    public void UpdateCommande(ClUpdateCommandeDto CommandDto) => throw new NotImplementedException("MOB-13.8");
+    public IInvoicingRepository Invoicing => throw new NotImplementedException("MOB-13.8");
 
     // ── Mapping ERP (DTO) → domaine mobile ───────────────────────────────────────
 

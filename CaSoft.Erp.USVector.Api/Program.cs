@@ -63,6 +63,8 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddScoped<ISignatureRepository, SignatureRepository>();
 builder.Services.AddScoped<IJobTimeRepository, JobTimeRepository>();
 builder.Services.AddScoped<ISessionRepository, SessionRepository>();
+// MOB-13 : overlay attributs de mission (catalogue + valeurs en BD Mobile).
+builder.Services.AddScoped<IJobAttributeOverlay, JobAttributeOverlayRepository>();
 
 // ── Ports ERP-backed (in-process) ───────────────────────────────────────────
 builder.Services.AddScoped<ICrewRepository, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.CrewRepository>();
