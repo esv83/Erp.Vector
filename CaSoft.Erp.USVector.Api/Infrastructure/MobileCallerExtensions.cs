@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-namespace CaSoft.Erp.Mobile.Api.Infrastructure;
+namespace CaSoft.Erp.USVector.Api.Infrastructure;
 
 /// <summary>
 /// MOB-4a — Extraction de l'identité Keycloak du token porté par la requête.

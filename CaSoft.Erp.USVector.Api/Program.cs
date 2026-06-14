@@ -1,9 +1,9 @@
 using CaSoft.Connectors.GpsGate;
-using CaSoft.Erp.Mobile.Application;
-using CaSoft.Erp.Mobile.Application.Port;
-using CaSoft.Erp.Mobile.Infrastructure.Persistence;
-using CaSoft.Erp.Mobile.Infrastructure.Repositories;
-using CaSoft.Erp.Mobile.Infrastructure.Repositories.Mobile;
+using CaSoft.Erp.USVector.Application;
+using CaSoft.Erp.USVector.Application.Port;
+using CaSoft.Erp.USVector.Infrastructure.Persistence;
+using CaSoft.Erp.USVector.Infrastructure.Repositories;
+using CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 using CaSoft.Orders.Infrastructure;
 using EmergencyPlatformConnector;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -53,9 +53,9 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v2", new OpenApiInfo
     {
-        Title = "API Mobile Ambulanciers",
+        Title = "USVector — API terrain",
         Version = "v2.0",
-        Description = "API mobile terrain reconnectée à l'ERP (contrat legacy préservé)"
+        Description = "USVector : API terrain ambulanciers reconnectée à l'ERP (contrat legacy préservé)"
     });
 });
 
@@ -65,16 +65,15 @@ builder.Services.AddScoped<IJobTimeRepository, JobTimeRepository>();
 builder.Services.AddScoped<ISessionRepository, SessionRepository>();
 
 // ── Ports ERP-backed (in-process) ───────────────────────────────────────────
-builder.Services.AddScoped<ICrewRepository, CaSoft.Erp.Mobile.Infrastructure.Repositories.Erp.CrewRepository>();
+builder.Services.AddScoped<ICrewRepository, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.CrewRepository>();
 // MOB-6 : détail mission (mission + commande + bénéficiaire ERP → ClJob).
-builder.Services.AddScoped<IJobRepository, CaSoft.Erp.Mobile.Infrastructure.Repositories.Erp.JobRepository>();
+builder.Services.AddScoped<IJobRepository, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.JobRepository>();
 // MOB-4a : résolution identité Keycloak (sub → PER_ID → crews actifs).
-builder.Services.AddScoped<IMobileIdentityResolver, CaSoft.Erp.Mobile.Infrastructure.Repositories.Erp.MobileIdentityResolver>();
+builder.Services.AddScoped<IMobileIdentityResolver, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.MobileIdentityResolver>();
 
 // ── Ports ERP → stubs (remplacés itération par itération, MOB-4+) ────────────
 builder.Services.AddScoped<ILogRepository, LogRepositoryStub>();
 builder.Services.AddScoped<ILogAnalyzeRepository, LogAnalyzeRepositoryStub>();
-builder.Services.AddScoped<ILoginRepository, LoginRepositoryStub>();
 builder.Services.AddScoped<IContactRepository, ContactRepositoryStub>();
 builder.Services.AddScoped<IInvoicingRepository, InvoicingRepositoryStub>();
 builder.Services.AddScoped<IMissionRepositary, MissionRepositoryStub>();
@@ -118,7 +117,7 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
-    c.SwaggerEndpoint("/swagger/v2/swagger.json", "API Mobile Ambulanciers v2");
+    c.SwaggerEndpoint("/swagger/v2/swagger.json", "USVector API v2");
     c.RoutePrefix = "swagger";
 });
 

@@ -1,7 +1,7 @@
-using CaSoft.Erp.Mobile.Application.Port;
+using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Orders.Application;
 
-namespace CaSoft.Erp.Mobile.Infrastructure.Repositories.Erp;
+namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Erp;
 
 /// <summary>
 /// MOB-4a — Implémentation ERP-backed de <see cref="IMobileIdentityResolver"/>.

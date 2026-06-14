@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
-using CaSoft.Erp.Mobile.Application;
-using CaSoft.Erp.Mobile.Application.Port;
-using CaSoft.Erp.Mobile.Api.Infrastructure;
+using CaSoft.Erp.USVector.Application;
+using CaSoft.Erp.USVector.Application.Port;
+using CaSoft.Erp.USVector.Api.Infrastructure;
 
-namespace CaSoft.Erp.Mobile.Api.Controllers
+namespace CaSoft.Erp.USVector.Api.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]

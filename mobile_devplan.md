@@ -1,11 +1,11 @@
-# 📱 CaSoft.Erp.Mobile — Plan de développement
+# 📱 CaSoft.Erp.USVector — Plan de développement
 
 > Feature : reconnecter l'API mobile terrain (ambulanciers ↔ régulation) à l'ERP en
 > développement, après perte de la base legacy `BD_REGULATION_prod` (piratage).
 > Le **schéma** legacy n'est pas perdu (récupérable depuis les entités EF scaffoldées de
 > `MobApp.Data.ef`), seule la **donnée** l'est.
 
-> Solution : `Mobile.sln` (`E:\VB_Projects\CaSoft.Erp\CaSoft.Erp.MobileApp`).
+> Solution : `USVector.sln` (`E:\VB_Projects\CaSoft.Erp\CaSoft.Erp.MobileApp`).
 > Historique : ce plan reprend `mobile_reconnect_devplan.md` (ex-repo Orders), désormais porté ici.
 
 ---
@@ -14,9 +14,9 @@
 
 | Livré | Détail |
 |---|---|
-| ✅ Squelette de solution | `Mobile.sln` + 5 projets Clean Architecture, **build vert**, projets vides. Références in-process vers `Orders.Application` / `Orders.Infrastructure` câblées dans `CaSoft.Erp.Mobile.Infrastructure`. |
+| ✅ Squelette de solution | `USVector.sln` + 5 projets Clean Architecture, **build vert**, projets vides. Références in-process vers `Orders.Application` / `Orders.Infrastructure` câblées dans `CaSoft.Erp.USVector.Infrastructure`. |
 | ✅ **MOB-0** (2026-06-06) | BD dédiée **`BD_ERP_MOBILE_APP`** créée sur `192.168.1.109,1440` (ErpAccount = db_owner). 3 tables MVP livrées + exécutées (`MOB_001_Initial.sql`). Entités scaffoldées Database First (`scripts/scaffold-tables.ps1`) + `MobileDbContext` manuel (Fluent API). Build vert. |
-| ✅ **MOB-1** (2026-06-06) | Portage legacy complet : Framework (51 vb, copié de `UrgenceSanteSolution_V2/0-Framework` → projet `CaSoft.Erp.Mobile.Framework`), Domain (28 vb), Contracts (2 vb), Application (116 vb), connecteurs `GpsGate.Connector` + `EmergencyPlatformConnector` (Sirus inclus), 16 controllers + Program.cs. 11 stubs repos (`NotImplementedStubs.cs`, Infrastructure). Secrets GpsGate/Sirus **externalisés** en config (`__SET_VIA_ENV__`). Build vert solution, **API démarre et expose les 25 routes du contrat legacy** (vérifié via swagger.json). |
+| ✅ **MOB-1** (2026-06-06) | Portage legacy complet : Framework (51 vb, copié de `UrgenceSanteSolution_V2/0-Framework` → projet `CaSoft.Erp.USVector.Framework`), Domain (28 vb), Contracts (2 vb), Application (116 vb), connecteurs `GpsGate.Connector` + `EmergencyPlatformConnector` (Sirus inclus), 16 controllers + Program.cs. 11 stubs repos (`NotImplementedStubs.cs`, Infrastructure). Secrets GpsGate/Sirus **externalisés** en config (`__SET_VIA_ENV__`). Build vert solution, **API démarre et expose les 25 routes du contrat legacy** (vérifié via swagger.json). |
 | ✅ **MOB-2** (2026-06-07) | DI `MobileDbContext` (`ConnectionStrings:MobileDb`, user-secrets en dev). Repos BD Mobile réels : `SignatureRepository` (`MOB_SIGNATURE`), `JobTimeRepository` (`MOB_MISSION_STATE`), `SessionRepository` (`MOB_SESSION`, port `ISessionRepository` ajouté côté Application pour MOB-4/12). Timeline branchée via `IJobRepository.GetJobTime/SaveJobTime` (délégation + **création paresseuse** de la ligne au premier geste ambulancier). TODO legacy résolu : `DELETE api/Signature` réellement câblé. **Validé en réel** contre `BD_ERP_MOBILE_APP` : PUT/GET/DELETE signature, PATCH/GET time (lignes vérifiées en base puis nettoyées). |
 | ✅ **MOB-6** (2026-06-08) | Détail mission ERP-backed. `Repositories/Erp/JobRepository.cs` implémente `IJobRepository.GetJob` : compose `IMissionDetailQueryService.GetFullAsync` (mission + adresses pickup/dropoff résolues, MIS-2) + `IOrderQueryService.GetByIdAsync` (mode/sens/fréquence) + `IBeneficiaryQueryService.GetByIdAsync` (identité patient) → `ClJob` via builder. Mapping départ/arrivée en paragraphes (repli `Label` si jointure orpheline), DDN/âge/téléphone. Timeline déléguée au `JobTimeRepository` (délégation identique au stub conservée). `IsExist` câblé. `Save`/`UpdateCommande`/`Invoicing` → MOB-13. DI : stub remplacé. La chaîne `JobDetailController → ClGetJobUseCase → ClJobListCache → IJobRepository` était déjà câblée (aucune modif controller/use case). **Build solution vert.** **Réaligné 2026-06-10** : le refactor ERP de `ClEditOrderDtoOut` (DTO devenu imbriqué `{ order, beneficiary }`) avait cassé le build mobile ; `JobRepository` lit désormais mode/sens/fréquence/bénéficiaire via `order.Order.*` (`TransportModeId`/`HasReturn`/`Frequency`/`BeneficiaryId`). Build revert vert. |
 | ✅ **MOB-7** (2026-06-08) | Statuts / temps. La timeline opérationnelle (`GET/PATCH api/time`, jalons ack/read/go/onsite/terminate en `MOB_MISSION_STATE`) reste pleinement fonctionnelle, désormais servie par le vrai `JobRepository` (délégation `GetJobTime/SaveJobTime` → `JobTimeRepository` préservée). **Projection statut fin→ERP différée** : le domaine `ClMission` d'Orders expose `Status` en lecture seule sans méthode de transition (le seul writer actuel est le défaut `ToDo`) ; en faire le mobile le premier writer est une décision ERP à cadrer (`orders_devplan`, module régulation), hors MVP. **Sirus : statu quo** (recâblage MOB-16). |
@@ -26,7 +26,7 @@
 
 **Notes de portage MOB-1** (divergences framework V2 comblées) :
 - `ClBusinessListBase(Of E)` (arité 1) ajoutée + `Synchronyze` reconstitué ; `Merge` de `ClBusinessBase` décommenté ; `IUseCaseResponse(Of T)`/`ClUseCaseResponse(Of T)` recréés (+ alias `Result`) ; `ClEntityBase.Id` restauré (`Shadows` sur les Id typés des entités).
-- Namespaces renommés : `CaSoft.MobileApp.Domaine`→`CaSoft.Erp.Mobile.Domain`, `CaSoft.MobileApp.Business`→`CaSoft.Erp.Mobile.Application`, `CaSoft.MobileApp.Modeles`→`CaSoft.Erp.Mobile.Contracts`, `CaSoft.Framework.Business[.Framework]`→`CaSoft.Framework`, `WebApi`→`CaSoft.Erp.Mobile.Api`.
+- Namespaces renommés : `CaSoft.MobileApp.Domaine`→`CaSoft.Erp.USVector.Domain`, `CaSoft.MobileApp.Business`→`CaSoft.Erp.USVector.Application`, `CaSoft.MobileApp.Modeles`→`CaSoft.Erp.USVector.Contracts`, `CaSoft.Framework.Business[.Framework]`→`CaSoft.Framework`, `WebApi`→`CaSoft.Erp.USVector.Api`.
 - Écartés (morts/couplés DAL legacy) : `ClReadJobCommand.cs`, `ClConfig.cs` (IdentityServer4), `WeatherForecast.cs`, injection `BD_REGULATION_PRODContext` du `SignatureController`. Mapping `ClContactModel.ToJobBeneficiary` recréé en extension Application.
 - 4 warnings BC42105 assumés (corps legacy commentés — réimplémentation MOB-6/MOB-10/Sirus).
 
@@ -40,11 +40,11 @@
 
 | Projet legacy | Langage | Rôle | Sort dans la reconnexion |
 |---|---|---|---|
-| `WebApi` (MobApp.API) | C# | API REST mobile (~35 endpoints, 13 controllers) | **Remplacée** par `CaSoft.Erp.Mobile.Api` |
-| `MobApp.Application` | VB | Use cases + services + **interfaces repos** | **Porté** → `CaSoft.Erp.Mobile.Application` (on garde les interfaces) |
-| `MobApp.Domaine` | VB | Entités métier (`ClJob`, `ClCrew`, `ClVehicle`…) | **Porté** tel quel → `CaSoft.Erp.Mobile.Domain` |
-| `MobApp.Modeles` | VB | DTOs = **contrat mobile** | **Porté** tel quel → `CaSoft.Erp.Mobile.Contracts` (préserve le contrat) |
-| `MobApp.Data` + `MobApp.Data.ef` | VB/C# | Repos + `BD_REGULATION_PRODContext` (legacy) | **Remplacés** → `CaSoft.Erp.Mobile.Infrastructure` |
+| `WebApi` (MobApp.API) | C# | API REST mobile (~35 endpoints, 13 controllers) | **Remplacée** par `CaSoft.Erp.USVector.Api` |
+| `MobApp.Application` | VB | Use cases + services + **interfaces repos** | **Porté** → `CaSoft.Erp.USVector.Application` (on garde les interfaces) |
+| `MobApp.Domaine` | VB | Entités métier (`ClJob`, `ClCrew`, `ClVehicle`…) | **Porté** tel quel → `CaSoft.Erp.USVector.Domain` |
+| `MobApp.Modeles` | VB | DTOs = **contrat mobile** | **Porté** tel quel → `CaSoft.Erp.USVector.Contracts` (préserve le contrat) |
+| `MobApp.Data` + `MobApp.Data.ef` | VB/C# | Repos + `BD_REGULATION_PRODContext` (legacy) | **Remplacés** → `CaSoft.Erp.USVector.Infrastructure` |
 | `EmergencyPlatformConnector` / `GpsGate.Connector` / `Sirus.Connector` | VB | Géoloc (GpsGate REST) + régulation (Sirus UDP) | **Portés tels quels** (statu quo) |
 
 ### Le point de raccordement
@@ -77,7 +77,7 @@ domaine, services, DTOs et contrat mobile restent intacts.
 │ (terrain)   │                                                 │
 └─────────────┘                                                 ▼
                                               ┌────────────────────────────────┐
-                                              │  CaSoft.Erp.Mobile.Api          │
+                                              │  CaSoft.Erp.USVector.Api          │
                                               │  ASP.NET Core 8 — sous-app IIS  │
                                               │  /mobile du gateway ERP         │
                                               │  (controllers + domaine + DTOs  │
@@ -99,9 +99,9 @@ domaine, services, DTOs et contrat mobile restent intacts.
 ```
 
 **Décisions :**
-1. **`CaSoft.Erp.Mobile.Api`** (ASP.NET Core 8) **remplace** `WebApi`. Même contrat
+1. **`CaSoft.Erp.USVector.Api`** (ASP.NET Core 8) **remplace** `WebApi`. Même contrat
    (routes + DTOs) → l'app mobile est **re-pointée**, zéro changement côté terminal.
-2. Accès données de référence ERP **in-process** : `CaSoft.Erp.Mobile.Infrastructure` référence
+2. Accès données de référence ERP **in-process** : `CaSoft.Erp.USVector.Infrastructure` référence
    directement `Orders.Application` / `Orders.Infrastructure`. Pas de hop HTTP, pas de couplage à `Orders.Api`.
 3. Données purement mobiles → **BD Mobile dédiée** (DbContext `MobileDbContext`, schéma `MOB_*`),
    référençant les entités ERP par id.
@@ -138,7 +138,7 @@ arbitrer en MOB-3 (table de correspondance `MOB_CREW_MAP` int↔Guid, ou exposer
 | # | Itération | Taille | Détail |
 |---|---|---|---|
 | M0 | ✅ **MOB-0 — Cadrage & schéma BD Mobile** | S | **Livré 2026-06-06**. BD dédiée `BD_ERP_MOBILE_APP` + 3 tables (`MOB_001_Initial.sql`, idempotent, exécuté) : `MOB_SESSION` (token unique + 1 session active max/équipage), `MOB_MISSION_STATE` (timeline 5 jalons alignée `T_JOB_TIME`), `MOB_SIGNATURE` (1:1 mission). Database First : scaffold sélectif (`scripts/scaffold-tables.ps1`) → entités POCO + `MobileDbContext` manuel. |
-| M1 | ✅ **MOB-1 — Portage du code legacy** | M | **Livré 2026-06-06**. Tout le legacy porté (`Domain`/`Contracts`/`Application`/connecteurs/controllers + framework `CaSoft.Erp.Mobile.Framework`), DI bootstrap, repos stubbés (NotImplemented). Build vert, API démarrée, 25 routes du contrat legacy exposées. Cf. « Notes de portage MOB-1 » (§0). `Sirus.Connector` legacy était un projet vide — le code Sirus vit dans `EmergencyPlatformConnector/Sirus/`. |
+| M1 | ✅ **MOB-1 — Portage du code legacy** | M | **Livré 2026-06-06**. Tout le legacy porté (`Domain`/`Contracts`/`Application`/connecteurs/controllers + framework `CaSoft.Erp.USVector.Framework`), DI bootstrap, repos stubbés (NotImplemented). Build vert, API démarrée, 25 routes du contrat legacy exposées. Cf. « Notes de portage MOB-1 » (§0). `Sirus.Connector` legacy était un projet vide — le code Sirus vit dans `EmergencyPlatformConnector/Sirus/`. |
 | M2 | ✅ **MOB-2 — Repos BD Mobile + DI** | S | **Livré 2026-06-07**. DI `MobileDbContext` + repos réels session/state/signature (cf. §0). `api/Signature` et `api/Time` fonctionnels de bout en bout sur la BD Mobile. |
 
 ### Phase 1 — MVP boucle ambulancier

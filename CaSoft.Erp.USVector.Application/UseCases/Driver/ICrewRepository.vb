@@ -1,4 +1,4 @@
-﻿Imports CaSoft.Erp.Mobile.Application.Dto
+﻿Imports CaSoft.Erp.USVector.Application.Dto
 
 Namespace Port
 

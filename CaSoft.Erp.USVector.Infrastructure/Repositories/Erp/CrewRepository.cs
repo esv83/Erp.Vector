@@ -1,12 +1,12 @@
-using CaSoft.Erp.Mobile.Application;
-using CaSoft.Erp.Mobile.Application.Dto;
-using CaSoft.Erp.Mobile.Domain;
-using CaSoft.Erp.Mobile.Infrastructure.Persistence;
+using CaSoft.Erp.USVector.Application;
+using CaSoft.Erp.USVector.Application.Dto;
+using CaSoft.Erp.USVector.Domain;
+using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Orders.Application;
 // ICrewRepository existe côté ERP et côté mobile : on désambiguïse explicitement.
-using IMobileCrewRepository = CaSoft.Erp.Mobile.Application.Port.ICrewRepository;
+using IMobileCrewRepository = CaSoft.Erp.USVector.Application.Port.ICrewRepository;
 
-namespace CaSoft.Erp.Mobile.Infrastructure.Repositories.Erp;
+namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Erp;
 
 /// <summary>
 /// MOB-5 — Implémentation ERP-backed de la partie liste de <see cref="ICrewRepository"/>.

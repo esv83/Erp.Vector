@@ -1,12 +1,12 @@
-using CaSoft.Erp.Mobile.Application;
-using CaSoft.Erp.Mobile.Application.Dto;
-using CaSoft.Erp.Mobile.Application.Port;
-using CaSoft.Erp.Mobile.Domain;
+using CaSoft.Erp.USVector.Application;
+using CaSoft.Erp.USVector.Application.Dto;
+using CaSoft.Erp.USVector.Application.Port;
+using CaSoft.Erp.USVector.Domain;
 
-namespace CaSoft.Erp.Mobile.Infrastructure.Repositories;
+namespace CaSoft.Erp.USVector.Infrastructure.Repositories;
 
 // ============================================================================
-// Stubs MOB-1 : implémentations vides des ports de CaSoft.Erp.Mobile.Application.
+// Stubs MOB-1 : implémentations vides des ports de CaSoft.Erp.USVector.Application.
 // Objectif : valider le contrat et l'assemblage DI (build vert), avant les
 // vraies implémentations (ERP in-process : MOB-3+, BD Mobile : MOB-2).
 // Chaque stub sera remplacé itération par itération (cf. mobile_devplan.md).
@@ -47,14 +47,6 @@ public class CrewRepositoryStub : ICrewRepository
     public void Update(ClCrew crew) => throw new NotImplementedException("MOB-4");
     public void AckInstruction(int instructionId) => throw new NotImplementedException("MOB-5");
     public List<Guid> GetCrewIdList(DateOnly id) => throw new NotImplementedException("MOB-4");
-}
-
-public class LoginRepositoryStub : ILoginRepository
-{
-    public bool HasToken(string strName, Guid gCrewId) => throw new NotImplementedException("MOB-4");
-    public ClTokenDto GetLoginToken(string strName, Guid gCrewId) => throw new NotImplementedException("MOB-4");
-    public List<ClCrewModel> GetCrewList() => throw new NotImplementedException("MOB-4");
-    public Guid CreateToken(Guid gCrewId) => throw new NotImplementedException("MOB-4");
 }
 
 public class SignatureRepositoryStub : ISignatureRepository

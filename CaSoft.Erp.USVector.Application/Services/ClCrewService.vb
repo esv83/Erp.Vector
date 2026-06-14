@@ -4,10 +4,8 @@ Public Class ClCrewService
 
     Private _repository As ICrewRepository
     Private _crewList As ClCrewListCache '(Of ClCrew)
-    Private _loginRepo As ILoginRepository
     Private _lastLocationRefresh As Date
-    Public Sub New(repository As ICrewRepository, loginrepo As ILoginRepository)
-        _loginRepo = loginrepo
+    Public Sub New(repository As ICrewRepository)
         _repository = repository
         _crewList = New ClCrewListCache(repository)
         _lastLocationRefresh = DateTime.Now.AddHours(-1)

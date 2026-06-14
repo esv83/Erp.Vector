@@ -1,12 +1,12 @@
 
 using Microsoft.AspNetCore.Mvc;
 using CaSoft.Framework;
-using CaSoft.Erp.Mobile.Application;
-using CaSoft.Erp.Mobile.Application.Port;
-using CaSoft.Erp.Mobile.Contracts;
-using CaSoft.Erp.Mobile.Api.Infrastructure;
+using CaSoft.Erp.USVector.Application;
+using CaSoft.Erp.USVector.Application.Port;
+using CaSoft.Erp.USVector.Contracts;
+using CaSoft.Erp.USVector.Api.Infrastructure;
 
-namespace CaSoft.Erp.Mobile.Api.Controllers
+namespace CaSoft.Erp.USVector.Api.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
@@ -27,11 +27,9 @@ namespace CaSoft.Erp.Mobile.Api.Controllers
         }
 
         // GET api/joblist  — canonique : crews dérivés du token Keycloak.
-        // GET api/joblist/{intCrewId} — legacy : le param est ignoré, on dérive du sub
         // (le client ne dicte plus l'équipage ; cf. mobile_devplan.md §7).
         [HttpGet]
-        [HttpGet("{intCrewId}")]
-        public IActionResult Get(Guid? intCrewId = null)
+             public IActionResult Get()
         {
             // MOB-4a : identité = token Keycloak. Plus de crewId déclaratif.
             var sub = User.GetKeycloakSubject();

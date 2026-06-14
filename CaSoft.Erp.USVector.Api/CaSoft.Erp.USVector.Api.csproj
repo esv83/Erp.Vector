@@ -14,10 +14,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CaSoft.Erp.Mobile.Application\CaSoft.Erp.Mobile.Application.vbproj" />
-    <ProjectReference Include="..\CaSoft.Erp.Mobile.Infrastructure\CaSoft.Erp.Mobile.Infrastructure.csproj" />
-    <ProjectReference Include="..\CaSoft.Erp.Mobile.Contracts\CaSoft.Erp.Mobile.Contracts.vbproj" />
-    <ProjectReference Include="..\CaSoft.Erp.Mobile.Domain\CaSoft.Erp.Mobile.Domain.vbproj" />
+    <ProjectReference Include="..\CaSoft.Erp.USVector.Application\CaSoft.Erp.USVector.Application.vbproj" />
+    <ProjectReference Include="..\CaSoft.Erp.USVector.Infrastructure\CaSoft.Erp.USVector.Infrastructure.csproj" />
+    <ProjectReference Include="..\CaSoft.Erp.USVector.Contracts\CaSoft.Erp.USVector.Contracts.vbproj" />
+    <ProjectReference Include="..\CaSoft.Erp.USVector.Domain\CaSoft.Erp.USVector.Domain.vbproj" />
     <ProjectReference Include="..\EmergencyPlatformConnector\EmergencyPlatformConnector.vbproj" />
     <ProjectReference Include="..\GpsGate.Connector\GpsGate.Connector.vbproj" />
   </ItemGroup>

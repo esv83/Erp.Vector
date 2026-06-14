@@ -1,11 +1,11 @@
 using CaSoft.Beneficiary.Application;
-using CaSoft.Erp.Mobile.Application;
-using CaSoft.Erp.Mobile.Application.Dto;
-using CaSoft.Erp.Mobile.Application.Port;
-using CaSoft.Erp.Mobile.Domain;
+using CaSoft.Erp.USVector.Application;
+using CaSoft.Erp.USVector.Application.Dto;
+using CaSoft.Erp.USVector.Application.Port;
+using CaSoft.Erp.USVector.Domain;
 using CaSoft.Orders.Application;
 
-namespace CaSoft.Erp.Mobile.Infrastructure.Repositories.Erp;
+namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Erp;
 
 /// <summary>
 /// MOB-6 — Implémentation ERP-backed de <see cref="IJobRepository"/> pour le détail mission.
