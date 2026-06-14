@@ -1,0 +1,115 @@
+using CaSoft.Erp.Mobile.Application;
+using CaSoft.Erp.Mobile.Application.Dto;
+using CaSoft.Erp.Mobile.Domain;
+using CaSoft.Erp.Mobile.Infrastructure.Persistence;
+using CaSoft.Orders.Application;
+// ICrewRepository existe côté ERP et côté mobile : on désambiguïse explicitement.
+using IMobileCrewRepository = CaSoft.Erp.Mobile.Application.Port.ICrewRepository;
+
+namespace CaSoft.Erp.Mobile.Infrastructure.Repositories.Erp;
+
+/// <summary>
+/// MOB-5 — Implémentation ERP-backed de la partie liste de <see cref="ICrewRepository"/>.
+/// La liste des missions vient de l'ERP (in-process via <see cref="IMissionQueryService"/>),
+/// les flags opérationnels (ack/terminé) de la BD Mobile (<c>MOB_MISSION_STATE</c>).
+///
+/// Les autres membres (résolution équipage, conducteur…) restent à implémenter en MOB-4/MOB-11.
+/// </summary>
+public class CrewRepository : IMobileCrewRepository
+{
+    private readonly IMissionQueryService _missionQuery;
+    private readonly MobileDbContext _mobileDb;
+    private readonly ISignatureRepository _signatures;
+
+    public CrewRepository(IMissionQueryService missionQuery, MobileDbContext mobileDb, ISignatureRepository signatures)
+    {
+        _missionQuery = missionQuery;
+        _mobileDb = mobileDb;
+        _signatures = signatures;
+    }
+
+    public List<ClJobListItemModel> FetchJobList(Guid gCrewId)
+        => FetchJobList(new[] { gCrewId });
+
+    public List<ClJobListItemModel> FetchJobList(IReadOnlyCollection<Guid> gCrewIds)
+    {
+        if (gCrewIds is null || gCrewIds.Count == 0)
+            return new List<ClJobListItemModel>();
+
+        var crewSet = gCrewIds.ToHashSet();
+
+        // Fenêtre du jour. L'ERP exige une plage From/To ; on liste les missions
+        // affectées puis on filtre sur les équipages du personnel (pas de filtre crew natif).
+        var today = DateTime.Today;
+        var query = new ClListMissionsQuery
+        {
+            From = today,
+            To = today.AddDays(1).AddTicks(-1),
+            UnassignedOnly = false,
+            IncludeCancelled = false,
+            Take = 500
+        };
+
+        // Pont sync/async : le contrat legacy ICrewRepository est synchrone.
+        // Sûr hors SynchronizationContext (ASP.NET Core). À revisiter si le port passe en async.
+        var missions = _missionQuery.ListAsync(query, CancellationToken.None).GetAwaiter().GetResult();
+
+        // Union des missions des crews du personnel (dédupliquée par mission).
+        var crewMissions = missions
+            .Where(m => m.AssignedCrewId.HasValue && crewSet.Contains(m.AssignedCrewId.Value))
+            .GroupBy(m => m.Id)
+            .Select(g => g.First())
+            .OrderBy(m => m.MissionDate)
+            .ThenBy(m => m.SchedulingTime)
+            .ToList();
+
+        // Overlay des flags opérationnels depuis MOB_MISSION_STATE en une seule requête.
+        var ids = crewMissions.Select(m => m.Id).ToList();
+        var states = _mobileDb.MissionStates
+            .Where(s => ids.Contains(s.MST_MISSION_ID))
+            .ToDictionary(s => s.MST_MISSION_ID);
+
+        // MOB-8 : overlay « signature existe » (MOB_SIGNATURE) — 1 requête clé seule.
+        var signed = _signatures.ExistingFor(ids);
+
+        var result = new List<ClJobListItemModel>();
+        var index = 1;
+        foreach (var m in crewMissions)
+        {
+            states.TryGetValue(m.Id, out var state);
+
+            result.Add(new ClJobListItemModel
+            {
+                Index = index++,
+                JobId = m.Id,
+                Patient = m.BeneficiaryDisplayName ?? string.Empty,
+                TransportMode = m.TransportModeId,
+                // TransportType / TransportSens / IsSerial absents du DTO liste léger ERP
+                // (portés par le détail Order) → renseignés en MOB-6.
+                schedule = m.SchedulingTime.ToString("HH:mm"),
+                Appointment = m.AppointmentTime.HasValue
+                    ? m.MissionDate.ToDateTime(m.AppointmentTime.Value)
+                    : null,
+                Departure = m.PickupLabel ?? string.Empty,
+                Arrival = m.DropoffLabel ?? string.Empty,
+                IsAck = state?.MST_ACK_AT is not null,
+                IsTerminated = state?.MST_TERMINATED_AT is not null,
+                SignatureExists = signed.Contains(m.Id)
+            });
+        }
+
+        return result;
+    }
+
+    // Pas d'équivalent ERP des instructions régulation → liste vide (cf. devplan, post-MVP).
+    public List<ClInstructionListItemModel> FetchInstructionList(Guid gCrewId)
+        => new();
+
+    // ── À implémenter ultérieurement ────────────────────────────────────────
+    public ClCrew GetCrew(Guid gCrewID) => throw new NotImplementedException("MOB-4");
+    public bool IsEmployeeInCrew(Guid gCrewID, Guid gEmployeeId) => throw new NotImplementedException("MOB-4");
+    public ClLogDriverModel GetCrewDriver(Guid gVehicleID) => throw new NotImplementedException("MOB-11");
+    public void Update(ClCrew crew) => throw new NotImplementedException("MOB-4");
+    public void AckInstruction(int instructionId) => throw new NotImplementedException("MOB-5 (instructions post-MVP)");
+    public List<Guid> GetCrewIdList(DateOnly id) => throw new NotImplementedException("MOB-4");
+}

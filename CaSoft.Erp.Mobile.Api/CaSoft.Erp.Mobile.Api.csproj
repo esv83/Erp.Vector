@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>c17727bc-af06-4984-892a-030d09f4488e</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
+    <PackageReference Include="NLog.Web.AspNetCore" Version="5.4.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CaSoft.Erp.Mobile.Application\CaSoft.Erp.Mobile.Application.vbproj" />
+    <ProjectReference Include="..\CaSoft.Erp.Mobile.Infrastructure\CaSoft.Erp.Mobile.Infrastructure.csproj" />
+    <ProjectReference Include="..\CaSoft.Erp.Mobile.Contracts\CaSoft.Erp.Mobile.Contracts.vbproj" />
+    <ProjectReference Include="..\CaSoft.Erp.Mobile.Domain\CaSoft.Erp.Mobile.Domain.vbproj" />
+    <ProjectReference Include="..\EmergencyPlatformConnector\EmergencyPlatformConnector.vbproj" />
+    <ProjectReference Include="..\GpsGate.Connector\GpsGate.Connector.vbproj" />
+  </ItemGroup>
+
+</Project>
