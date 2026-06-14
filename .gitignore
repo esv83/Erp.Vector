@@ -1,0 +1,25 @@
+## .NET build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+
+## Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Rider
+.idea/
+
+## Secrets / local config
+appsettings.*.local.json
+*.pubxml.user
+web.config
+
+## OS
+Thumbs.db
+.DS_Store

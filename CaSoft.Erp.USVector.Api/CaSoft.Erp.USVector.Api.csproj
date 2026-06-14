@@ -5,6 +5,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>c17727bc-af06-4984-892a-030d09f4488e</UserSecretsId>
+    <!-- Le web.config est géré manuellement sur le serveur (secrets dans <environmentVariables>).
+         dotnet publish ne doit jamais le générer ni l'écraser. -->
+    <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
   </PropertyGroup>
 
   <ItemGroup>
