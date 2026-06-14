@@ -18,14 +18,24 @@
             Try
                 Dim job = _cache.GetJob(_command.JobID)
 
-                For Each attribut In _command.NewAttributsValues
-                    job.UpdateAttribute(attribut.AttributName, attribut.AttributValue)
-                Next
+                ' Validation : rejeter les attributs hors du contrat courant plutôt que de
+                ' les ignorer silencieusement (UpdateAttribute est un no-op sur clé absente).
+                Dim unknown = _command.NewAttributsValues _
+                    .Where(Function(a) Not job.ContractType.Attributs.ContainsKey(a.AttributName)) _
+                    .Select(Function(a) a.AttributName) _
+                    .ToList()
 
-                _repository.Save(job)
+                If unknown.Count > 0 Then
+                    Response.AddError("Attribut(s) non applicable(s) au contrat de la mission : " & String.Join(", ", unknown))
+                Else
+                    For Each attribut In _command.NewAttributsValues
+                        job.UpdateAttribute(attribut.AttributName, attribut.AttributValue)
+                    Next
 
-                Response.SetResult(_command.NewAttributsValues)
-                '  Response.SetResult(True)
+                    _repository.Save(job)
+
+                    Response.SetResult(_command.NewAttributsValues)
+                End If
 
             Catch ex As Exception
                 Response.AddError(ex.Message)

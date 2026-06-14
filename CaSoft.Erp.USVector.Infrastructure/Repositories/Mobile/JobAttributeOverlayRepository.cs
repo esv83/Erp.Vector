@@ -111,6 +111,7 @@ public class JobAttributeOverlayRepository : IJobAttributeOverlay
         foreach (var attr in contractType.Attributs.Values)
         {
             string? toStore;
+            bool isEmpty;
             if (attr.IsMulti)
             {
                 // On ne persiste que les items AJOUTÉS (hors baseline ERP), sans doublon.
@@ -119,15 +120,23 @@ public class JobAttributeOverlayRepository : IJobAttributeOverlay
                     : new HashSet<string>(Cmp);
                 var added = Dedup(ParseJsonArray(attr.Value).Where(x => !baseline.Contains(x)));
                 toStore = JsonSerializer.Serialize(added);
+                isEmpty = added.Count == 0;
             }
             else
             {
                 toStore = attr.Value;
+                isEmpty = string.IsNullOrWhiteSpace(attr.Value);
             }
 
-            if (existing.TryGetValue(attr.Name, out var row))
+            var hasRow = existing.TryGetValue(attr.Name, out var row);
+
+            // Pas de ligne overlay vide : on ne crée rien pour un attribut non renseigné.
+            // Une ligne existante reste modifiable (y compris remise à vide).
+            if (isEmpty && !hasRow) continue;
+
+            if (hasRow)
             {
-                row.JAV_VALUE = toStore;
+                row!.JAV_VALUE = toStore;
                 row.JAV_UPDATED_AT = DateTime.UtcNow;
             }
             else

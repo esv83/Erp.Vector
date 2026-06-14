@@ -101,9 +101,9 @@ MOB_JOB_ATTRIBUTE_VALUE                          -- 1 ligne par (mission, attrib
 | **MOB-13.6** | `JobRepository.Save` : upsert overlay ; `throw` retirés | ✅ livré |
 | **MOB-13.7** | DI : `IJobAttributeOverlay` enregistré (`Program.cs`) | ✅ livré |
 | **MOB-13.8** | Sélection du contrat : `GET/POST api/Contract/{jobId}` → `MOB_JOB_CONTRACT` ; use cases `ClListContractsUseCase`/`ClSelectContractUseCase` + DTO `ClContractChoiceDto` | ✅ livré (DTO propres, **pas** les `ClContractType*Model` legacy) |
-| **MOB-13.9** | Validation FluentValidation (Required) + erreurs presenter | ⬜ à faire |
-| **MOB-13.10** | Tests xUnit + FluentAssertions (use cases + overlay) | ⬜ à faire |
-| **MOB-13.11** | (option) `InstantUpdate` : PATCH unitaire | ⬜ à faire |
+| **MOB-13.9** | Nettoyage/validation | ✅ livré — `Save` ne crée plus de lignes vides (obs. 1) ; le PATCH rejette les attributs hors contrat au lieu de les ignorer. *(Required à l'enregistrement final = différé, dépend de l'étape « finalize/transfert facturation », cf. 13.12.)* |
+| **MOB-13.10** | Tests xUnit + FluentAssertions (use cases + overlay) | ⏸ **en pause** — bloqué par le build global (WIP Orders : `IBreakInterruptReasonQueryService` absent). Repris après décision de découplage Vector↔Orders. |
+| **MOB-13.11** | `InstantUpdate` | ✅ **couvert sans code** — flag exposé dans `FormStructure` ; le front déclenche le `PATCH JobEdit` existant sur le champ concerné. |
 
 ### Écarts vs plan initial (actés)
 - **Modèle d'applicabilité N..N** : un attribut est défini une fois (`CAT_NAME` unique) puis soit
@@ -153,9 +153,16 @@ GET/POST api/Contract/{jobId}
 
 ## 8. Reste à faire
 
-Ossature (13.1→13.8) **livrée et déployée**. Suite :
-- **13.2 (vrai catalogue)** — fournir/seeder les types de contrat et attributs métier réels (§7.1).
-- **13.9 (validation)** — Required + n'upserter que le renseigné/changé (obs. 1).
-- **13.10 (tests)** — xUnit/FluentAssertions sur l'overlay (dont le lock tél/mail ERP, obs. 2).
-- **13.11 (option)** — `InstantUpdate`.
-- Démo bascule contrat : nécessite un 2ᵉ contrat seedé (cf. 13.2).
+Ossature (13.1→13.9) **livrée et déployée**. Reste :
+- **13.2 (vrai catalogue)** — donnée métier, alimentée par l'utilisateur (déjà : STANDARD + ART80).
+- **13.10 (tests)** — ⏸ en pause : nécessite un build vert (cf. découplage Vector↔Orders, direction
+  **HTTP** retenue le 2026-06-14 — devplan séparé).
+- **13.12 (purge des valeurs orphelines)** — au changement de contrat, les valeurs overlay hors
+  du nouveau périmètre sont **conservées** (PAS de purge auto). La purge est une **action explicite** :
+  déclenchée par un utilisateur disposant du rôle adéquat, OU à une étape précise du workflow mission
+  (ex. transfert en facturation). À spécifier : déclencheurs, rôle requis, portée de la purge.
+
+### Comportement acté — valeurs orphelines
+Changer le contrat d'une mission **ne supprime pas** les valeurs des attributs qui ne font plus
+partie du contrat : `BuildContractType` ne renvoie que les attributs du contrat courant (les
+orphelines ne s'affichent pas) mais elles restent en base jusqu'à une purge explicite (13.12).
