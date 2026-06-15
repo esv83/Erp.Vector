@@ -27,6 +27,9 @@ public class MobileDbContext : DbContext
     public DbSet<MOB_JOB_CONTRACT> JobContracts => Set<MOB_JOB_CONTRACT>();
     public DbSet<MOB_JOB_ATTRIBUTE_VALUE> JobAttributeValues => Set<MOB_JOB_ATTRIBUTE_VALUE>();
 
+    // Carte mutuelle (P1)
+    public DbSet<MOB_MUTUELLE_CARD> MutuelleCards => Set<MOB_MUTUELLE_CARD>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<MOB_SESSION>(b =>
@@ -107,6 +110,18 @@ public class MobileDbContext : DbContext
             b.ToTable("MOB_JOB_ATTRIBUTE_VALUE");
             b.HasKey(v => new { v.JAV_MISSION_ID, v.JAV_ATTRIBUTE_NAME });
             b.Property(v => v.JAV_UPDATED_AT).HasPrecision(0).HasDefaultValueSql("SYSUTCDATETIME()");
+        });
+
+        // ── Carte mutuelle (P1) ─────────────────────────────────────────────────
+        modelBuilder.Entity<MOB_MUTUELLE_CARD>(b =>
+        {
+            b.ToTable("MOB_MUTUELLE_CARD");
+            b.HasKey(c => c.MMC_ID);
+            b.Property(c => c.MMC_ID).ValueGeneratedNever();   // Guid généré côté application
+            b.Property(c => c.MMC_IMAGE).IsRequired();
+            b.Property(c => c.MMC_CAPTURED_AT).HasPrecision(0).HasDefaultValueSql("SYSUTCDATETIME()");
+            b.Property(c => c.MMC_OCR_VALIDATED_AT).HasPrecision(0);
+            b.HasIndex(c => new { c.MMC_BENEFICIARY_ID, c.MMC_CAPTURED_AT }, "IX_MOB_MUTUELLE_CARD_BENEFICIARY");
         });
     }
 }

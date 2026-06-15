@@ -63,6 +63,8 @@ builder.Services.AddScoped<IJobTimeRepository, JobTimeRepository>();
 builder.Services.AddScoped<ISessionRepository, SessionRepository>();
 // MOB-13 : overlay attributs de mission (catalogue + valeurs en BD Mobile).
 builder.Services.AddScoped<IJobAttributeOverlay, JobAttributeOverlayRepository>();
+// Carte mutuelle (P1) : stockage BD Mobile.
+builder.Services.AddScoped<IMutuelleCardRepository, MutuelleCardRepository>();
 
 // ── Ports ERP-backed (in-process) ───────────────────────────────────────────
 builder.Services.AddScoped<ICrewRepository, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.CrewRepository>();
