@@ -5,6 +5,8 @@ Public Class ClMutuelleCardDtoOut
     Public Property ContentType As String
     Public Property ByteSize As Integer
     Public Property CapturedAt As DateTime
+    ''' <summary>Chemin relatif de l'image (à composer avec la base de l'API mobile).</summary>
+    Public Property ImageUrl As String
 
     ' Champs extraits (P3) — Nothing tant que non renseignés.
     Public Property MutuelleName As String

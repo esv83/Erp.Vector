@@ -15,6 +15,12 @@ Namespace Port
         ''' <summary>Carte par identifiant (pour servir l'image), ou Nothing.</summary>
         Function GetById(cardId As Guid) As ClMutuelleCard
 
+        ''' <summary>
+        ''' Met à jour les champs mutuelle modifiables (nom/AMC/concentrateur/télétransmission +
+        ''' statut/validation) de la carte <c>card.Id</c>. Renvoie la carte à jour, ou Nothing si introuvable.
+        ''' </summary>
+        Function Update(card As ClMutuelleCard) As ClMutuelleCard
+
     End Interface
 
 End Namespace

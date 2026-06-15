@@ -44,6 +44,17 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             return card is null ? NotFound() : Ok(card.ToDtoOut());
         }
 
+        /// <summary>
+        /// Renseigne/corrige manuellement les champs mutuelle d'une carte (avant OCR, P2).
+        /// Saisie humaine → statut <c>validated</c>.
+        /// </summary>
+        [HttpPatch("mutuelle-card/{cardId:guid}")]
+        public IActionResult SetFields(Guid cardId, [FromBody] ClMutuelleFieldsDtoIn fields)
+        {
+            var command = new ClSetMutuelleFieldsCommand(cardId, fields);
+            return new ClUseCaseHandler(new ClSetMutuelleFieldsUseCase(command, _repository)).Execute();
+        }
+
         /// <summary>Octets de l'image d'une carte (Content-Type d'origine).</summary>
         [HttpGet("mutuelle-card/{cardId:guid}/image")]
         public IActionResult GetImage(Guid cardId)

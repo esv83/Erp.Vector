@@ -64,4 +64,40 @@ public class MutuelleCardRepositoryTests
 
         sut.GetCurrent(Ben).Should().BeNull();
     }
+
+    [Fact]
+    public void Update_sets_mutuelle_fields_and_keeps_image()
+    {
+        using var ctx = NewContext();
+        var sut = new MutuelleCardRepository(ctx);
+        var card = Card(new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc), 1, 2);
+        sut.Save(card);
+
+        var patch = new ClMutuelleCard
+        {
+            Id = card.Id,
+            AmcCode = "AMC123",
+            MutuelleName = "Ma Mutuelle",
+            Concentrateur = "ConcentX",
+            Teletransmission = "TLT9",
+            OcrStatus = "validated",
+            OcrValidatedAt = new DateTime(2026, 6, 15, 12, 0, 0, DateTimeKind.Utc),
+        };
+
+        var updated = sut.Update(patch);
+
+        updated.Should().NotBeNull();
+        updated!.AmcCode.Should().Be("AMC123");
+        updated.OcrStatus.Should().Be("validated");
+        sut.GetById(card.Id)!.Image.Should().Equal(1, 2); // image intacte
+    }
+
+    [Fact]
+    public void Update_returns_null_when_card_unknown()
+    {
+        using var ctx = NewContext();
+        var sut = new MutuelleCardRepository(ctx);
+
+        sut.Update(new ClMutuelleCard { Id = Guid.NewGuid(), AmcCode = "X" }).Should().BeNull();
+    }
 }

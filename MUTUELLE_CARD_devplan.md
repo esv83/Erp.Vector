@@ -59,7 +59,19 @@ MMC_OCR_VALIDATED_AT DATETIME2(0)  NULL
 - Infra : `MutuelleCardRepository` (EF, `MobileDbContext`) + entité `MOB_MUTUELLE_CARD`.
 - Validation : type MIME image/*, taille max (ex. 8 Mo), bornes.
 
-## P2 — Restitution à la facturation (Certification)
+## P2 — Restitution à la facturation (Certification) — ✅ côté mobile LIVRÉ (2026-06-15)
+
+> Décision : **2b** (Certification tire en HTTP) + **saisie manuelle** des champs (avant OCR).
+> Livré côté mobile :
+> - `PATCH /api/mutuelle-card/{cardId}` (body `{mutuelleName, amcCode, concentrateur, teletransmission}`)
+>   → renseigne les champs, statut `validated` (saisie humaine). Use case `ClSetMutuelleFields`.
+> - Contrat de lecture pour la facturation : `GET /api/beneficiaries/{id}/mutuelle-card` renvoie
+>   métadonnées + **champs mutuelle** + **`imageUrl`** (`api/mutuelle-card/{id}/image`).
+> - `IMutuelleCardRepository.Update` + 2 tests xUnit (total **16 verts**).
+>
+> **Reste (côté Certification)** : implémenter le client HTTP qui appelle ce contrat à l'export
+> (touche le module Certification — tâche séparée). Le pivot reste le **code AMC**.
+
 **Point à trancher** : où atterrissent les champs structurés pour que l'export Certification les voie ?
 - **2a.** Ajouter les champs mutuelle au **bénéficiaire ERP** (Orders) → l'export les résout via AMC.
   Le plus « propre » mais touche le module Orders/Beneficiary.

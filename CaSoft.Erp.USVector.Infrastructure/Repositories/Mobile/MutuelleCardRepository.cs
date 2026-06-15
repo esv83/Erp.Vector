@@ -29,4 +29,21 @@ public class MutuelleCardRepository : IMutuelleCardRepository
 
     public ClMutuelleCard? GetById(Guid cardId)
         => _ctx.MutuelleCards.SingleOrDefault(c => c.MMC_ID == cardId)?.ToDomain();
+
+    public ClMutuelleCard? Update(ClMutuelleCard card)
+    {
+        var entity = _ctx.MutuelleCards.SingleOrDefault(c => c.MMC_ID == card.Id);
+        if (entity is null) return null;
+
+        // Seuls les champs mutuelle sont modifiables (image/traçabilité figées).
+        entity.MMC_MUTUELLE_NAME = card.MutuelleName;
+        entity.MMC_AMC_CODE = card.AmcCode;
+        entity.MMC_CONCENTRATEUR = card.Concentrateur;
+        entity.MMC_TELETRANSMISSION = card.Teletransmission;
+        entity.MMC_OCR_STATUS = card.OcrStatus;
+        entity.MMC_OCR_VALIDATED_AT = card.OcrValidatedAt;
+
+        _ctx.SaveChanges();
+        return entity.ToDomain();
+    }
 }

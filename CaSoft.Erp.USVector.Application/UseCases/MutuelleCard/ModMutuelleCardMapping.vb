@@ -11,6 +11,7 @@ Public Module ModMutuelleCardMapping
             .ContentType = card.ContentType,
             .ByteSize = card.ByteSize,
             .CapturedAt = card.CapturedAt,
+            .ImageUrl = $"api/mutuelle-card/{card.Id}/image",
             .MutuelleName = card.MutuelleName,
             .AmcCode = card.AmcCode,
             .Concentrateur = card.Concentrateur,
