@@ -76,3 +76,10 @@ public sealed class ErpCrewListItemDto
 {
     public Guid Id { get; set; }
 }
+
+/// <summary>GET /missions/{id} — on ne lit que le statut de transfert (gel terrain, TRF-7).</summary>
+public sealed class ErpMissionStatusDto
+{
+    public Guid Id { get; set; }
+    public int TransferStatus { get; set; }
+}

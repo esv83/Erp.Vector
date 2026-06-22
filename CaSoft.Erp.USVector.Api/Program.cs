@@ -38,6 +38,11 @@ builder.Services.AddHttpClient<IErpReadApiClient, HttpErpReadApiClient>(c =>
     c.BaseAddress = new Uri(builder.Configuration["OrdersApi:BaseUrl"]
         ?? throw new InvalidOperationException("OrdersApi:BaseUrl manquant.")));
 
+// TRF-5 : chemin d'écriture Vector→Orders (projection de l'avancement opérationnel terrain).
+builder.Services.AddHttpClient<IErpWriteApiClient, HttpErpWriteApiClient>(c =>
+    c.BaseAddress = new Uri(builder.Configuration["OrdersApi:BaseUrl"]
+        ?? throw new InvalidOperationException("OrdersApi:BaseUrl manquant.")));
+
 // Contrat mobile inchangé : PascalCase comme l'ancienne WebApi (pas de camelCase).
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -65,6 +70,12 @@ builder.Services.AddScoped<ISessionRepository, SessionRepository>();
 builder.Services.AddScoped<IJobAttributeOverlay, JobAttributeOverlayRepository>();
 // Carte mutuelle (P1) : stockage BD Mobile.
 builder.Services.AddScoped<IMutuelleCardRepository, MutuelleCardRepository>();
+// Anomalies terrain (TRF-8) : stockage BD Mobile.
+builder.Services.AddScoped<IAnomalyRepository, AnomalyRepository>();
+// Documents/photos terrain (TRF-10) : stockage BD Mobile.
+builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
+// Paquet d'enrichissement consolidé (TRF-6) : tiré par Certification au transfert.
+builder.Services.AddScoped<IFieldDataReader, CaSoft.Erp.USVector.Infrastructure.Repositories.FieldDataReader>();
 
 // ── Ports ERP-backed (in-process) ───────────────────────────────────────────
 builder.Services.AddScoped<ICrewRepository, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.CrewRepository>();

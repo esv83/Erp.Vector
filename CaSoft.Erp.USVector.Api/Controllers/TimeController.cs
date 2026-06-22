@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using CaSoft.Framework;
+using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 
@@ -33,6 +34,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
 
         // PATCH api/<ValuesController1>/5
         [HttpPatch("{gJobId}")]
+        [FreezeOnTransfer]
         public IActionResult PatchJobTime(Guid gJobId, [FromBody] ClJobTimeModel JobTime)
         {
 

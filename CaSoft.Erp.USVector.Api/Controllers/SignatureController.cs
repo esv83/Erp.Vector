@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Contracts;
 
@@ -27,6 +28,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         }
 
         [HttpPut("{gJobId}")]
+        [FreezeOnTransfer]
         public ActionResult PutSignature( Guid gJobId ,ClSignatureGetModel signatureModel, [FromServices] ISignatureRepository repository)
         {
             //Update les infos de la mission
@@ -45,6 +47,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
                        }
 
         [HttpPatch("{gJobId}")]
+        [FreezeOnTransfer]
         public ActionResult PatchSignature(Guid gJobId,ClSignatureGetModel signatureModel, [FromServices] ISignatureRepository repository)
         {
             //Update les infos de la mission
@@ -63,6 +66,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         }
 
         [HttpDelete("{gJobId}")]
+        [FreezeOnTransfer]
         public ActionResult DeleteSignature(Guid gJobId, [FromServices] ISignatureRepository Repository)
         {
             try {

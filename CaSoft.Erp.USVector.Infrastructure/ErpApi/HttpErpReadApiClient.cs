@@ -58,6 +58,12 @@ public sealed class HttpErpReadApiClient : IErpReadApiClient
         return await response.Content.ReadFromJsonAsync<Guid?>(JsonOptions, ct);
     }
 
+    public async Task<int?> GetMissionTransferStatusAsync(Guid missionId, CancellationToken ct = default)
+    {
+        var dto = await GetOrNullAsync<ErpMissionStatusDto>($"missions/{missionId}", ct);
+        return dto?.TransferStatus;
+    }
+
     private async Task<T?> GetOrNullAsync<T>(string url, CancellationToken ct) where T : class
     {
         var response = await _http.GetAsync(url, ct);

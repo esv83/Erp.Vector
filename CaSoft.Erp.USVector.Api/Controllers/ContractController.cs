@@ -1,3 +1,4 @@
+using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 using Microsoft.AspNetCore.Mvc;
@@ -23,6 +24,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
 
         /// <summary>Enregistre le contrat choisi pour la mission.</summary>
         [HttpPost("{gJobId}")]
+        [FreezeOnTransfer]
         public IActionResult SelectContract(Guid gJobId, [FromBody] int contractId)
             => new ClUseCaseHandler(new ClSelectContractUseCase(new ClSelectContractCommand(gJobId, contractId), _overlay)).Execute();
     }

@@ -30,6 +30,12 @@ public class MobileDbContext : DbContext
     // Carte mutuelle (P1)
     public DbSet<MOB_MUTUELLE_CARD> MutuelleCards => Set<MOB_MUTUELLE_CARD>();
 
+    // Anomalies terrain (TRF-8)
+    public DbSet<MOB_ANOMALY> Anomalies => Set<MOB_ANOMALY>();
+
+    // Documents/photos terrain (TRF-10)
+    public DbSet<MOB_DOCUMENT> Documents => Set<MOB_DOCUMENT>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<MOB_SESSION>(b =>
@@ -122,6 +128,27 @@ public class MobileDbContext : DbContext
             b.Property(c => c.MMC_CAPTURED_AT).HasPrecision(0).HasDefaultValueSql("SYSUTCDATETIME()");
             b.Property(c => c.MMC_OCR_VALIDATED_AT).HasPrecision(0);
             b.HasIndex(c => new { c.MMC_BENEFICIARY_ID, c.MMC_CAPTURED_AT }, "IX_MOB_MUTUELLE_CARD_BENEFICIARY");
+        });
+
+        // ── Anomalies terrain (TRF-8) ───────────────────────────────────────────
+        modelBuilder.Entity<MOB_ANOMALY>(b =>
+        {
+            b.ToTable("MOB_ANOMALY");
+            b.HasKey(a => a.ANO_ID);
+            b.Property(a => a.ANO_ID).ValueGeneratedNever();   // Guid généré côté application
+            b.Property(a => a.ANO_REPORTED_AT).HasPrecision(0).HasDefaultValueSql("SYSUTCDATETIME()");
+            b.HasIndex(a => new { a.ANO_MISSION_ID, a.ANO_REPORTED_AT }, "IX_MOB_ANOMALY_MISSION");
+        });
+
+        // ── Documents/photos terrain (TRF-10) ───────────────────────────────────
+        modelBuilder.Entity<MOB_DOCUMENT>(b =>
+        {
+            b.ToTable("MOB_DOCUMENT");
+            b.HasKey(d => d.DOC_ID);
+            b.Property(d => d.DOC_ID).ValueGeneratedNever();   // Guid généré côté application
+            b.Property(d => d.DOC_CONTENT).IsRequired();
+            b.Property(d => d.DOC_CAPTURED_AT).HasPrecision(0).HasDefaultValueSql("SYSUTCDATETIME()");
+            b.HasIndex(d => new { d.DOC_MISSION_ID, d.DOC_CAPTURED_AT }, "IX_MOB_DOCUMENT_MISSION");
         });
     }
 }

@@ -21,4 +21,10 @@ public interface IErpReadApiClient
 
     /// <summary>Résolution identité Keycloak (sub) → PER_ID. Null si non mappé ou endpoint absent.</summary>
     Task<Guid?> ResolvePersonnelIdByKeycloakAsync(Guid keycloakSub, CancellationToken ct = default);
+
+    /// <summary>
+    /// Statut de transfert en facturation d'une mission (gel terrain, TRF-7). Null si mission introuvable.
+    /// Valeurs : 0=NonTransférable, 1=Transférable, 2=Transféré, 3=Facturé.
+    /// </summary>
+    Task<int?> GetMissionTransferStatusAsync(Guid missionId, CancellationToken ct = default);
 }

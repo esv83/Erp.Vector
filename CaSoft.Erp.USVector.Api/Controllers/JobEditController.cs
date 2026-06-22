@@ -1,4 +1,5 @@
-﻿using CaSoft.Erp.USVector.Application;
+﻿using CaSoft.Erp.USVector.Api.Infrastructure;
+using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 using Microsoft.AspNetCore.Mvc;
 
@@ -33,6 +34,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         //}
 
         [HttpPatch("{gJobId}")]
+        [FreezeOnTransfer]
         public IActionResult PatchEditableJob(Guid gJobId ,List<ClAttributValueModel> Values)
 
         {
