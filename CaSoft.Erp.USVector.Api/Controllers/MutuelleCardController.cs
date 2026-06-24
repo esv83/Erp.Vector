@@ -16,14 +16,26 @@ namespace CaSoft.Erp.USVector.Api.Controllers
 
         public MutuelleCardController(IMutuelleCardRepository repository) => _repository = repository;
 
+        /// <summary>
+        /// Corps multipart du dépôt de carte mutuelle. L'<see cref="IFormFile"/> est porté par un
+        /// modèle <c>[FromForm]</c> (SwaggerGen ne sait pas générer un <c>IFormFile</c> en paramètre
+        /// <c>[FromForm]</c> à plat). Binding insensible à la casse → champ <c>file</c> compatible.
+        /// </summary>
+        public sealed class UploadMutuelleCardForm
+        {
+            public IFormFile? File { get; set; }
+        }
+
         /// <summary>Dépose une photo de carte mutuelle (champ de formulaire <c>file</c>).</summary>
         [HttpPost("beneficiaries/{beneficiaryId:guid}/mutuelle-card")]
+        [Consumes("multipart/form-data")]
         public async Task<IActionResult> Upload(
             Guid beneficiaryId,
-            [FromForm] IFormFile file,
+            [FromForm] UploadMutuelleCardForm form,
             [FromQuery] Guid? crewId,
             [FromQuery] Guid? missionId)
         {
+            var file = form.File;
             if (file is null || file.Length == 0)
                 return BadRequest("Fichier image manquant.");
 

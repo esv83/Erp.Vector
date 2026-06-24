@@ -18,15 +18,28 @@ namespace CaSoft.Erp.USVector.Api.Controllers
 
         public DocumentController(IDocumentRepository repository) => _repository = repository;
 
+        /// <summary>
+        /// Corps multipart du dépôt de document. Regroupe les champs de formulaire dans un seul
+        /// modèle : requis par SwaggerGen (un <see cref="IFormFile"/> ne peut pas être un paramètre
+        /// <c>[FromForm]</c> à plat aux côtés d'autres champs). Binding insensible à la casse →
+        /// les champs <c>file</c> / <c>category</c> restent compatibles avec le client.
+        /// </summary>
+        public sealed class UploadDocumentForm
+        {
+            public IFormFile? File { get; set; }
+            public int Category { get; set; }
+        }
+
         /// <summary>Dépose un document (champ de formulaire <c>file</c> + <c>category</c>). 409 si mission transférée.</summary>
         [HttpPost("missions/{gJobId:guid}/documents")]
         [FreezeOnTransfer("gJobId")]
+        [Consumes("multipart/form-data")]
         public async Task<IActionResult> Upload(
             Guid gJobId,
-            [FromForm] IFormFile file,
-            [FromForm] int category,
+            [FromForm] UploadDocumentForm form,
             [FromQuery] Guid? crewId)
         {
+            var file = form.File;
             if (file is null || file.Length == 0)
                 return BadRequest("Fichier manquant.");
 
@@ -34,7 +47,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             await file.CopyToAsync(ms);
 
             var command = new ClUploadDocumentCommand(
-                gJobId, ms.ToArray(), file.ContentType, file.FileName, category, crewId);
+                gJobId, ms.ToArray(), file.ContentType, file.FileName, form.Category, crewId);
 
             return new ClUseCaseHandler(new ClUploadDocumentUseCase(command, _repository)).Execute();
         }

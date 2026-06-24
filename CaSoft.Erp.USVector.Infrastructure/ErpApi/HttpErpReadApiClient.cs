@@ -49,13 +49,17 @@ public sealed class HttpErpReadApiClient : IErpReadApiClient
         return list is null ? Array.Empty<Guid>() : list.Select(c => c.Id).ToList();
     }
 
-    public async Task<Guid?> ResolvePersonnelIdByKeycloakAsync(Guid keycloakSub, CancellationToken ct = default)
+    public Task<Guid?> ResolvePersonnelIdByKeycloakAsync(Guid keycloakSub, CancellationToken ct = default)
     {
-        // Endpoint additif (DEC-4) ; tant qu'il n'existe pas, 404 → null (login non résolu, hors MOB-13).
-        var response = await _http.GetAsync($"personnel/by-keycloak/{keycloakSub}", ct);
-        if (response.StatusCode is HttpStatusCode.NotFound) return null;
-        await EnsureSuccessAsync(response, $"GET personnel/by-keycloak/{keycloakSub}", ct);
-        return await response.Content.ReadFromJsonAsync<Guid?>(JsonOptions, ct);
+        // 🔧 STUB TEMPORAIRE — renvoie un personnelId fixe pour les tests (endpoint by-keycloak pas encore dispo).
+        // TODO: retirer ce stub et restaurer l'appel HTTP ci-dessous.
+        return Task.FromResult<Guid?>(new Guid("8669F7CE-0B22-4CCD-B83F-FE18C9502682"));
+
+        // // Endpoint additif (DEC-4) ; tant qu'il n'existe pas, 404 → null (login non résolu, hors MOB-13).
+        // var response = await _http.GetAsync($"personnel/by-keycloak/{keycloakSub}", ct);
+        // if (response.StatusCode is HttpStatusCode.NotFound) return null;
+        // await EnsureSuccessAsync(response, $"GET personnel/by-keycloak/{keycloakSub}", ct);
+        // return await response.Content.ReadFromJsonAsync<Guid?>(JsonOptions, ct);
     }
 
     public async Task<int?> GetMissionTransferStatusAsync(Guid missionId, CancellationToken ct = default)

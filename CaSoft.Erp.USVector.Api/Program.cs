@@ -5,8 +5,11 @@ using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Repositories;
 using CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 using CaSoft.Erp.USVector.Infrastructure.ErpApi;
+using CaSoft.Erp.USVector.Api.Infrastructure;
 using EmergencyPlatformConnector;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using NLog.Web;
@@ -21,9 +24,64 @@ if (keycloakEnabled)
         .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
-            options.Authority = builder.Configuration["Keycloak:Authority"];
-            options.Audience = builder.Configuration["Keycloak:Audience"];
+            options.Authority = "https://auth.ade-dev.fr/realms/delesse"; //builder.Configuration["Keycloak:Authority"];
+            options.Audience = "us-ambulance";//builder.Configuration["Keycloak:Audience"];
             options.RequireHttpsMetadata = builder.Configuration.GetValue("Keycloak:RequireHttpsMetadata", true);
+
+            // ⚠️ DEV/TEST UNIQUEMENT (Keycloak:DisableValidation=true) : décode le token et lit les
+            // claims (sub…) SANS vérifier signature / issuer / audience / expiration, et SANS contacter
+            // Keycloak. Permet de tester la lecture du sub quand l'Authority n'est pas joignable.
+            // NE JAMAIS activer en production — désactivé par défaut.
+            if (builder.Configuration.GetValue("Keycloak:DisableValidation", false))
+            {
+                options.Authority = null; // évite le fetch OIDC metadata (placeholder)
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = false,
+                    ValidateAudience = false,
+                    ValidateLifetime = false,
+                    ValidateIssuerSigningKey = false,
+                    SignatureValidator = (token, _) => new JsonWebToken(token)
+                };
+            }
+
+            // ── Interception JWT observable/testable (MOB-4a) ────────────────────
+            // On trace chaque étape du pipeline et on dépose la raison d'un rejet
+            // dans HttpContext.Items pour que les controllers renvoient une erreur explicite.
+            options.Events = new JwtBearerEvents
+            {
+                OnMessageReceived = ctx =>
+                {
+                    var log = ctx.HttpContext.RequestServices
+                        .GetRequiredService<ILoggerFactory>().CreateLogger("Keycloak.Jwt");
+                    log.LogDebug("JWT — requête {Method} {Path} : header Authorization {Present}.",
+                        ctx.HttpContext.Request.Method, ctx.HttpContext.Request.Path,
+                        ctx.HttpContext.HasAuthorizationHeader() ? "présent" : "ABSENT");
+                    return Task.CompletedTask;
+                },
+                OnTokenValidated = ctx =>
+                {
+                    var log = ctx.HttpContext.RequestServices
+                        .GetRequiredService<ILoggerFactory>().CreateLogger("Keycloak.Jwt");
+                    log.LogInformation("JWT validé : sub={Sub} iss={Iss} aud={Aud} exp={Exp}.",
+                        ctx.Principal?.FindFirst("sub")?.Value,
+                        ctx.Principal?.FindFirst("iss")?.Value,
+                        ctx.Principal?.FindFirst("aud")?.Value,
+                        ctx.Principal?.FindFirst("exp")?.Value);
+                    return Task.CompletedTask;
+                },
+                OnAuthenticationFailed = ctx =>
+                {
+                    var reason = $"{ctx.Exception.GetType().Name}: {ctx.Exception.Message}";
+                    // Déposé pour lecture par les controllers (cf. MobileCallerExtensions.GetJwtError).
+                    ctx.HttpContext.Items[MobileCallerExtensions.JwtErrorKey] = reason;
+                    var log = ctx.HttpContext.RequestServices
+                        .GetRequiredService<ILoggerFactory>().CreateLogger("Keycloak.Jwt");
+                    log.LogWarning(ctx.Exception, "JWT REJETÉ sur {Path} : {Reason}.",
+                        ctx.HttpContext.Request.Path, reason);
+                    return Task.CompletedTask;
+                }
+            };
         });
     builder.Services.AddAuthorization();
 }
@@ -59,6 +117,27 @@ builder.Services.AddSwaggerGen(c =>
         Title = "USVector — API terrain",
         Version = "v2.0",
         Description = "USVector : API terrain ambulanciers reconnectée à l'ERP (contrat legacy préservé)"
+    });
+
+    // Bouton « Authorize » : coller un JWT → envoyé en « Authorization: Bearer <token> » sur les requêtes.
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Collez le JWT (sans le préfixe « Bearer »)."
+    });
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+            },
+            Array.Empty<string>()
+        }
     });
 });
 
