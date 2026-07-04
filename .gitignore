@@ -23,3 +23,6 @@ web.config
 ## OS
 Thumbs.db
 .DS_Store
+
+# Logs générés par un run local de l API
+CaSoft.Erp.USVector.Api/logs/
