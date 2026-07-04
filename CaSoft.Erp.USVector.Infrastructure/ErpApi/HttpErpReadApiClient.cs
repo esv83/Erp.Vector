@@ -65,7 +65,8 @@ public sealed class HttpErpReadApiClient : IErpReadApiClient
 
     public async Task<Guid?> ResolvePersonnelIdByKeycloakAsync(Guid keycloakSub, CancellationToken ct = default)
     {
-        // sub Keycloak → PER_ID via PER_KEYCLOAK_MAP (Orders.Api). 404 → null (compte non rattaché).
+        // sub Keycloak → PER_ID via l'endpoint additif d'Orders.Api (PER_KEYCLOAK_MAP).
+        // 404 = compte Keycloak non rattaché à un personnel → null (le controller renvoie alors 403).
         var response = await _http.GetAsync($"personnel/by-keycloak/{keycloakSub}", ct);
         if (response.StatusCode is HttpStatusCode.NotFound) return null;
         await EnsureSuccessAsync(response, $"GET personnel/by-keycloak/{keycloakSub}", ct);
