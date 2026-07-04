@@ -45,7 +45,11 @@ public sealed class HttpErpReadApiClient : IErpReadApiClient
         Guid personnelId, DateOnly onDate, int take, CancellationToken ct = default)
     {
         var url = $"crews?personnelId={personnelId}&date={onDate:yyyy-MM-dd}&take={take}";
-        var list = await _http.GetFromJsonAsync<List<ErpCrewListItemDto>>(url, JsonOptions, ct);
+        // 404 = aucun équipage (cf. JobListController : crews vide ⇒ joblist vide, pas une erreur).
+        var response = await _http.GetAsync(url, ct);
+        if (response.StatusCode is HttpStatusCode.NotFound) return Array.Empty<Guid>();
+        await EnsureSuccessAsync(response, $"GET {url}", ct);
+        var list = await response.Content.ReadFromJsonAsync<List<ErpCrewListItemDto>>(JsonOptions, ct);
         return list is null ? Array.Empty<Guid>() : list.Select(c => c.Id).ToList();
     }
 

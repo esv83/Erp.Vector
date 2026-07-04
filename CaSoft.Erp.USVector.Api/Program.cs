@@ -90,16 +90,24 @@ if (keycloakEnabled)
 builder.Services.AddDbContext<MobileDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MobileDb")));
 
+// BaseAddress DOIT finir par '/' : sinon la résolution d'URI relative supprime le dernier
+// segment de la base (ex. ".../order" + "personnel/x" => ".../personnel/x" — le "/order" est
+// perdu), l'appel part au mauvais endroit et Orders.Api renvoie un non-2xx → 500.
+static Uri OrdersBaseUri(IConfiguration cfg)
+{
+    var raw = cfg["OrdersApi:BaseUrl"]
+        ?? throw new InvalidOperationException("OrdersApi:BaseUrl manquant.");
+    return new Uri(raw.EndsWith('/') ? raw : raw + "/");
+}
+
 // Découplage Vector↔Orders (4a) : données de référence ERP lues via Orders.Api en HTTP
 // (missions, commandes, bénéficiaires, équipages), comme Address.Api. Plus aucune réf projet Orders.
 builder.Services.AddHttpClient<IErpReadApiClient, HttpErpReadApiClient>(c =>
-    c.BaseAddress = new Uri(builder.Configuration["OrdersApi:BaseUrl"]
-        ?? throw new InvalidOperationException("OrdersApi:BaseUrl manquant.")));
+    c.BaseAddress = OrdersBaseUri(builder.Configuration));
 
 // TRF-5 : chemin d'écriture Vector→Orders (projection de l'avancement opérationnel terrain).
 builder.Services.AddHttpClient<IErpWriteApiClient, HttpErpWriteApiClient>(c =>
-    c.BaseAddress = new Uri(builder.Configuration["OrdersApi:BaseUrl"]
-        ?? throw new InvalidOperationException("OrdersApi:BaseUrl manquant.")));
+    c.BaseAddress = OrdersBaseUri(builder.Configuration));
 
 // Contrat mobile inchangé : PascalCase comme l'ancienne WebApi (pas de camelCase).
 builder.Services.AddControllers()
