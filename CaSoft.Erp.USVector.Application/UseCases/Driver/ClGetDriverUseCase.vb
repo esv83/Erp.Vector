@@ -22,10 +22,14 @@ Public Class ClGetDriverUseCase
                 With LogDriverModel
                     .DriversCollection = New ClDriverListModel(crew.EmployeeList)
                     .VehicleModel = New ClVehicleModel(crew.Vehicle)
-                    ' Conducteur non encore désigné : SelectedDriver/ChangeDate restent Nothing.
                     If lastDriver IsNot Nothing Then
                         .ChangeDate = lastDriver.From
                         .SelectedDriver = New ClDriverModel(lastDriver.Employee)
+                    Else
+                        ' Aucun conducteur désigné : le contrat garantit un SelectedDriver non-null
+                        ' (le client legacy lit SelectedDriver.DriverName sans garde). Conducteur « vide »
+                        ' → Guid vide, non présent dans DriversCollection = rien de pré-sélectionné.
+                        .SelectedDriver = New ClDriverModel(Guid.Empty, String.Empty)
                     End If
                 End With
 
