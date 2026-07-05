@@ -88,3 +88,71 @@ Le code est alors **uniformément conforme à CLAUDE.md** (`Handle` → `ClResul
 ## Effort (ordre de grandeur)
 Phase 0 : ~0,5–1 j. Pilote : ~0,5 j. Puis ~31 use cases en petites unités isolées (≈30 min + test chacune,
 groupées par lot). Nettoyage : ~0,5 j. **Aucun big-bang, interruptible à tout lot.**
+
+---
+
+# Vague 1 — FAIT (2026-07-05)
+
+Tous les use cases migrés en `Handle() : ClResult(Of T)`, validés lot par lot (build Release + 31 tests + smoke, parité HTTP stricte) :
+Phase 0 (fondations) · Pilote (MissionSeen) · A (Time ×3) · B (Driver/Crew ×3) · C (JobList ×2) ·
+D (Job/Signature/Km ×8) · E (Terrain ×8) · F (MechanicLog ×6).
+
+> ⚠️ **Straggler restant : `ClSetDriverUseCase`** (encore `Inherits ClUseCaseBase`, appelé par
+> `ClCrewService.ChangeDriver` en `.execute(handler)`) — raté par l'inventaire initial (fichier
+> `ClSetDriverUSeCase.vb`, casse anormale). Réel : **31/32**. → 1ᵉ item de la vague 2.
+
+---
+
+# Vague 2 — Retrait du legacy (à faire)
+
+But : contrôleurs et services consomment `ClResult` **en direct** ; suppression de tout l'échafaudage
+presenter. **Non cassant, étape par étape**, chaque type legacy supprimé UNIQUEMENT quand un grep
+confirme 0 référence.
+
+## État de l'échafaudage encore porteur
+| Élément | Encore utilisé par | Retirable quand |
+|---|---|---|
+| `ClResultUseCaseAdapter(Of T)` | services qui alimentent un `IResponseHandler` | tous les consommateurs passent au Result direct |
+| `IResponseHandler`, `ClUseCaseResponseBase`, `IUseCaseResponse` | l'adaptateur + presenters + signatures de services | adaptateur + presenters supprimés |
+| `ClWebApiPresenter` | contrôleurs passant par un service (Time, Driver, JobList/PatchSeen, FormStructure) | ces contrôleurs en `.ToActionResult()` |
+| `ClDefaultPresenter`, `ClPresenterBase` | services lisant `presenter.Response` (GetCrewList, GetJobValue, cache GetCrew, obsolètes) | ces services renvoient `ClResult` |
+| `ClUseCaseHandler` | **plus rien** (refs commentées seulement) | **retirable immédiatement** |
+| `ClUseCaseBase`, `IUseCase` | **`ClSetDriverUseCase` uniquement** | straggler migré |
+| handlers custom `ClResponseHandler(Of T)`/`ClNoResponseHandler` (ClMechanicService) | ClMechanicService | ClMechanicService en Result |
+
+## Décision à trancher au démarrage
+**Garde-t-on une couche service ?**
+- **(Reco) Inliner les pass-through** : les méthodes de service qui ne font que « créer le use case → exécuter →
+  renvoyer » disparaissent ; le contrôleur appelle `new ClXxx(...).Handle().ToActionResult()` (c'est déjà
+  le style des contrôleurs migrés en vagues récentes : JobDetail, Contract, Kilometers…).
+- **Garder les services à logique réelle**, mais renvoyant **`ClResult(Of T)`** : `ClCrewService.GetCrewList`
+  (assemble les crews), le cache `ClCrewListCache.GetCrew`, `ClJobService.GetJobValue`.
+
+## Étapes (ordre sûr)
+0. **Straggler** : migrer `ClSetDriverUseCase` → `IResultUseCase(Of Boolean)` ; `ChangeDriver` via
+   adaptateur. → plus aucun `.execute(` actif ni `Inherits ClUseCaseBase`. (**32/32**)
+1. **Mort immédiat** : supprimer `ClUseCaseHandler` (0 référence active) + les blocs commentés qui y
+   réfèrent (AnalyzeLogController). Build.
+2. **Contrôleurs → Result direct** : TimeController (Set/Get/Clear), JobListController.PatchSeen,
+   DriverController (GetDriver/ChangeDriver), FormStructureController — appeler le use case en direct
+   `.Handle().ToActionResult()` (ou le service s'il renvoie ClResult). Retire l'usage de `ClWebApiPresenter`.
+3. **Services** :
+   - Supprimer les méthodes pass-through devenues inutiles de `IJobService`/`ICrewService`.
+   - Convertir les méthodes à logique en `Function … As ClResult(Of T)` (GetCrewList, cache GetCrew,
+     GetJobValue) ; supprimer `ClDefaultPresenter` de leur corps.
+   - Supprimer les méthodes `<Obsolete>` mortes (GetEndOfService/SetEndOfService/GetKilometers/
+     SetKilometers/UpdateAttributValues si sans appelant) — vérifier au grep insensible à la casse.
+   - Retirer les handlers custom de ClMechanicService.
+4. **Retrait de l'échafaudage** (grep = 0 référence pour chacun, dans l'ordre) :
+   `ClResultUseCaseAdapter` → `IResponseHandler` → `ClUseCaseResponseBase`/`IUseCaseResponse` →
+   `ClWebApiPresenter`/`ClDefaultPresenter`/`ClPresenterBase` → `ClUseCaseBase`/`IUseCase`.
+5. **Vérif finale** : build Api **Release** (le `dotnet test` ne compile pas l'Api) + 31 tests + smoke
+   des endpoints touchés (Time, Driver, JobList, FormStructure).
+
+## Points de vigilance
+- **Option Strict Off** : des conversions implicites actuelles (`Return presenter.Response.Data` en
+  `Boolean`, etc.) deviennent **explicites et typées** en passant à `ClResult(Of T)` — bénéfice, mais
+  vérifier chaque retour.
+- **Grep insensible à la casse** (`[Nn]ew Cl…`) pour ne rater aucun contrôleur C#.
+- **Toujours re-builder l'Api en Release soi-même** après tout fork (les tests ne compilent pas l'Api).
+- Effort : ~5 contrôleurs + 3 services + suppression de ~8 types. Chantier moyen, interruptible à chaque étape.
