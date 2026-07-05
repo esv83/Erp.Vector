@@ -36,6 +36,9 @@ public class MobileDbContext : DbContext
     // Documents/photos terrain (TRF-10)
     public DbSet<MOB_DOCUMENT> Documents => Set<MOB_DOCUMENT>();
 
+    // Outbox de projection opérationnelle (synchro régulation garantie + debounce)
+    public DbSet<MOB_OPERATIONAL_OUTBOX> OperationalOutbox => Set<MOB_OPERATIONAL_OUTBOX>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<MOB_SESSION>(b =>
@@ -128,6 +131,17 @@ public class MobileDbContext : DbContext
             b.Property(c => c.MMC_CAPTURED_AT).HasPrecision(0).HasDefaultValueSql("SYSUTCDATETIME()");
             b.Property(c => c.MMC_OCR_VALIDATED_AT).HasPrecision(0);
             b.HasIndex(c => new { c.MMC_BENEFICIARY_ID, c.MMC_CAPTURED_AT }, "IX_MOB_MUTUELLE_CARD_BENEFICIARY");
+        });
+
+        // ── Outbox projection opérationnelle (synchro régulation garantie) ───────
+        modelBuilder.Entity<MOB_OPERATIONAL_OUTBOX>(b =>
+        {
+            b.ToTable("MOB_OPERATIONAL_OUTBOX");
+            b.HasKey(o => o.OOB_MISSION_ID);
+            b.Property(o => o.OOB_MISSION_ID).ValueGeneratedNever();
+            b.Property(o => o.OOB_DISPATCH_AFTER).HasPrecision(0);
+            b.Property(o => o.OOB_UPDATED_AT).HasPrecision(0);
+            b.HasIndex(o => o.OOB_DISPATCH_AFTER, "IX_MOB_OPERATIONAL_OUTBOX_DISPATCH");
         });
 
         // ── Anomalies terrain (TRF-8) ───────────────────────────────────────────

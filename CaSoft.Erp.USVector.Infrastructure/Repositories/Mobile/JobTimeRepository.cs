@@ -1,31 +1,26 @@
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
-using CaSoft.Erp.USVector.Infrastructure.ErpApi;
 using CaSoft.Erp.USVector.Infrastructure.Mapping;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Persistence.Entities;
-using Microsoft.Extensions.Logging;
 
 namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 
 /// <summary>
-/// Timeline opérationnelle d'une mission (MOB_MISSION_STATE, 1:1 ORD_MISSION).
-/// Sémantique reprise du ClJobTimeRepository legacy (T_JOB_TIME) : upsert par mission.
-/// TRF-5 : après l'écriture locale (source détaillée), projette l'avancement vers Orders
-/// (best-effort) pour que la régulation le voie en temps réel.
+/// Timeline opérationnelle d'une mission (MOB_MISSION_STATE, 1:1 ORD_MISSION) : upsert par mission.
+/// La projection vers Orders (régulation) n'est plus synchrone/best-effort : chaque changement
+/// inscrit une entrée d'<b>Outbox</b> dans la même transaction (aucune perte), et le
+/// <see cref="OperationalOutboxDispatcher"/> projette l'état consolidé après un délai de debounce,
+/// avec relance jusqu'à succès → <b>synchro régulation garantie</b>.
 /// </summary>
 public class JobTimeRepository : IJobTimeRepository
 {
-    private readonly MobileDbContext _ctx;
-    private readonly IErpWriteApiClient _erpWrite;
-    private readonly ILogger<JobTimeRepository> _logger;
+    // Debounce : on projette l'état consolidé après N s de calme (coalesce les manipulations rapprochées).
+    private const int DebounceSeconds = 5;
 
-    public JobTimeRepository(MobileDbContext ctx, IErpWriteApiClient erpWrite, ILogger<JobTimeRepository> logger)
-    {
-        _ctx = ctx;
-        _erpWrite = erpWrite;
-        _logger = logger;
-    }
+    private readonly MobileDbContext _ctx;
+
+    public JobTimeRepository(MobileDbContext ctx) => _ctx = ctx;
 
     public void Save(Guid gJobId, ClJobTimeData timeData)
     {
@@ -42,30 +37,37 @@ public class JobTimeRepository : IJobTimeRepository
             entity.ApplyJobTimeData(timeData);
         }
 
-        _ctx.SaveChanges();
+        // Marque la mission à projeter — MÊME transaction que le changement de jalon (zéro perte).
+        // Debounce : la projection est repoussée de DebounceSeconds à chaque nouveau changement ;
+        // le worker projette l'état consolidé après la rafale.
+        EnqueueProjection(gJobId);
 
-        ProjectToErp(gJobId, timeData);
+        _ctx.SaveChanges();
     }
 
-    /// <summary>
-    /// TRF-5 — projection best-effort de l'avancement vers Orders. Un échec (ERP indisponible,
-    /// transition refusée) est journalisé sans casser l'écriture locale ; la vérité reste en BD
-    /// Mobile et sera reprise au prochain geste / au tirage field-data par la facturation.
-    /// Pont sync→async assumé (port legacy synchrone, cf. devplan).
-    /// </summary>
-    private void ProjectToErp(Guid gJobId, ClJobTimeData timeData)
+    private void EnqueueProjection(Guid gJobId)
     {
-        try
+        var now = DateTime.UtcNow;
+        var dispatchAfter = now.AddSeconds(DebounceSeconds);
+        var ob = _ctx.OperationalOutbox.SingleOrDefault(o => o.OOB_MISSION_ID == gJobId);
+
+        if (ob is null)
         {
-            _erpWrite.ProjectOperationalAsync(
-                gJobId,
-                timeData.AckTime, timeData.ReadTime, timeData.GoTime,
-                timeData.OnSiteTime, timeData.TerminateTime,
-                sourceCrewId: null).GetAwaiter().GetResult();
+            _ctx.OperationalOutbox.Add(new MOB_OPERATIONAL_OUTBOX
+            {
+                OOB_MISSION_ID = gJobId,
+                OOB_DISPATCH_AFTER = dispatchAfter,
+                OOB_ATTEMPTS = 0,
+                OOB_UPDATED_AT = now
+            });
         }
-        catch (Exception ex)
+        else
         {
-            _logger.LogWarning(ex, "Projection avancement mission {MissionId} vers Orders échouée (best-effort).", gJobId);
+            // Nouveau changement : on repousse (debounce) et on relance le compteur de tentatives.
+            ob.OOB_DISPATCH_AFTER = dispatchAfter;
+            ob.OOB_ATTEMPTS = 0;
+            ob.OOB_LAST_ERROR = null;
+            ob.OOB_UPDATED_AT = now;
         }
     }
 

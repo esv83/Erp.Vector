@@ -6,6 +6,7 @@ using CaSoft.Erp.USVector.Infrastructure.Repositories;
 using CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 using CaSoft.Erp.USVector.Infrastructure.ErpApi;
 using CaSoft.Erp.USVector.Api.Infrastructure;
+using CaSoft.Erp.USVector.Api.Workers;
 using EmergencyPlatformConnector;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -152,6 +153,8 @@ builder.Services.AddSwaggerGen(c =>
 // ── Ports BD Mobile → implémentations réelles (MOB-2) ────────────────────────
 builder.Services.AddScoped<ISignatureRepository, SignatureRepository>();
 builder.Services.AddScoped<IJobTimeRepository, JobTimeRepository>();
+// Synchro régulation garantie : worker qui vide l'Outbox de projection opérationnelle (debounce + retry).
+builder.Services.AddHostedService<OperationalOutboxDispatcher>();
 builder.Services.AddScoped<ISessionRepository, SessionRepository>();
 // MOB-13 : overlay attributs de mission (catalogue + valeurs en BD Mobile).
 builder.Services.AddScoped<IJobAttributeOverlay, JobAttributeOverlayRepository>();
