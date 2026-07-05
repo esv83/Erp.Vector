@@ -126,7 +126,7 @@ Principe donnée (inchangé) : **`DB_VECTOR` = vérité terrain déclarative, no
 - **Remontées terrain** : via les **APIs HTTP d'écriture** des modules à travers le firewall (`PUT missions/{id}/operational`, driver… — **TRF-5, en place**). *Option V2* : `VectorOutboxMessage` transactionnel + `VectorDmzBridgeWorker` (pull LAN) + RabbitMQ + Inbox (asynchrone/résilience/idempotence).
 - **Statuts terrain V1** : Mission vue → En route → Sur place → Patient pris en charge → Arrivé destination → **Disponible** (clôture terrain). Retours arrière OK, sauts OK, pas de doublon du même statut.
 - **Données admin terrain** : téléphone, NIR (masqué partiel), mutuelle, prescription récupérée/manquante, **photo carte mutuelle**, consignes retour — historisées, non fiables, ne modifient pas la commande.
-- **Photo carte mutuelle** : **hors base SQL** — staging temporaire DMZ + référence `VectorDocumentStaging`, transfert contrôlé vers stockage interne par le bridge, purge DMZ.
+- **Photo carte mutuelle** : cible spec = **hors base SQL** (staging + référence `VectorDocumentStaging` + transfert + purge). **V1 (tranché) : conservée en blob SQL** (`MMC_IMAGE`) — cf. §5 / Vd-6.
 - **Visibilité équipage retour** : calculée **côté interne** puis **projetée** ; Vector n'affiche que l'autorisé (ne recalcule pas les droits métier).
 - **Rétention** : purge auto à **3 ans**.
 - **Événements Vector→LAN** : MissionSeen, CrewEnRoute, CrewOnScene, PatientPickedUp, PickupLocationDeparted, DestinationReached, PatientDroppedOff, CrewAvailable, PrescriptionCollected/Missing, FieldAdministrativeDataProvided, MutualCardPhotoUploaded, ReturnInstructionProvided.
@@ -142,12 +142,12 @@ Principe donnée (inchangé) : **`DB_VECTOR` = vérité terrain déclarative, no
 | Accès données ERP | Vector appelle **`Orders.Api` en HTTP** (lecture missions/crews, écriture operational/driver) — 4a | **APIs HTTP à travers firewall** (pas d'accès direct aux bases des autres modules) | ✅ **Conforme — retenu.** Projections/Outbox = durcissement V2 optionnel |
 | Base | `BD_ERP_MOBILE_APP` (MOB_*) sur SQL interne partagé | **`DB_VECTOR`** propre à Vector (LAN, derrière firewall) | Renommer/reloger en `DB_VECTOR` (base dédiée) |
 | **« Mission vue »** (ex-ACK, tranché 2026-07-05) | `MST_READ_AT`, flag `IsSeen`, `MissionSeen` | Spec §10 « Mission vue » | ✅ **Aligné** (acquittement distinct abandonné) |
-| **Photo carte mutuelle** (livré P1/P2) | Stockée en **BD Mobile** | **Hors SQL** : staging DMZ → transfert interne → purge | ⚠️ Évolution : sortir la photo du SQL |
+| **Photo carte mutuelle** (livré P1/P2) | Blob SQL `MMC_IMAGE` | Spec §13 : hors SQL (fichier + réf + purge) | ✅ **Tranché** : SQL en V1, sortie fichier en **V2 (Vd-6)** |
 | Écritures régulation | `ProjectOperationalAsync` (PUT direct `Orders.Api`, TRF-5) | **API HTTP via firewall (conforme)** ; SignalR état consolidé alimenté LAN | ✅ Conserver ; Outbox = durcissement V2 |
 | Nommage projets | `CaSoft.Erp.USVector.*` | `CaSoft.Erp.Vector.*` | Décision de nommage |
 | Fiabilité donnée | implicite | **non fiable par défaut**, traçage du niveau de fiabilité | Formaliser (billing trace, audit qualité) |
 
-> La roadmap **MOB-*** (**4a HTTP + `DB_VECTOR` derrière firewall**) reste le **socle retenu**. Le durcissement event-driven (projections poussées, Outbox/bridge, RabbitMQ, SignalR) est une **option V2 à cadrer séparément** (cf. Phase 3). Restent valables indépendamment du firewall : photo carte mutuelle **hors SQL** (§13), masquage/visibilité, purge 3 ans.
+> La roadmap **MOB-*** (**4a HTTP + `DB_VECTOR` derrière firewall**) reste le **socle retenu**. Le durcissement event-driven (projections poussées, Outbox/bridge, RabbitMQ, SignalR) est une **option V2 à cadrer séparément** (cf. Phase 3). Restent valables indépendamment du firewall : masquage/visibilité, purge 3 ans. **Photo carte mutuelle** : tranché **SQL en V1 / fichier en V2** (cf. §5, Vd-6).
 
 ---
 
@@ -208,7 +208,7 @@ arbitrer en MOB-3 (table de correspondance `MOB_CREW_MAP` int↔Guid, ou exposer
 
 ### Phase 3 — Durcissement DMZ event-driven (option V2, cf. §2bis)
 
-**Option de durcissement** issue de `spec_architecture_vector_mission_dmz.md`. Le **socle retenu** reste le **4a HTTP + `DB_VECTOR` derrière firewall** ; ces jalons ne s'imposent que pour renforcer résilience/asynchronisme. **Vd-1 et Vd-6 restent pertinents indépendamment.**
+**Option de durcissement** issue de `spec_architecture_vector_mission_dmz.md`. Le **socle retenu** reste le **4a HTTP + `DB_VECTOR` derrière firewall** ; ces jalons ne s'imposent que pour renforcer résilience/asynchronisme. **Vd-1 reste pertinent tout de suite ; Vd-6 (photos hors SQL) est planifié V2** (décision : photo mutuelle en blob SQL en V1).
 
 | # | Itération | Détail |
 |---|---|---|
@@ -217,7 +217,7 @@ arbitrer en MOB-3 (table de correspondance `MOB_CREW_MAP` int↔Guid, ou exposer
 | Vd-3 | *(option)* **Outbox + bridge** | `VectorOutboxMessage` transactionnel + `VectorDmzBridgeWorker` (pull LAN) + RabbitMQ + Inbox — sinon PUT direct `Orders.Api` (4a). |
 | Vd-4 | **Statuts terrain event-driven** | Cycle `Mission vue`→`Disponible` via événements ; `MissionFieldStatusCurrent/History` côté OrderDb. |
 | Vd-5 | **Données admin + masquage + visibilité** | `SensitiveDataMaskingMode`, NIR masqué, visibilité équipage retour **projetée** (calcul interne). |
-| Vd-6 | **Photo carte mutuelle hors SQL** | Staging DMZ + `VectorDocumentStaging` + transfert interne + purge 3 ans. |
+| Vd-6 | **Photos hors SQL (V2)** | Sortir `MOB_MUTUELLE_CARD.MMC_IMAGE` (+ `MOB_DOCUMENT.DOC_CONTENT`) du SQL → stockage fichier/objet ; BD = référence + métadonnées ; purge 3 ans ; migration des blobs existants. |
 | Vd-7 | **SignalR régulation** | État consolidé (≤ 1 min), sans donnée patient, alimenté LAN. |
 | Vd-8 | **Contrats d'événements** | `CaSoft.Erp.Integration.Contracts` (événements Vector↔LAN, spec §22). |
 
@@ -226,7 +226,7 @@ arbitrer en MOB-3 (table de correspondance `MOB_CREW_MAP` int↔Guid, ou exposer
 ## 5. Sujets transverses / à trancher plus tard
 
 - **✅ ACK → « Mission vue » (tranché 2026-07-05)** : aligné sur la spec (§10). Le « bien reçu » de la JobList = marqueur terrain **« Mission vue »** — `MST_READ_AT`, flag **`IsSeen`**, `ClMarkMissionSeenUseCase`, événement **`MissionSeen`**. L'« acquittement » distinct est abandonné (`MST_ACK_AT` laissé dormant). ⚠️ **Coordination UI** : le champ joblist `IsAck` devient **`IsSeen`**. ⚠️ **Orders.Api** : la régulation affiche « vue à HH:MM » depuis le champ **`read`** (plus `ack`).
-- **⚠️ Photo carte mutuelle hors SQL (spec DMZ §13)** : livrée en BD Mobile (P1/P2), mais la cible impose un stockage **hors base** (staging DMZ + transfert interne + purge 3 ans). Cf. §2bis / Vd-6.
+- **✅ Photo carte mutuelle : SQL en V1 → fichier en V2 (tranché 2026-07-05)** : conservée en blob SQL (`MOB_MUTUELLE_CARD.MMC_IMAGE`) en V1 — le firewall retire le driver DMZ de §13. Sortie vers stockage fichier (BD = référence, purge 3 ans), étendue à `MOB_DOCUMENT`, planifiée en **Vd-6 (V2)**. Déviation V1 assumée vs §13.
 - **Authentification réelle** : aujourd'hui token Guid + auth commentée côté legacy. À aligner
   avec le P0 #1 de l'ERP (JWT, `orders_devplan.md`). Le MVP réactive a minima le contrôle par
   token de session. **Refondu en MOB-4 ci-dessous (login = Keycloak).**
