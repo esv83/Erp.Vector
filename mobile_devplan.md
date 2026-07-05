@@ -112,6 +112,41 @@ domaine, services, DTOs et contrat mobile restent intacts.
 
 ---
 
+## 2bis. Architecture cible DMZ (enrichissements — `spec_architecture_vector_mission_dmz.md`, 2026-07)
+
+Contrainte structurante nouvelle : **Vector sera hébergé en DMZ** (accessible aux mobiles) et **ne doit accéder à AUCUNE base interne** (`OrderDb`/`CrewDb`/`CertificationDb`/`BillingDb`), ni initier de connexion directe vers le LAN. Cela va **au-delà du découplage 4a actuel** (où Vector appelle `Orders.Api` en HTTP direct) : la cible est **event-driven — projections entrantes + Outbox/Inbox + worker pont**. Principe donnée : **VectorDb = vérité terrain déclarative, non fiable** (corrigeable/ignorable, comparée aux données certifiées).
+
+### Ce qui relève du module Vector (périmètre de ce plan)
+- **VectorDb (DMZ)** — base locale isolée. Tables cibles : `VectorMissionProjection`, `VectorMissionStatusHistory`, `VectorFieldAdministrativeData`, `VectorDocumentStaging`, `VectorOutboxMessage`, `VectorInboxMessage`.
+- **Lecture missions** : uniquement via `VectorMissionProjection` (copie filtrée/limitée poussée par un worker interne **`VectorPublicationWorker`**) — jamais de lecture live d'`OrderDb`/`Orders.Api`. Champs projetés : MissionId, CrewId, type, adresses affichables, heure prévue, mode, patient (selon masquage), `SensitiveDataMaskingMode`, `CanEditFieldData`, `AccessUntilStatus`, version/date.
+- **Remontées terrain** : uniquement via `VectorOutboxMessage` (écrit dans **la même transaction** que l'action), récupéré par **`VectorDmzBridgeWorker`** (le LAN *tire* depuis la DMZ) → RabbitMQ interne → Inbox consumers → `OrderDb`.
+- **Statuts terrain V1** : Mission vue → En route → Sur place → Patient pris en charge → Arrivé destination → **Disponible** (clôture terrain). Retours arrière OK, sauts OK, pas de doublon du même statut.
+- **Données admin terrain** : téléphone, NIR (masqué partiel), mutuelle, prescription récupérée/manquante, **photo carte mutuelle**, consignes retour — historisées, non fiables, ne modifient pas la commande.
+- **Photo carte mutuelle** : **hors base SQL** — staging temporaire DMZ + référence `VectorDocumentStaging`, transfert contrôlé vers stockage interne par le bridge, purge DMZ.
+- **Visibilité équipage retour** : calculée **côté interne** puis **projetée** ; Vector n'affiche que l'autorisé (ne recalcule pas les droits métier).
+- **Rétention** : purge auto à **3 ans**.
+- **Événements Vector→LAN** : MissionSeen, CrewEnRoute, CrewOnScene, PatientPickedUp, PickupLocationDeparted, DestinationReached, PatientDroppedOff, CrewAvailable, PrescriptionCollected/Missing, FieldAdministrativeDataProvided, MutualCardPhotoUploaded, ReturnInstructionProvided.
+- **Événements LAN→Vector (consommés)** : MissionPublishedToVector, MissionUpdatedForVector, MissionRemovedFromVector, MissionAccessClosedForVector, ReturnCrewDataAvailable, VectorVisibilityRulesChanged.
+- **Découpage projet cible** : `CaSoft.Erp.Vector.{Domain,Application,Infrastructure,Api,Worker}` + `CaSoft.Erp.Vector.DmzBridge.Worker` (côté LAN).
+
+### Hors périmètre Vector (modules internes LAN — pour info)
+`Order/Mission`, `Crew`, `Certification`, `Billing`, `Integration` : Vector ne les touche pas ; il émet/consomme des événements et reçoit des projections. SignalR régulation est **alimenté depuis le LAN** (état consolidé, ≤ 1 min, **jamais** de donnée patient dans les notifications).
+
+### Delta vs état actuel & points à arbitrer
+| Sujet | Actuel (MOB-*) | Cible DMZ (spec) | Action |
+|---|---|---|---|
+| Accès données ERP | Vector appelle **`Orders.Api` en HTTP** (lecture missions/crews, écriture operational/driver) — 4a | **Projections** entrantes + **Outbox/bridge** ; aucune init DMZ→LAN | 4a = étape intermédiaire → migrer vers projections + Outbox |
+| Base | `BD_ERP_MOBILE_APP` (MOB_*) sur SQL interne partagé | **VectorDb** isolée en DMZ, tables `Vector*` | Reloger/isoler + renommer schéma |
+| **ACK « Bien reçu »** (livré) | `MST_ACK_AT`, `PATCH /api/joblist` | Spec §10 : **« Mission acquittée = Non »**, seul **« Mission vue »** retenu | ⚠️ **Arbitrer** : conserver l'ack, ou le mapper sur « Mission vue » / `MissionSeen` |
+| **Photo carte mutuelle** (livré P1/P2) | Stockée en **BD Mobile** | **Hors SQL** : staging DMZ → transfert interne → purge | ⚠️ Évolution : sortir la photo du SQL |
+| Écritures régulation | `ProjectOperationalAsync` (PUT direct `Orders.Api`, TRF-5) | **Outbox → bridge → RabbitMQ → consumers** ; SignalR état consolidé | Migrer le push direct vers Outbox |
+| Nommage projets | `CaSoft.Erp.USVector.*` | `CaSoft.Erp.Vector.*` | Décision de nommage |
+| Fiabilité donnée | implicite | **non fiable par défaut**, traçage du niveau de fiabilité | Formaliser (billing trace, audit qualité) |
+
+> La roadmap **MOB-*** reste l'implémentation courante (parité mobile). La bascule DMZ est un **chantier d'architecture V1/V2 à cadrer séparément** (cf. Phase 3).
+
+---
+
 ## 3. Mapping legacy → ERP (données de référence, lues in-process)
 
 | Table legacy | Entité ERP | Notes de mapping |
@@ -167,10 +202,27 @@ arbitrer en MOB-3 (table de correspondance `MOB_CREW_MAP` int↔Guid, ou exposer
 | M15 | **MOB-15 — Documents** (`api/document`) | S | Source PDF (ERP ou BD Mobile). |
 | M16 | **MOB-16 — Recâblage connecteurs** (Sirus + GpsGate) | S | Brancher GpsGate (positions équipages) + Sirus (statuts véhicule) sur le nouveau flux DI. Statu quo fonctionnel. |
 
+### Phase 3 — Cible DMZ (post-parité, cf. §2bis)
+
+Chantier d'architecture issu de `spec_architecture_vector_mission_dmz.md`. Cadrage/planning à faire ; ces jalons remplacent progressivement le couplage HTTP 4a par des projections + Outbox event-driven.
+
+| # | Itération | Détail |
+|---|---|---|
+| Vd-1 | **VectorDb isolée (DMZ)** | Base + tables projections (`Vector*`), schéma isolé, secrets DMZ séparés du LAN. |
+| Vd-2 | **Projection missions entrante** | `VectorMissionProjection` + `VectorPublicationWorker` (push LAN→DMZ) — remplace les GET live `Orders.Api` (missions/crews). |
+| Vd-3 | **Outbox + bridge** | `VectorOutboxMessage` transactionnel + `VectorDmzBridgeWorker` (pull LAN) + RabbitMQ + Inbox consumers (idempotence/rejeu). Remplace les PUT directs `Orders.Api`. |
+| Vd-4 | **Statuts terrain event-driven** | Cycle `Mission vue`→`Disponible` via événements ; `MissionFieldStatusCurrent/History` côté OrderDb. |
+| Vd-5 | **Données admin + masquage + visibilité** | `SensitiveDataMaskingMode`, NIR masqué, visibilité équipage retour **projetée** (calcul interne). |
+| Vd-6 | **Photo carte mutuelle hors SQL** | Staging DMZ + `VectorDocumentStaging` + transfert interne + purge 3 ans. |
+| Vd-7 | **SignalR régulation** | État consolidé (≤ 1 min), sans donnée patient, alimenté LAN. |
+| Vd-8 | **Contrats d'événements** | `CaSoft.Erp.Integration.Contracts` (événements Vector↔LAN, spec §22). |
+
 ---
 
 ## 5. Sujets transverses / à trancher plus tard
 
+- **⚠️ ACK vs « Mission vue » (spec DMZ §10)** : la spec retient « Mission vue = Oui / **Mission acquittée = Non** ». Or MOB a livré l'acquittement explicite (`MST_ACK_AT`, `PATCH /api/joblist`). À arbitrer : conserver l'ack, ou le fusionner avec « Mission vue » (`MissionSeen`). Cf. §2bis.
+- **⚠️ Photo carte mutuelle hors SQL (spec DMZ §13)** : livrée en BD Mobile (P1/P2), mais la cible impose un stockage **hors base** (staging DMZ + transfert interne + purge 3 ans). Cf. §2bis / Vd-6.
 - **Authentification réelle** : aujourd'hui token Guid + auth commentée côté legacy. À aligner
   avec le P0 #1 de l'ERP (JWT, `orders_devplan.md`). Le MVP réactive a minima le contrôle par
   token de session. **Refondu en MOB-4 ci-dessous (login = Keycloak).**
