@@ -90,14 +90,15 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             return result;
         }
 
-        // PATCH api/joblist — marquer une mission comme lue.
+        // PATCH api/joblist — « Bien reçu » : acquitte la mission (pose MST_ACK_AT + projette
+        // vers Orders.Api pour la régulation). Idempotent. L'UI masque l'icône quand IsAck=true.
         [HttpPatch()]
-        public IActionResult PatchRead(ClReadJobModel ReadModel)
+        public IActionResult PatchAck(ClReadJobModel ReadModel)
         {
             ClWebApiPresenter presenter = ClWebApiPresenter.GetPresenter();
             if (ReadModel.IsJob)
             {
-                _jobSce.ReadJob(ReadModel.JobId, presenter);
+                _jobSce.AckJob(ReadModel.JobId, presenter);
             }
 
             return presenter.Result;
