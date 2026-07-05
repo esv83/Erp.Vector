@@ -134,10 +134,54 @@ public class JobRepository : IJobRepository
             IsIterativ = body is not null && body.Frequency != 0,
             TransportMode = transportMode,
             TransportType = transportType,
-            Departure = ToAddressLines(mission.Pickup),
+            // Libellés ERP : principal (id→label, l'order n'expose que l'id) + secondaire.
+            TransportModeLabel = MapTransportModeLabel(body?.TransportModeId),
+            TransportSubCategoryLabel = body?.TransportSubCategoryLabel ?? string.Empty,
+            Departure = ToAddressLines(mission.Pickup),   // compat : version paragraphe
             Arrival = ToAddressLines(mission.Dropoff),
-            Comments = string.Empty           // pas de champ commentaire dans le DTO commande V0
+            PickupLocation = ToJobLocation(mission.Pickup),
+            DropoffLocation = ToJobLocation(mission.Dropoff),
+            Comments = mission.Comment ?? string.Empty
         };
+    }
+
+    /// <summary>
+    /// Libellé du mode de transport principal à partir de l'id ERP (l'endpoint order ne renvoie
+    /// que l'id ; libellés capturés du référentiel Orders.Api). À compléter si de nouveaux modes.
+    /// </summary>
+    private static string MapTransportModeLabel(int? modeId) => modeId switch
+    {
+        1 => "AMBULANCE",
+        2 => "VSL",
+        4 => "Produits Sanguins",
+        _ => string.Empty
+    };
+
+    /// <summary>
+    /// Stage ERP → lieu détaillé structuré (mapping « au mieux » des champs disponibles).
+    /// Lieu non référencé (structuré vide) : repli du Label figé dans Nom.
+    /// </summary>
+    private static ClJobLocation ToJobLocation(ErpStageDto? stage)
+    {
+        var loc = new ClJobLocation();
+        if (stage is null) return loc;
+
+        static string S(string? v) => v?.Trim() ?? string.Empty;
+
+        loc.Nom = S(stage.LocationName);
+        loc.Adresse = S(stage.AddressLine1);
+        loc.Residence = S(stage.AddressLine2);
+        loc.BatEtage = !string.IsNullOrWhiteSpace(stage.AddressLine3) ? S(stage.AddressLine3) : S(stage.ServiceLabel);
+        loc.Commune = string.Join(" ",
+            new[] { stage.PostalCode, stage.City }.Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
+        loc.Complement = S(stage.Complement);
+
+        // Aucun champ structuré → repli sur le label figé.
+        var hasStructured = new[] { loc.Nom, loc.Adresse, loc.Residence, loc.BatEtage, loc.Commune, loc.Complement }
+            .Any(v => !string.IsNullOrWhiteSpace(v));
+        if (!hasStructured) loc.Nom = S(stage.Label);
+
+        return loc;
     }
 
     private static ClJobBeneficiary BuildBeneficiary(ErpBeneficiaryDetailDto? dto)

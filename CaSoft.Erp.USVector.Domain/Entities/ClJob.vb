@@ -15,15 +15,20 @@ Public Class ClJob
         _IsSign = Mission.IsSign
         _TransportMode = Mission.TransportMode
         _TransportType = Mission.TransportType
+        _TransportModeLabel = Mission.TransportModeLabel
+        _TransportSubCategoryLabel = Mission.TransportSubCategoryLabel
         _Appointment = Mission.Appointment
         _IsLastDay = Mission.IsLastDay
         _Arrival = Mission.Arrival
         _Departure = Mission.Departure
+        _PickupLocation = Mission.PickupLocation
+        _DropoffLocation = Mission.DropoffLocation
         _IsIterativ = Mission.IsIterativ
         _Schedule = Mission.Schedule
         _IsAsap = Mission.IsAsap
         _MaxDelay = Mission.MaxDelay
         _CallTime = Mission.CallTime
+        Me.Comments = Mission.Comments
 
     End Sub
 
@@ -98,10 +103,14 @@ Public Class ClJob
     Public ReadOnly Property IsSign As Boolean
     Public ReadOnly Property TransportMode As ClTransportMode
     Public ReadOnly Property TransportType As ClTransportType
+    Public ReadOnly Property TransportModeLabel As String
+    Public ReadOnly Property TransportSubCategoryLabel As String
     Public ReadOnly Property Appointment As Date?
     Public ReadOnly Property IsLastDay As Boolean
     Public ReadOnly Property Arrival As List(Of String)
     Public ReadOnly Property Departure As List(Of String)
+    Public ReadOnly Property PickupLocation As ClJobLocation
+    Public ReadOnly Property DropoffLocation As ClJobLocation
     Public ReadOnly Property IsIterativ As Boolean
     Public ReadOnly Property Schedule As Date
     Public ReadOnly Property IsAsap As Boolean

@@ -27,9 +27,41 @@ Public Class ClJobDetailAdapter
             .IsLastDay = job.IsLastDay
             .IsSign = job.IsSign
 
+            ' Nouveaux champs (règles serveur) :
+            ' Prise en charge formatée sur le Schedule.
+            .ScheduleLabel = FormatSchedule(job.Schedule)
+            ' Mode : secondaire (sous-catégorie) si présent, sinon principal.
+            .TransportModeLabel = If(String.IsNullOrWhiteSpace(job.TransportSubCategoryLabel),
+                                     job.TransportModeLabel, job.TransportSubCategoryLabel)
+            ' Lieux détaillés structurés.
+            .PickupLocation = ToLocationDto(job.PickupLocation)
+            .DropoffLocation = ToLocationDto(job.DropoffLocation)
+
         End With
 
     End Sub
+
+    ''' <summary>« à HH:mm » le jour même, sinon « dddd dd/MM/yyyy à HH:mm » (culture fr-FR).</summary>
+    Private Shared Function FormatSchedule(dte As Date) As String
+        Dim fr = New System.Globalization.CultureInfo("fr-FR")
+        If dte.Date = Date.Today Then
+            Return dte.ToString("'à' HH:mm", fr)
+        End If
+        Return dte.ToString("dddd dd/MM/yyyy 'à' HH:mm", fr)
+    End Function
+
+    Private Shared Function ToLocationDto(loc As ClJobLocation) As ClJobLocationDto
+        Dim dto As New ClJobLocationDto
+        If loc IsNot Nothing Then
+            dto.Nom = loc.Nom
+            dto.Adresse = loc.Adresse
+            dto.Residence = loc.Residence
+            dto.BatEtage = loc.BatEtage
+            dto.Commune = loc.Commune
+            dto.Complement = loc.Complement
+        End If
+        Return dto
+    End Function
 
     Private Function GetTransportSensDisplay(value As TripType) As String
         Dim result As String

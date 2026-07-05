@@ -30,6 +30,8 @@ public sealed class ErpMissionFullDto
     public Guid? AssignedCrewId { get; set; }
     public ErpStageDto? Pickup { get; set; }
     public ErpStageDto? Dropoff { get; set; }
+    /// <summary>Commentaire opérationnel de la mission (ex. « C15 CHUTE MECA DLR LOMBAIRE »).</summary>
+    public string? Comment { get; set; }
 }
 
 /// <summary>GET /missions (liste légère)</summary>
@@ -60,6 +62,9 @@ public sealed class ErpOrderBodyDto
 {
     public Guid BeneficiaryId { get; set; }
     public int TransportModeId { get; set; }
+    /// <summary>Sous-catégorie de transport (secondaire) : null si absente. Label ex. « Bariatrique », « TPMR ».</summary>
+    public int? TransportSubCategoryId { get; set; }
+    public string? TransportSubCategoryLabel { get; set; }
     public bool HasReturn { get; set; }
     public int Frequency { get; set; }
 }
