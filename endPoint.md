@@ -82,8 +82,12 @@ public sealed class CrewDriverDto  { public Guid PersonnelId { get; init; } publ
 
 ### Sémantique / mapping ERP
 - `members[].id` = **PER_ID** (indispensable : le `POST` de changement renvoie ce PER_ID).
-- `activeDriver` = conducteur courant de la vacation ; `null` tant que non désigné
-  (cohérent avec `hasActiveDriver:false` de la liste `GET /crews`).
+- `activeDriver` = conducteur courant de la vacation. **Conducteur par défaut (décision 2026-07-05)** :
+  quand **aucun conducteur n'est explicitement affecté**, renvoyer `activeDriver` = **1er membre actif**
+  (ou règle métier ERP : chef d'équipage / rôle conducteur). Objectif : l'app affiche toujours un
+  conducteur par défaut, cohérent pour tous les consommateurs. Ne jamais renvoyer `activeDriver: null`
+  quand l'équipage a au moins un membre. (Vector conserve une garde : si `null`, il renvoie un
+  conducteur « vide » pour ne pas casser le client — mais le défaut doit venir d'Orders.Api.)
 - `vehicle.immatriculation` = requis par l'UI (l'ID seul ne suffit pas).
 - `serviceStart` / `serviceEnd` = fenêtre de vacation (Vector s'en sert pour départager
   quand un personnel a plusieurs équipages actifs le même jour).
