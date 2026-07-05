@@ -42,25 +42,30 @@ function Publish-Target($key) {
     $url = ([string]$x.SelectSingleNode('//*[local-name()="publishUrl"]').InnerText).Trim()
     if (-not $url) { throw "publishUrl introuvable dans $pubxml." }
 
-    $startUtc = (Get-Date).ToUniversalTime()
-
     dotnet publish $proj -c Release "/p:PublishProfile=$profileName"
     if ($LASTEXITCODE) { throw "Echec de la publication $key (profil $profileName)." }
 
-    # Verification : AU MOINS UN assembly applicatif (CaSoft.*.dll) doit avoir ete (re)ecrit sur
-    # le partage a l'instant. On ne cible plus Api.dll seul : un correctif dans un assembly
-    # dependant (ex. Application.dll) ne touche pas Api.dll et donnait un faux "Verif KO".
-    # Evite quand meme un faux "[OK]" si la publication est partie en local sans atteindre l'UNC.
-    $ownDlls = Get-ChildItem -LiteralPath $url -Filter 'CaSoft.*.dll' -ErrorAction SilentlyContinue
-    if (-not $ownDlls) { throw "Verif KO : aucun CaSoft.*.dll dans $url apres publication." }
-    $newest = $ownDlls | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
-    if ($newest.LastWriteTimeUtc -lt $startUtc) {
-        throw "Verif KO : aucun assembly applicatif reecrit depuis le debut de la publication " +
-              "(plus recent : $($newest.Name) @ $($newest.LastWriteTimeUtc), debut $startUtc). " +
-              "La publication n'a peut-etre pas atteint $url (ou rien n'a change)."
+    # Verification robuste : l'assembly applicatif le plus recent produit par la build (bin local)
+    # doit exister a l'IDENTIQUE (meme horodatage) sur l'UNC. La copie de publication preserve
+    # l'horodatage source, donc bin == UNC => ce build a bien atteint la cible.
+    # Insensible : (a) a quel assembly a change (on prend le plus recent du bin, pas Api.dll seul),
+    # (b) a un pre-build (on ne compare pas a un startUtc mais bin<->UNC).
+    $binDir = Join-Path $PSScriptRoot 'CaSoft.Erp.USVector.Api\bin\Release'
+    $localNewest = Get-ChildItem -LiteralPath $binDir -Recurse -Filter 'CaSoft.*.dll' -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+    if (-not $localNewest) { throw "Verif KO : build local introuvable sous $binDir." }
+
+    $uncFile = Join-Path $url $localNewest.Name
+    if (-not (Test-Path -LiteralPath $uncFile)) {
+        throw "Verif KO : $($localNewest.Name) absent de $url. La publication n'a pas atteint la cible."
+    }
+    $uncWriteUtc = (Get-Item -LiteralPath $uncFile).LastWriteTimeUtc
+    if ([Math]::Abs(($uncWriteUtc - $localNewest.LastWriteTimeUtc).TotalSeconds) -gt 2) {
+        throw "Verif KO : $($localNewest.Name) sur $url ($uncWriteUtc) ne correspond pas au build local " +
+              "($($localNewest.LastWriteTimeUtc)). La publication est peut-etre partie en local sans atteindre $url."
     }
     Write-Host "[OK] $($key.ToUpper()) publie et verifie -> $url" -ForegroundColor Green
-    Write-Host "     Assembly le plus recent : $($newest.Name) @ $($newest.LastWriteTime)" -ForegroundColor DarkGray
+    Write-Host "     Assembly verifie : $($localNewest.Name) @ $($localNewest.LastWriteTime)" -ForegroundColor DarkGray
 }
 
 Publish-Target $Target
