@@ -41,22 +41,26 @@ function Publish-Target($key) {
     [xml]$x = Get-Content -LiteralPath $pubxml
     $url = ([string]$x.SelectSingleNode('//*[local-name()="publishUrl"]').InnerText).Trim()
     if (-not $url) { throw "publishUrl introuvable dans $pubxml." }
-    $dll = Join-Path $url 'CaSoft.Erp.USVector.Api.dll'
 
     $startUtc = (Get-Date).ToUniversalTime()
 
     dotnet publish $proj -c Release "/p:PublishProfile=$profileName"
     if ($LASTEXITCODE) { throw "Echec de la publication $key (profil $profileName)." }
 
-    # Verification : le binaire DOIT avoir ete (re)ecrit sur le partage a l'instant.
-    # Evite un faux "[OK]" si la publication est partie en local sans atteindre l'UNC.
-    if (-not (Test-Path -LiteralPath $dll)) { throw "Verif KO : $dll introuvable apres publication." }
-    $writeUtc = (Get-Item -LiteralPath $dll).LastWriteTimeUtc
-    if ($writeUtc -lt $startUtc) {
-        throw "Verif KO : $dll non mis a jour (ecrit $writeUtc, debut $startUtc). Rien n'a atteint $url."
+    # Verification : AU MOINS UN assembly applicatif (CaSoft.*.dll) doit avoir ete (re)ecrit sur
+    # le partage a l'instant. On ne cible plus Api.dll seul : un correctif dans un assembly
+    # dependant (ex. Application.dll) ne touche pas Api.dll et donnait un faux "Verif KO".
+    # Evite quand meme un faux "[OK]" si la publication est partie en local sans atteindre l'UNC.
+    $ownDlls = Get-ChildItem -LiteralPath $url -Filter 'CaSoft.*.dll' -ErrorAction SilentlyContinue
+    if (-not $ownDlls) { throw "Verif KO : aucun CaSoft.*.dll dans $url apres publication." }
+    $newest = $ownDlls | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+    if ($newest.LastWriteTimeUtc -lt $startUtc) {
+        throw "Verif KO : aucun assembly applicatif reecrit depuis le debut de la publication " +
+              "(plus recent : $($newest.Name) @ $($newest.LastWriteTimeUtc), debut $startUtc). " +
+              "La publication n'a peut-etre pas atteint $url (ou rien n'a change)."
     }
     Write-Host "[OK] $($key.ToUpper()) publie et verifie -> $url" -ForegroundColor Green
-    Write-Host "     DLL serveur : $((Get-Item -LiteralPath $dll).LastWriteTime)" -ForegroundColor DarkGray
+    Write-Host "     Assembly le plus recent : $($newest.Name) @ $($newest.LastWriteTime)" -ForegroundColor DarkGray
 }
 
 Publish-Target $Target
