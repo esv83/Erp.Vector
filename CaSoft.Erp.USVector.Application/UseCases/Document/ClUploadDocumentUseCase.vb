@@ -1,32 +1,28 @@
 ''' <summary>
 ''' TRF-10 — Dépose un document/photo terrain sur une mission. Historisé ; transféré ensuite
-''' dans le paquet field-data (binaire servi par <c>imageUrl</c>).
+''' dans le paquet field-data (binaire servi par <c>imageUrl</c>). Result pattern.
 ''' </summary>
 Public Class ClUploadDocumentUseCase
-    Inherits ClUseCaseBase
-    Implements IUseCase
+    Implements IResultUseCase(Of ClDocumentDtoOut)
 
-    Private _command As ClUploadDocumentCommand
-    Private _repository As IDocumentRepository
+    Private ReadOnly _command As ClUploadDocumentCommand
+    Private ReadOnly _repository As IDocumentRepository
 
     Public Sub New(command As ClUploadDocumentCommand, repository As IDocumentRepository)
         _command = command
         _repository = repository
     End Sub
 
-    Public Overrides Sub execute(presenter As IResponseHandler) Implements IUseCase.Execute
+    Public Function Handle() As ClResult(Of ClDocumentDtoOut) Implements IResultUseCase(Of ClDocumentDtoOut).Handle
         Try
             If _command.MissionId = Guid.Empty Then
-                Response.AddError("Mission obligatoire.")
-                Return
+                Return ClResult(Of ClDocumentDtoOut).Fail(ClError.Application("Mission obligatoire."))
             End If
             If _command.Content Is Nothing OrElse _command.Content.Length = 0 Then
-                Response.AddError("Fichier manquant.")
-                Return
+                Return ClResult(Of ClDocumentDtoOut).Fail(ClError.Application("Fichier manquant."))
             End If
             If Not [Enum].IsDefined(GetType(EnDocumentCategory), _command.Category) Then
-                Response.AddError("Catégorie de document invalide.")
-                Return
+                Return ClResult(Of ClDocumentDtoOut).Fail(ClError.Application("Catégorie de document invalide."))
             End If
 
             Dim document As New ClDocument With {
@@ -42,15 +38,10 @@ Public Class ClUploadDocumentUseCase
             }
 
             _repository.Save(document)
-            Response.SetResult(document.ToDtoOut())
+            Return ClResult(Of ClDocumentDtoOut).Ok(document.ToDtoOut())
         Catch ex As Exception
-            Response.AddError(ex.Message)
-        Finally
-            presenter.Handle(Response)
+            Return ClResult(Of ClDocumentDtoOut).Fail(ClError.Application(ex.Message, ex))
         End Try
-    End Sub
-
-    Public Overrides Sub Before()
-    End Sub
+    End Function
 
 End Class

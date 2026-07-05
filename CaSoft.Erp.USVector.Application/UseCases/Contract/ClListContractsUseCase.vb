@@ -1,20 +1,19 @@
 ''' <summary>
 ''' MOB-13.8 — Liste des types de contrat sélectionnables pour une mission, en marquant
-''' le contrat effectif (choisi explicitement, sinon premier actif = défaut de BuildContractType).
+''' le contrat effectif (choisi explicitement, sinon premier actif = défaut de BuildContractType). Result pattern.
 ''' </summary>
 Public Class ClListContractsUseCase
-    Inherits ClUseCaseBase
-    Implements IUseCase
+    Implements IResultUseCase(Of List(Of ClContractChoiceDto))
 
-    Private _missionId As Guid
-    Private _overlay As IJobAttributeOverlay
+    Private ReadOnly _missionId As Guid
+    Private ReadOnly _overlay As IJobAttributeOverlay
 
     Public Sub New(missionId As Guid, overlay As IJobAttributeOverlay)
         _missionId = missionId
         _overlay = overlay
     End Sub
 
-    Public Overrides Sub execute(presenter As IResponseHandler) Implements IUseCase.Execute
+    Public Function Handle() As ClResult(Of List(Of ClContractChoiceDto)) Implements IResultUseCase(Of List(Of ClContractChoiceDto)).Handle
         Try
             Dim contracts = _overlay.GetContracts()
 
@@ -29,14 +28,10 @@ Public Class ClListContractsUseCase
                 .IsSelected = selectedId.HasValue AndAlso c.Id = selectedId.Value
             }).ToList()
 
-            Response.SetResult(list)
+            Return ClResult(Of List(Of ClContractChoiceDto)).Ok(list)
         Catch ex As Exception
-            Response.AddError(ex.Message)
-        Finally
-            presenter.Handle(Response)
+            Return ClResult(Of List(Of ClContractChoiceDto)).Fail(ClError.Application(ex.Message, ex))
         End Try
-    End Sub
+    End Function
 
-    Public Overrides Sub Before()
-    End Sub
 End Class

@@ -1,3 +1,4 @@
+using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 using Microsoft.AspNetCore.Mvc;
@@ -45,7 +46,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             var command = new ClUploadMutuelleCardCommand(
                 beneficiaryId, ms.ToArray(), file.ContentType, crewId, missionId);
 
-            return new ClUseCaseHandler(new ClUploadMutuelleCardUseCase(command, _repository)).Execute();
+            return new ClUploadMutuelleCardUseCase(command, _repository).Handle().ToActionResult();
         }
 
         /// <summary>Métadonnées de la carte courante du bénéficiaire (sans le binaire).</summary>
@@ -64,7 +65,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         public IActionResult SetFields(Guid cardId, [FromBody] ClMutuelleFieldsDtoIn fields)
         {
             var command = new ClSetMutuelleFieldsCommand(cardId, fields);
-            return new ClUseCaseHandler(new ClSetMutuelleFieldsUseCase(command, _repository)).Execute();
+            return new ClSetMutuelleFieldsUseCase(command, _repository).Handle().ToActionResult();
         }
 
         /// <summary>Octets de l'image d'une carte (Content-Type d'origine).</summary>

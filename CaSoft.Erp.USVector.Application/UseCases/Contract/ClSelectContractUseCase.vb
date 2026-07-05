@@ -1,30 +1,25 @@
 ''' <summary>
 ''' MOB-13.8 — Enregistre le type de contrat choisi pour la mission. Bascule le jeu
-''' d'attributs : le prochain GetFormStructure renverra core + attributs du contrat choisi.
+''' d'attributs : le prochain GetFormStructure renverra core + attributs du contrat choisi. Result pattern.
 ''' </summary>
 Public Class ClSelectContractUseCase
-    Inherits ClUseCaseBase
-    Implements IUseCase
+    Implements IResultUseCase(Of Boolean)
 
-    Private _command As ClSelectContractCommand
-    Private _overlay As IJobAttributeOverlay
+    Private ReadOnly _command As ClSelectContractCommand
+    Private ReadOnly _overlay As IJobAttributeOverlay
 
     Public Sub New(command As ClSelectContractCommand, overlay As IJobAttributeOverlay)
         _command = command
         _overlay = overlay
     End Sub
 
-    Public Overrides Sub execute(presenter As IResponseHandler) Implements IUseCase.Execute
+    Public Function Handle() As ClResult(Of Boolean) Implements IResultUseCase(Of Boolean).Handle
         Try
             _overlay.SelectContract(_command.MissionId, _command.ContractId)
-            Response.SetResult(True)
+            Return ClResult(Of Boolean).Ok(True)
         Catch ex As Exception
-            Response.AddError(ex.Message)
-        Finally
-            presenter.Handle(Response)
+            Return ClResult(Of Boolean).Fail(ClError.Application(ex.Message, ex))
         End Try
-    End Sub
+    End Function
 
-    Public Overrides Sub Before()
-    End Sub
 End Class

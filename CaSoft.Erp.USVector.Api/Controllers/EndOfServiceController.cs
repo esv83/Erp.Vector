@@ -1,4 +1,5 @@
 ﻿using CaSoft.Framework;
+using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
@@ -20,10 +21,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         public IActionResult GetEndOfService(Guid intCrewId)
         {
             ClGetEndOfServiceUseCase useCase = new ClGetEndOfServiceUseCase(intCrewId, _crewRepository);
-            ClWebApiPresenter presenter = new ClWebApiPresenter();
-            useCase.Execute(presenter);
-
-            return presenter.Result;
+            return useCase.Handle().ToActionResult();
 
         }
 
@@ -35,7 +33,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             ClSetEndOfServiceUseCase useCase = new ClSetEndOfServiceUseCase(query,_crewCache, _crewRepository);
                       
 
-            return new ClUseCaseHandler(useCase).Execute();
+            return useCase.Handle().ToActionResult();
 
           
 

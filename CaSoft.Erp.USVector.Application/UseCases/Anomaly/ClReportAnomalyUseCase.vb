@@ -1,28 +1,25 @@
 ''' <summary>
 ''' TRF-8 — Signale une anomalie terrain sur une mission. Anomalie non bloquante : simple
-''' enregistrement historisé, transféré ensuite dans le paquet field-data.
+''' enregistrement historisé, transféré ensuite dans le paquet field-data. Result pattern.
 ''' </summary>
 Public Class ClReportAnomalyUseCase
-    Inherits ClUseCaseBase
-    Implements IUseCase
+    Implements IResultUseCase(Of ClAnomalyDtoOut)
 
-    Private _command As ClReportAnomalyCommand
-    Private _repository As IAnomalyRepository
+    Private ReadOnly _command As ClReportAnomalyCommand
+    Private ReadOnly _repository As IAnomalyRepository
 
     Public Sub New(command As ClReportAnomalyCommand, repository As IAnomalyRepository)
         _command = command
         _repository = repository
     End Sub
 
-    Public Overrides Sub execute(presenter As IResponseHandler) Implements IUseCase.Execute
+    Public Function Handle() As ClResult(Of ClAnomalyDtoOut) Implements IResultUseCase(Of ClAnomalyDtoOut).Handle
         Try
             If _command.MissionId = Guid.Empty Then
-                Response.AddError("Mission obligatoire.")
-                Return
+                Return ClResult(Of ClAnomalyDtoOut).Fail(ClError.Application("Mission obligatoire."))
             End If
             If Not [Enum].IsDefined(GetType(EnAnomalyType), _command.Input.Type) Then
-                Response.AddError("Type d'anomalie invalide.")
-                Return
+                Return ClResult(Of ClAnomalyDtoOut).Fail(ClError.Application("Type d'anomalie invalide."))
             End If
 
             Dim anomaly As New ClAnomaly With {
@@ -35,15 +32,10 @@ Public Class ClReportAnomalyUseCase
             }
 
             _repository.Save(anomaly)
-            Response.SetResult(anomaly.ToDtoOut())
+            Return ClResult(Of ClAnomalyDtoOut).Ok(anomaly.ToDtoOut())
         Catch ex As Exception
-            Response.AddError(ex.Message)
-        Finally
-            presenter.Handle(Response)
+            Return ClResult(Of ClAnomalyDtoOut).Fail(ClError.Application(ex.Message, ex))
         End Try
-    End Sub
-
-    Public Overrides Sub Before()
-    End Sub
+    End Function
 
 End Class

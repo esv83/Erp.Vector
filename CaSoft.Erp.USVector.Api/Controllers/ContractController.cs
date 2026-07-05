@@ -20,12 +20,12 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         /// <summary>Liste des contrats sélectionnables, avec le contrat effectif de la mission.</summary>
         [HttpGet("{gJobId}")]
         public IActionResult GetContracts(Guid gJobId)
-            => new ClUseCaseHandler(new ClListContractsUseCase(gJobId, _overlay)).Execute();
+            => new ClListContractsUseCase(gJobId, _overlay).Handle().ToActionResult();
 
         /// <summary>Enregistre le contrat choisi pour la mission.</summary>
         [HttpPost("{gJobId}")]
         [FreezeOnTransfer]
         public IActionResult SelectContract(Guid gJobId, [FromBody] int contractId)
-            => new ClUseCaseHandler(new ClSelectContractUseCase(new ClSelectContractCommand(gJobId, contractId), _overlay)).Execute();
+            => new ClSelectContractUseCase(new ClSelectContractCommand(gJobId, contractId), _overlay).Handle().ToActionResult();
     }
 }

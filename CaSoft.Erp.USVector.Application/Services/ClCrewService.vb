@@ -35,7 +35,8 @@ Public Class ClCrewService
         Dim useCase = New ClGetEndOfServiceUseCase(gCrewId, _repository)
 
         Dim presenter As New ClDefaultPresenter
-        useCase.execute(presenter)
+        Dim adapter As New ClResultUseCaseAdapter(Of ClReliableDateModel)(useCase)
+        adapter.Execute(presenter)
 
         Return presenter.Response
 
@@ -48,7 +49,8 @@ Public Class ClCrewService
         Dim useCase As New ClSetEndOfServiceUseCase(query, Nothing, _repository)
         Dim presenter As New ClDefaultPresenter
 
-        useCase.execute(presenter)
+        Dim adapter As New ClResultUseCaseAdapter(Of Boolean)(useCase)
+        adapter.Execute(presenter)
 
         Return presenter.Response
 

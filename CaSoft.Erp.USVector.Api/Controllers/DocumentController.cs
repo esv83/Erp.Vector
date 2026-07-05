@@ -49,7 +49,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             var command = new ClUploadDocumentCommand(
                 gJobId, ms.ToArray(), file.ContentType, file.FileName, form.Category, crewId);
 
-            return new ClUseCaseHandler(new ClUploadDocumentUseCase(command, _repository)).Execute();
+            return new ClUploadDocumentUseCase(command, _repository).Handle().ToActionResult();
         }
 
         /// <summary>Métadonnées des documents de la mission (du plus récent au plus ancien).</summary>

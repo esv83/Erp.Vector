@@ -22,7 +22,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         [HttpPost("missions/{gJobId:guid}/anomalies")]
         [FreezeOnTransfer("gJobId")]
         public IActionResult Report(Guid gJobId, [FromBody] ClReportAnomalyDtoIn input)
-            => new ClUseCaseHandler(new ClReportAnomalyUseCase(new ClReportAnomalyCommand(gJobId, input), _repository)).Execute();
+            => new ClReportAnomalyUseCase(new ClReportAnomalyCommand(gJobId, input), _repository).Handle().ToActionResult();
 
         /// <summary>Anomalies de la mission (de la plus récente à la plus ancienne).</summary>
         [HttpGet("missions/{gJobId:guid}/anomalies")]
