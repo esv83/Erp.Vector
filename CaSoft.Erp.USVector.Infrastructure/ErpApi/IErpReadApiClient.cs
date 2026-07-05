@@ -9,8 +9,16 @@ public interface IErpReadApiClient
 {
     Task<ErpMissionFullDto?> GetMissionFullAsync(Guid missionId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Missions sur une fenêtre. <paramref name="assignedCrewIds"/> (optionnel) demande à Orders.Api
+    /// de ne renvoyer que les missions affectées à ces équipages (param répétable
+    /// <c>assignedCrewId</c>) : évite de rapatrier toute la journée pour n'en garder qu'une poignée,
+    /// et surtout évite que le plafond <paramref name="take"/> (global) tronque les missions d'un
+    /// équipage un jour chargé. Ignoré par Orders.Api s'il ne le gère pas encore (rétro-compatible).
+    /// </summary>
     Task<IReadOnlyList<ErpMissionListItemDto>> ListMissionsAsync(
-        DateTime from, DateTime to, int take, CancellationToken ct = default);
+        DateTime from, DateTime to, int take,
+        IReadOnlyCollection<Guid>? assignedCrewIds = null, CancellationToken ct = default);
 
     Task<ErpOrderEditDto?> GetOrderAsync(Guid orderId, CancellationToken ct = default);
 

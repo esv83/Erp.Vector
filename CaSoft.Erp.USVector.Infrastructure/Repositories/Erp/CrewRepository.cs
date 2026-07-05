@@ -50,7 +50,9 @@ public class CrewRepository : IMobileCrewRepository
         var today = DateTime.Today;
 
         // Pont sync/async : le contrat legacy ICrewRepository est synchrone.
-        var missions = _erp.ListMissionsAsync(today, today.AddDays(1).AddTicks(-1), 500, CancellationToken.None)
+        // On passe les équipages du personnel : Orders.Api filtre côté serveur si supporté (payload réduit,
+        // plafond take non tronquant) ; sinon renvoie tout et le filtre client ci-dessous garantit le résultat.
+        var missions = _erp.ListMissionsAsync(today, today.AddDays(1).AddTicks(-1), 500, crewSet, CancellationToken.None)
             .GetAwaiter().GetResult();
 
         // Union des missions des crews du personnel (dédupliquée par mission).

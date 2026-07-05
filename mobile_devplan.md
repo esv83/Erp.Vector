@@ -363,4 +363,23 @@ Limites connues MOB-4a (acceptées) : pont sync/async (`.GetAwaiter().GetResult(
 
 ---
 
+## 8. Dette de compatibilité — à supprimer un jour
+
+Rétrocompatibilités volontairement conservées pour ne pas casser un consommateur (UI web, Orders.Api,
+contrat legacy). **Chacune doit être retirée une fois sa condition remplie.** Cocher au fur et à mesure.
+
+| # | Rétrocompatibilité | Emplacement | Condition de suppression | Réf. |
+|---|--------------------|-------------|--------------------------|------|
+| C1 | **`IsAck`** (alias lecture seule de `IsSeen`) sur les items JobList | `ClJobListItemModel.IsAck` | UI web migrée sur `IsSeen` | `52fbd97` |
+| C2 | **Champs JobDetail legacy** conservés en parallèle des nouveaux : `Schedule`→`ScheduleLabel`, `TransportMode`/`TransportSens`→`TransportModeLabel`, `Departure`/`Arrival`→`PickupLocation`/`DropoffLocation` | `ClJobDetailModel` + `ClJobDetailAdapter` | UI web bascule sur les nouveaux champs | `df5c12b` |
+| C3 | **`SelectedDriver` toujours non-null** (conducteur vide `Guid.Empty` + `""` au lieu de `null`) | `ClGetDriverUseCase` | UI web garde-fou le `null` proprement (évitait la page blanche) | `f27c924` |
+| C4 | **Sur-rapatriement missions + filtre équipage côté client** : Vector passe `assignedCrewId` mais Orders.Api l'ignore → télécharge toute la journée puis filtre en mémoire | `CrewRepository.FetchJobList` + `HttpErpReadApiClient.ListMissionsAsync` | Orders.Api honore `assignedCrewId` (endPoint.md §4) — retirer le filtre client OU le garder en défense | `70f9c93`+ |
+| C5 | **Annulation (retour arrière) locale seulement** : Vector envoie le snapshot complet mais Orders.Api traite `null = ignorer` → l'effacement d'un jalon ne remonte pas à la régulation | contrat operational | Orders.Api bascule en `null = effacé` (endPoint.md §3) — alors plus aucun changement Vector | `12057f8` |
+| C6 | **`Keycloak:DisableValidation=true`** — décode le token SANS vérifier signature/issuer/expiration (DEV uniquement) | `Program.cs` + config serveur | **OBLIGATOIRE avant prod** : passer à `false` (Authority joignable) | `c8b131c` |
+
+> Compléments déjà planifiés ailleurs : photo carte mutuelle **SQL (V1) → fichier (V2)** = Vd-6 ; base
+> dédiée **`DB_VECTOR`** = Vd-1. Voir §2bis / Phase 3.
+
+---
+
 **Fin du document**

@@ -135,10 +135,11 @@ Le personnel devient le conducteur actif à la date `from` → doit ensuite ress
 
 ---
 
-## 3) `PUT /missions/{missionId}/operational` — avancement terrain (⚠️ passe en `null = effacé`)
+## 3) `PUT /missions/{missionId}/operational` — avancement terrain (`null = effacé`) — ✅ implémenté 2026-07-05
 
 Vector projette l'avancement opérationnel terrain (jalons) pour que la **régulation reste
-synchronisée**. Cet endpoint **existe déjà** ; le seul changement demandé est **sémantique**.
+synchronisée**. Cet endpoint **existe déjà** ; le changement de sémantique (`null = effacé`) est
+**implémenté et déployé côté Orders.Api (2026-07-05)**. Aucun changement Vector supplémentaire.
 
 ### Requête
 ```
@@ -193,6 +194,30 @@ statut en conséquence (retour arrière). `read` (Seen) = marqueur, sans transit
 
 > ⚠️ Tant que ce n'est pas basculé en `null = effacé`, l'annulation reste **locale** côté Vector
 > (BD Mobile) sans remonter à la régulation.
+
+---
+
+## 4) `GET /missions` — filtre équipage `assignedCrewId` (perf + anti-troncature)
+
+Pour la liste terrain, Vector appelle `GET /missions?from&to&take=500` puis filtre par équipage
+**côté client**. Deux limites :
+- **Perf** : rapatrie toutes les missions du jour (toute la société) pour n'en garder qu'une poignée — répété par chaque ambulancier à chaque chargement.
+- **Correction** : le plafond `take=500` est **global** → un jour à &gt; 500 missions, des missions d'un équipage peuvent être **silencieusement tronquées**.
+
+### Demande
+Accepter un paramètre **répétable `assignedCrewId`** :
+```
+GET /missions?from=…&to=…&unassignedOnly=false&includeCancelled=false&take=500
+    &assignedCrewId={crewId}&assignedCrewId={crewId2}
+```
+| Cas | Comportement attendu |
+|-----|----------------------|
+| `assignedCrewId` présent (1..n) | ne renvoyer que les missions dont l'équipage affecté ∈ la liste |
+| absent | comportement actuel inchangé |
+
+Effet : payload réduit à la poignée de missions de l'équipage, plafond `take` **appliqué après filtre** (non tronquant), charge DB réduite.
+
+> Vector envoie **déjà** ces paramètres (rétro-compatible : ignorés aujourd'hui, le filtre client garantit le résultat). Dès qu'Orders.Api les honore, gain automatique **sans redéploiement Vector**.
 
 ---
 

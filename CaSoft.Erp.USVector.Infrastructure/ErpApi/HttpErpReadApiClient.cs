@@ -26,11 +26,18 @@ public sealed class HttpErpReadApiClient : IErpReadApiClient
         => await GetOrNullAsync<ErpMissionFullDto>($"missions/{missionId}/full", ct);
 
     public async Task<IReadOnlyList<ErpMissionListItemDto>> ListMissionsAsync(
-        DateTime from, DateTime to, int take, CancellationToken ct = default)
+        DateTime from, DateTime to, int take,
+        IReadOnlyCollection<Guid>? assignedCrewIds = null, CancellationToken ct = default)
     {
         var url = $"missions?from={Uri.EscapeDataString(from.ToString("o"))}"
                 + $"&to={Uri.EscapeDataString(to.ToString("o"))}"
                 + $"&unassignedOnly=false&includeCancelled=false&take={take}";
+
+        // Filtre équipage (param répétable) : ne rapatrie que les missions du/des crew(s). Ignoré
+        // par Orders.Api tant que non implémenté → repli sur le filtre client (correction préservée).
+        if (assignedCrewIds is { Count: > 0 })
+            url += string.Concat(assignedCrewIds.Select(id => $"&assignedCrewId={id}"));
+
         var list = await _http.GetFromJsonAsync<List<ErpMissionListItemDto>>(url, JsonOptions, ct);
         return list ?? new List<ErpMissionListItemDto>(0);
     }
