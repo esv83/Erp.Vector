@@ -99,8 +99,11 @@ Public Class ClJobService
     End Function
 
     Public Sub MarkMissionSeen(gJobId As Guid, handler As IResponseHandler) Implements IJobService.MarkMissionSeen
+        ' Use case migré au Result pattern : branché dans la plomberie legacy via l'adaptateur
+        ' (parité HTTP stricte). Le contrôleur reste inchangé.
         Dim useCase As New ClMarkMissionSeenUseCase(gJobId, _jobTimeRepository)
-        useCase.execute(handler)
+        Dim adapter As New ClResultUseCaseAdapter(Of Boolean)(useCase)
+        adapter.Execute(handler)
 
     End Sub
 
