@@ -188,12 +188,18 @@ Outbox → Orders applique l'état verbatim. Aucun autre changement Vector néce
 |------|-----|
 | `200` / `204` | appliqué (Vector teste `IsSuccessStatusCode`) |
 
-### Effet statut (règles Orders.Api, inchangées)
-`go` → **InProgress** ; `terminate` → **Terminé** ; l'effacement d'un jalon doit **re-dériver** le
-statut en conséquence (retour arrière). `read` (Seen) = marqueur, sans transition de statut.
+### Effet statut (Orders.Api — ✅ implémenté 2026-07-05)
+**`onsite` (sur place) → En cours** ; `terminate` (disponible) → **Terminé**. **`go` (en route) et
+`read` (vue) = marqueurs d'affichage** (pilotent l'icône board), **sans transition de statut**.
+L'effacement d'un jalon **re-dérive** le statut (retour arrière : `terminate` effacé ⇒ Terminé→En cours ;
+`onsite` effacé ⇒ En cours→À faire). **Clôturé / Annulée** restent pilotés par la régulation — jamais reculés.
 
-> ⚠️ Tant que ce n'est pas basculé en `null = effacé`, l'annulation reste **locale** côté Vector
-> (BD Mobile) sans remonter à la régulation.
+> ⚠️ **Correctif vs 1ʳᵉ version de cette note** : c'est **`onsite` (sur place)** qui fait passer *En cours*,
+> **pas `go` (en route)** — décision régulation 2026-07-05. `go` reste envoyé/persisté (il pilote l'icône
+> board « en route ») mais **ne démarre pas** la mission.
+
+> ✅ Basculé en `null = effacé` côté Orders : l'annulation (retour arrière) **remonte désormais à la
+> régulation** automatiquement (Vector envoyait déjà le snapshot complet).
 
 ---
 
