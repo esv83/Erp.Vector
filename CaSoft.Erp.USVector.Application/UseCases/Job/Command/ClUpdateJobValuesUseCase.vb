@@ -1,56 +1,46 @@
-﻿
-Public Class ClUpdateJobValuesUseCase
-    Inherits ClUseCaseBase
 
-    Private _command As ClUpdateJobValuesCommand
-    Private _cache As ClJobListCache
-    Private _repository As IJobRepository
+' Mise à jour des valeurs d'attributs d'une mission — Result pattern. (Sans consommateur actif.)
+Public Class ClUpdateJobValuesUseCase
+    Implements IResultUseCase(Of Boolean)
+
+    Private ReadOnly _command As ClUpdateJobValuesCommand
+    Private ReadOnly _cache As ClJobListCache
+    Private ReadOnly _repository As IJobRepository
 
     Public Sub New(command As ClUpdateJobValuesCommand, cache As ClJobListCache, repository As IJobRepository)
         _command = command
         _cache = cache
         _repository = repository
     End Sub
-    Public Overrides Sub execute(presenter As IResponseHandler)
-        ' Dim job = _repository.GetJob(CommandQuery.JobId)
-        Try
-            'En affectant un contractType,
-            'la liste des attributs disponible est mise a jour
 
-            'Todo Remplacer par SetContractType Serait plus explicite
+    Public Function Handle() As ClResult(Of Boolean) Implements IResultUseCase(Of Boolean).Handle
+
+        Try
+            'En affectant un contractType, la liste des attributs disponible est mise a jour.
             Dim job = _cache.GetJob(_command.JobID)
             Dim contractType = _repository.Invoicing.GetContract(_command.JobID)
 
-            '  CommandQuery.Job.SetContractType(contractType)
+            Dim errors As New List(Of String)
             For Each attribut In _command.AttributList
                 Try
                     job.UpdateAttribute(attribut.Name, attribut.Value)
                 Catch ex As Exception
-                    Response.AddError(ex.Message)
-                    ' MyBase.Response()
+                    errors.Add(ex.Message)
                 End Try
-
             Next
 
-            If Not Response.HasError Then
-                _repository.Save(job)
+            If errors.Count > 0 Then
+                Return ClResult(Of Boolean).Fail(ClError.Application(String.Join(" ; ", errors)))
             End If
 
-            Response.SetResult(True)
+            _repository.Save(job)
+            Return ClResult(Of Boolean).Ok(True)
 
         Catch ex As Exception
-            Response.AddError(ex.Message)
-        Finally
-            presenter.Handle(Response)
+            Return ClResult(Of Boolean).Fail(ClError.Application(ex.Message, ex))
         End Try
 
-
-
-    End Sub
-
-    Public Overrides Sub Before()
-
-    End Sub
+    End Function
 
 
 #Region "Adapter"

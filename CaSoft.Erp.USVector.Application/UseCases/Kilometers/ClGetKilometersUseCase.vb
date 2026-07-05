@@ -1,38 +1,31 @@
-﻿Public Class ClGetKilometersUseCase
-    Inherits ClUseCaseBase
-    Implements IUseCase
 
-    Private _query As Guid
-    Private _repository As ICrewRepository
-    Private _cache As ICrewCache
+' Lecture du kilométrage véhicule — Result pattern. (Sans consommateur actif.)
+Public Class ClGetKilometersUseCase
+    Implements IResultUseCase(Of ClKmModel)
+
+    Private ReadOnly _query As Guid
+    Private ReadOnly _repository As ICrewRepository
+    Private ReadOnly _cache As ICrewCache
+
     Public Sub New(query As Guid, cache As ICrewCache, Repository As ICrewRepository)
         _query = query
         _repository = Repository
         _cache = cache
     End Sub
 
-    Public Overrides Sub execute(presenter As IResponseHandler) Implements IUseCase.Execute
+    Public Function Handle() As ClResult(Of ClKmModel) Implements IResultUseCase(Of ClKmModel).Handle
 
-        If CanExecute() Then
-            Try
-                Dim KmModel As New ClKmModel
-                Dim crew = _cache.GetCrew(_query)
-                If crew.Vehicle.HasLastKilometers Then
-                    Response.SetResult(New ClKmModel With {.Km = crew.Vehicle.LastKilometers.Kilometers})
-                Else
-                    Response.SetResult(New ClKmModel With {.Km = 0})
-                End If
-            Catch ex As Exception
-                Response.AddError(ex.Message)
-            Finally
-                presenter.Handle(Response)
-            End Try
-        End If
+        Try
+            Dim crew = _cache.GetCrew(_query)
+            If crew.Vehicle.HasLastKilometers Then
+                Return ClResult(Of ClKmModel).Ok(New ClKmModel With {.Km = crew.Vehicle.LastKilometers.Kilometers})
+            Else
+                Return ClResult(Of ClKmModel).Ok(New ClKmModel With {.Km = 0})
+            End If
+        Catch ex As Exception
+            Return ClResult(Of ClKmModel).Fail(ClError.Application(ex.Message, ex))
+        End Try
 
-
-    End Sub
-
-    Public Overrides Sub Before()
-    End Sub
+    End Function
 
 End Class

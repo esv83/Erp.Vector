@@ -1,6 +1,7 @@
 ﻿using CaSoft.Framework;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
+using CaSoft.Erp.USVector.Api.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CaSoft.Erp.USVector.Api.Controllers
@@ -16,7 +17,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
            
             ClGetJobEditFormStructureUseCase useCase = new ClGetJobEditFormStructureUseCase(gJobId,  repository);
 
-            return new ClUseCaseHandler(useCase).Execute();
+            return useCase.Handle().ToActionResult();
 
 
 

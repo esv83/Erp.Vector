@@ -1,38 +1,26 @@
-﻿
-Public Class ClGetSignatureUseCase
-    Inherits ClUseCaseBase
-    Implements IUseCase
 
-    Private _query As Guid
-    Private _repository As ISignatureRepository
+' Lecture de la signature d'une mission — Result pattern.
+Public Class ClGetSignatureUseCase
+    Implements IResultUseCase(Of ClSignatureDto)
+
+    Private ReadOnly _query As Guid
+    Private ReadOnly _repository As ISignatureRepository
 
     Public Sub New(query As Guid, Repository As ISignatureRepository)
         _query = query
-
         _repository = Repository
     End Sub
 
-    Public Overrides sub execute(presenter As IResponseHandler) Implements IUseCase.Execute
+    Public Function Handle() As ClResult(Of ClSignatureDto) Implements IResultUseCase(Of ClSignatureDto).Handle
 
         Try
             Dim SignGuid As New ClValidGuid(_query)
             Dim signature As ClSignatureDto = _repository.Fetch(SignGuid.Value)
-            Response.SetResult(signature)
-
+            Return ClResult(Of ClSignatureDto).Ok(signature)
         Catch ex As Exception
-            Response.AddError(ex.Message)
-
-        Finally
-            presenter.Handle(Response)
-
+            Return ClResult(Of ClSignatureDto).Fail(ClError.Application(ex.Message, ex))
         End Try
 
-
-
-
-    End Sub
-
-    Public Overrides Sub Before()
-    End Sub
+    End Function
 
 End Class

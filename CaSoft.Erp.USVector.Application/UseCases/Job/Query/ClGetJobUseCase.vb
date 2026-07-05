@@ -1,31 +1,26 @@
-﻿
-Public Class ClGetJobUseCase
-    Inherits ClUseCaseBase
-    Implements IUseCase
 
-    Private _query As Guid
-    Private _cache As IJobCache
+' Détail d'une mission (assemblé depuis le cache) — Result pattern.
+Public Class ClGetJobUseCase
+    Implements IResultUseCase(Of ClJobDetailModel)
+
+    Private ReadOnly _query As Guid
+    Private ReadOnly _cache As IJobCache
 
     Public Sub New(Query As Guid, cache As IJobCache)
         _query = Query
         _cache = cache
-        '   _repository = repository
-
     End Sub
-    Public Overrides Sub execute(presenter As IResponseHandler) Implements IUseCase.Execute
+
+    Public Function Handle() As ClResult(Of ClJobDetailModel) Implements IResultUseCase(Of ClJobDetailModel).Handle
+
         Try
             Dim job = _cache.GetJob(_query)
             Dim jobDetail As ClJobDetailModel = New ClJobDetailAdapter(job)
-            Response.SetResult(jobDetail)
+            Return ClResult(Of ClJobDetailModel).Ok(jobDetail)
         Catch ex As Exception
-            Response.AddError(ex.Message)
-        Finally
-            presenter.Handle(Response)
+            Return ClResult(Of ClJobDetailModel).Fail(ClError.Application(ex.Message, ex))
         End Try
 
-    End Sub
+    End Function
 
-    Public Overrides Sub Before()
-
-    End Sub
 End Class

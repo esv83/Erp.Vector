@@ -1,27 +1,25 @@
-﻿Public Class ClUpdateSignUseCase
-    Inherits ClUseCaseBase
+' Enregistrement d'une signature — Result pattern. (Sans consommateur actif : SignatureController
+' écrit via ISignatureRepository directement.)
+Public Class ClUpdateSignUseCase
+    Implements IResultUseCase(Of Boolean)
 
-    Private _repository As ISignatureRepository
-    Private _command As ClUpdateSignCommand
+    Private ReadOnly _repository As ISignatureRepository
+    Private ReadOnly _command As ClUpdateSignCommand
+
     Public Sub New(command As ClUpdateSignCommand, Repository As ISignatureRepository)
         _command = command
         _repository = Repository
     End Sub
 
-    Public Overrides sub execute(presenter As IResponseHandler)
+    Public Function Handle() As ClResult(Of Boolean) Implements IResultUseCase(Of Boolean).Handle
+
         Try
             _repository.Insert(_command.JobId, _command.Data)
-            Response.SetResult(True)
+            Return ClResult(Of Boolean).Ok(True)
         Catch ex As Exception
-            Response.AddError(ex.Message)
-        Finally
-            presenter.Handle(Response)
+            Return ClResult(Of Boolean).Fail(ClError.Application(ex.Message, ex))
         End Try
 
-
-    End Sub
-
-    Public Overrides Sub Before()
-    End Sub
+    End Function
 
 End Class

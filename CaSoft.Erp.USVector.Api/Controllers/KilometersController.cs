@@ -1,6 +1,7 @@
 ﻿using CaSoft.Framework;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
+using CaSoft.Erp.USVector.Api.Infrastructure;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
@@ -23,7 +24,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         {
 
             ClGetKilometersUseCase useCase = new ClGetKilometersUseCase(CrewId,_crewCache, _repository);
-            return new ClUseCaseHandler(useCase).Execute();
+            return useCase.Handle().ToActionResult();
 
             //renvoyer un objet Km Debut, Km Fin
         //    return Ok(4444);  
@@ -35,7 +36,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             ClSetKilometersCommand command = new ClSetKilometersCommand(CrewId, Kilometers, "");
             ClSetKilometersUseCase useCase = new ClSetKilometersUseCase(command, _crewCache, _repository);
           
-            return new ClUseCaseHandler(useCase).Execute();
+            return useCase.Handle().ToActionResult();
         }
 
 

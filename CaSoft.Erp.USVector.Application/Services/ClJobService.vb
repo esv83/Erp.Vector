@@ -23,7 +23,8 @@ Public Class ClJobService
 
         Dim useCase = New ClGetJobEditFormStructureUseCase(gJobId, _jobRepository)
 
-        useCase.execute(handler)
+        Dim adapter As New ClResultUseCaseAdapter(Of List(Of ClMobileAppFieldModel))(useCase)
+        adapter.Execute(handler)
 
     End Sub
     Public Function GetJobValue(gJobId As Guid) As Object Implements IJobService.GetJobValue
@@ -31,7 +32,8 @@ Public Class ClJobService
 
         Dim UseCase = New ClGetJobUseCase(gJobId, _jobCache)
         Dim presenter As New ClDefaultPresenter
-        UseCase.execute(presenter)
+        Dim adapter As New ClResultUseCaseAdapter(Of ClJobDetailModel)(UseCase)
+        adapter.Execute(presenter)
 
         Return presenter
 
@@ -42,7 +44,8 @@ Public Class ClJobService
         Dim presenter As New ClDefaultPresenter()
         Dim UseCase = New ClUpdateJobEditUseCase(Cmd, _jobCache, _jobRepository)
 
-        UseCase.execute(presenter)
+        Dim adapter As New ClResultUseCaseAdapter(Of List(Of ClAttributValueModel))(UseCase)
+        adapter.Execute(presenter)
 
         Return presenter.Response.Data
 

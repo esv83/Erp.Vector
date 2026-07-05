@@ -29,7 +29,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
                 return StatusCode(403, "Mission hors de vos équipages.");
 
             ClGetJobUseCase useCase = new ClGetJobUseCase(gJobId, jobCache);
-            return new ClUseCaseHandler(useCase).Execute();
+            return useCase.Handle().ToActionResult();
         }
     }
 }

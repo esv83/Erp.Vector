@@ -22,7 +22,8 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             }
 
             ClGetSignatureUseCase GetSignatureUseCase = new ClGetSignatureUseCase(gJobId, getSignatureRepository);
-           return new ClUseCaseHandler( GetSignatureUseCase).Execute();
+            // Use case migré au Result pattern : consommé via le pont Result→ActionResult.
+            return GetSignatureUseCase.Handle().ToActionResult();
 
 
         }

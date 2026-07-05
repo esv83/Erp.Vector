@@ -39,12 +39,9 @@ namespace CaSoft.Erp.USVector.Api.Controllers
 
         {
             ClUpdateJobEditCommand Cmd = new ClUpdateJobEditCommand(gJobId, Values);
-            ClWebApiPresenter presenter = new ClWebApiPresenter();
             ClUpdateJobEditUseCase UseCase = new ClUpdateJobEditUseCase(Cmd, _jobCache, _jobRepository);
 
-        UseCase.Execute(presenter);
-
-            return presenter.Result;
+            return UseCase.Handle().ToActionResult();
 
            //  response = jobService.UpdateAttributValues(gJobId, Values);
                   }
