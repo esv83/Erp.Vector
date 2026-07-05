@@ -84,8 +84,9 @@ namespace CaSoft.Erp.USVector.Api.Controllers
                 _logger.LogInformation("GET api/joblist — {Count} équipage(s) actif(s) [{Crews}].",
                     crewIds.Count, string.Join(", ", crewIds));
 
+            // Use case migré au Result pattern : consommé directement via le pont Result→ActionResult.
             var useCase = new ClGetJobListUseCase(crewIds, _crewRepository);
-            var result = new ClUseCaseHandler(useCase).Execute();
+            var result = useCase.Handle().ToActionResult();
             _logger.LogInformation("GET api/joblist — fin, réponse construite.");
             return result;
         }

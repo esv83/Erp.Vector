@@ -1,45 +1,33 @@
-﻿Public Class ClGetJobListUseCase
-    Inherits ClUseCaseBase
-    Implements IUseCase
+' Liste des missions du personnel (crews actifs résolus du token Keycloak) — Result pattern.
+Public Class ClGetJobListUseCase
+    Implements IResultUseCase(Of ClJobListModel)
 
-    Private _crewIds As IReadOnlyList(Of Guid)
-    Private _repository As ICrewRepository
-
+    Private ReadOnly _crewIds As IReadOnlyList(Of Guid)
+    Private ReadOnly _repository As ICrewRepository
 
     ''' <summary>MOB-4a — crews actifs du personnel (résolus depuis le sub Keycloak).</summary>
     Public Sub New(crewIds As IReadOnlyList(Of Guid), repository As ICrewRepository)
         _crewIds = crewIds
         _repository = repository
-
     End Sub
 
-    Public Overrides Sub execute(presenter As IResponseHandler) Implements IUseCase.Execute
+    Public Function Handle() As ClResult(Of ClJobListModel) Implements IResultUseCase(Of ClJobListModel).Handle
 
-        If CanExecute() Then
+        Try
+            Dim jobList = _repository.FetchJobList(_crewIds)
 
-            Try
+            ' Instructions régulation : pas d'équivalent ERP (union sur les crews, vide en V1).
+            Dim instructionList As New List(Of ClInstructionListItemModel)
+            For Each crewId In _crewIds
+                instructionList.AddRange(_repository.FetchInstructionList(crewId))
+            Next
 
-                Dim jobList = _repository.FetchJobList(_crewIds)
+            Return ClResult(Of ClJobListModel).Ok(New ClJobListModel(jobList, instructionList))
 
-                ' Instructions régulation : pas d'équivalent ERP (union sur les crews, vide en V1).
-                Dim instructionList As New List(Of ClInstructionListItemModel)
-                For Each crewId In _crewIds
-                    instructionList.AddRange(_repository.FetchInstructionList(crewId))
-                Next
+        Catch ex As Exception
+            Return ClResult(Of ClJobListModel).Fail(ClError.Application(ex.Message, ex))
+        End Try
 
-                Response.SetResult(New ClJobListModel(jobList, instructionList))
+    End Function
 
-            Catch ex As Exception
-                Response.AddError(ex.Message)
-            Finally
-                presenter.Handle(Response)
-            End Try
-
-        End If
-
-    End Sub
-
-    Public Overrides Sub Before()
-
-    End Sub
 End Class

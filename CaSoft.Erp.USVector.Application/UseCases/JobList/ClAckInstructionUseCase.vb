@@ -1,27 +1,24 @@
-﻿Friend Class ClAckInstructionUseCase
-    Inherits ClUseCaseBase
+' Acquittement d'une instruction régulation — Result pattern. (Instructions non exposées en V1.)
+Friend Class ClAckInstructionUseCase
+    Implements IResultUseCase(Of Boolean)
 
-    Private _query As Integer
-    Private _repository As ICrewRepository
+    Private ReadOnly _query As Integer
+    Private ReadOnly _repository As ICrewRepository
+
     Public Sub New(query As Integer, repository As ICrewRepository)
         _query = query
         _repository = repository
     End Sub
 
-    Public Overrides Sub execute(presenter As IResponseHandler)
-        If CanExecute() Then
-            Try
-                _repository.AckInstruction(_query)
-                Response.SetResult(True)
-            Catch ex As Exception
-                Response.AddError(ex.Message)
-            Finally
-                presenter.Handle(Response)
-            End Try
-        End If
-    End Sub
+    Public Function Handle() As ClResult(Of Boolean) Implements IResultUseCase(Of Boolean).Handle
 
-    Public Overrides Sub Before()
+        Try
+            _repository.AckInstruction(_query)
+            Return ClResult(Of Boolean).Ok(True)
+        Catch ex As Exception
+            Return ClResult(Of Boolean).Fail(ClError.Application(ex.Message, ex))
+        End Try
 
-    End Sub
+    End Function
+
 End Class

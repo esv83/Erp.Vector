@@ -88,8 +88,8 @@ Public Class ClCrewService
 
         Dim useCase = New ClGetJobListUseCase(New List(Of Guid) From {gCrewId}, _repository)
 
-        'Dim presenter As New ClDefaultPresenter
-        useCase.execute(handler)
+        Dim adapter As New ClResultUseCaseAdapter(Of ClJobListModel)(useCase)
+        adapter.Execute(handler)
 
 
     End Sub
@@ -99,7 +99,8 @@ Public Class ClCrewService
         Dim UseCase = New ClAckInstructionUseCase(gJobId, _repository)
 
         Dim presenter As New ClDefaultPresenter
-        UseCase.execute(presenter)
+        Dim adapter As New ClResultUseCaseAdapter(Of Boolean)(UseCase)
+        adapter.Execute(presenter)
 
         Return False
         'Return presenter.Response
