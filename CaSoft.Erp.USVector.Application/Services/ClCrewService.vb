@@ -25,7 +25,8 @@ Public Class ClCrewService
         Dim command = New ClSetDriverCommand(gCrewId, gEmployeeId)
         Dim UseCase = New ClSetDriverUseCase(command, _repository)
 
-        UseCase.execute(handler)
+        Dim adapter As New ClResultUseCaseAdapter(Of Boolean)(UseCase)
+        adapter.Execute(handler)
 
 
 
