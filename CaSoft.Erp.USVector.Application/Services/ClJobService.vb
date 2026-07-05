@@ -69,6 +69,12 @@ Public Class ClJobService
         useCase.execute(handler)
 
     End Sub
+    Public Sub ClearJobTime(gJobId As Guid, jalon As String, handler As IResponseHandler) Implements IJobService.ClearJobTime
+
+        Dim useCase = New ClClearJobTimeUseCase(gJobId, jalon, _jobRepository)
+        useCase.execute(handler)
+
+    End Sub
     Public Sub EditMission()
 
     End Sub

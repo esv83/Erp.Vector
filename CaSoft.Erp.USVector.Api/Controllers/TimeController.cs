@@ -45,6 +45,17 @@ namespace CaSoft.Erp.USVector.Api.Controllers
 
                   }
 
+        // DELETE api/time/{id}/{jalon} — retour arrière : efface un jalon (seen | go | onsite | terminate).
+        // L'effacement est projeté (Outbox) → régulation resynchronisée dès qu'Orders.Api gère « null = effacé ».
+        [HttpDelete("{gJobId}/{jalon}")]
+        [FreezeOnTransfer]
+        public IActionResult ClearJobTime(Guid gJobId, string jalon)
+        {
+            ClWebApiPresenter presenter = ClWebApiPresenter.GetPresenter();
+            _jobService.ClearJobTime(gJobId, jalon, (IResponseHandler) presenter);
+            return presenter.Result;
+        }
+
     }
 }
 
