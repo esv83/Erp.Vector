@@ -45,4 +45,16 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
             missionId, (int)response.StatusCode, content);
         throw new HttpRequestException($"Orders.Api PUT missions/{missionId}/operational → {(int)response.StatusCode}.");
     }
+
+    public async Task SetCrewDriverAsync(Guid crewId, Guid driverPersonnelId, DateTime from, CancellationToken ct = default)
+    {
+        var body = new { driverPersonnelId, from };
+        var response = await _http.PutAsJsonAsync($"crews/{crewId}/driver", body, JsonOptions, ct);
+        if (response.IsSuccessStatusCode) return;
+
+        var content = await response.Content.ReadAsStringAsync(ct);
+        _logger.LogError("Orders.Api PUT crews/{CrewId}/driver a échoué : {Status} {Body}",
+            crewId, (int)response.StatusCode, content);
+        throw new HttpRequestException($"Orders.Api PUT crews/{crewId}/driver → {(int)response.StatusCode}.");
+    }
 }

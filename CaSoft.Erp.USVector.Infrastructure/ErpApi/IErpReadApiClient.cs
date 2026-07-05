@@ -19,6 +19,12 @@ public interface IErpReadApiClient
     Task<IReadOnlyList<Guid>> ListCrewIdsAsync(
         Guid personnelId, DateOnly onDate, int take, CancellationToken ct = default);
 
+    /// <summary>
+    /// Détail complet d'un équipage (membres avec Id, conducteur actif, véhicule) — MOB-4/MOB-11.
+    /// Null si l'équipage est introuvable côté ERP.
+    /// </summary>
+    Task<ErpCrewFullDto?> GetCrewFullAsync(Guid crewId, CancellationToken ct = default);
+
     /// <summary>Résolution identité Keycloak (sub) → PER_ID. Null si non mappé ou endpoint absent.</summary>
     Task<Guid?> ResolvePersonnelIdByKeycloakAsync(Guid keycloakSub, CancellationToken ct = default);
 

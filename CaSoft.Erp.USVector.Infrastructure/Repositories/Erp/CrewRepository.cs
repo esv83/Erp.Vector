@@ -2,6 +2,7 @@ using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Dto;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.ErpApi;
+using CaSoft.Erp.USVector.Infrastructure.Mapping;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
 // ICrewRepository existe côté ERP et côté mobile : on désambiguïse explicitement.
 using IMobileCrewRepository = CaSoft.Erp.USVector.Application.Port.ICrewRepository;
@@ -18,12 +19,15 @@ namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Erp;
 public class CrewRepository : IMobileCrewRepository
 {
     private readonly IErpReadApiClient _erp;
+    private readonly IErpWriteApiClient _erpWrite;
     private readonly MobileDbContext _mobileDb;
     private readonly ISignatureRepository _signatures;
 
-    public CrewRepository(IErpReadApiClient erp, MobileDbContext mobileDb, ISignatureRepository signatures)
+    public CrewRepository(IErpReadApiClient erp, IErpWriteApiClient erpWrite,
+        MobileDbContext mobileDb, ISignatureRepository signatures)
     {
         _erp = erp;
+        _erpWrite = erpWrite;
         _mobileDb = mobileDb;
         _signatures = signatures;
     }
@@ -97,11 +101,36 @@ public class CrewRepository : IMobileCrewRepository
     public List<ClInstructionListItemModel> FetchInstructionList(Guid gCrewId)
         => new();
 
+    // ── MOB-4 : détail d'un équipage (membres + conducteur + véhicule) via Orders.Api ────────
+    public ClCrew GetCrew(Guid gCrewID)
+    {
+        var dto = _erp.GetCrewFullAsync(gCrewID, CancellationToken.None).GetAwaiter().GetResult();
+        if (dto is null)
+            throw new InvalidOperationException($"Équipage {gCrewID} introuvable côté ERP.");
+        return dto.ToDomain();
+    }
+
+    public bool IsEmployeeInCrew(Guid gCrewID, Guid gEmployeeId)
+    {
+        var dto = _erp.GetCrewFullAsync(gCrewID, CancellationToken.None).GetAwaiter().GetResult();
+        return dto is not null && dto.Members.Any(m => m.Id == gEmployeeId);
+    }
+
+    // ── MOB-11 : désignation du conducteur (écriture ERP) ────────────────────────────────────
+    public void Update(ClCrew crew)
+    {
+        var driver = crew.LastDriver;
+        if (driver is null)
+            throw new InvalidOperationException($"Aucun conducteur à enregistrer pour l'équipage {crew.CrewId}.");
+
+        _erpWrite.SetCrewDriverAsync(crew.CrewId, driver.Employee.Id, driver.From, CancellationToken.None)
+            .GetAwaiter().GetResult();
+    }
+
     // ── À implémenter ultérieurement ────────────────────────────────────────
-    public ClCrew GetCrew(Guid gCrewID) => throw new NotImplementedException("MOB-4");
-    public bool IsEmployeeInCrew(Guid gCrewID, Guid gEmployeeId) => throw new NotImplementedException("MOB-4");
-    public ClLogDriverModel GetCrewDriver(Guid gVehicleID) => throw new NotImplementedException("MOB-11");
-    public void Update(ClCrew crew) => throw new NotImplementedException("MOB-4");
+    // GetCrewDriver(vehicleId) : lookup par véhicule non exposé par Orders.Api (le chemin canonique
+    // passe par GetCrew(crewId)). GetCrewIdList(date) : nécessite un endpoint « crews du jour » global.
+    public ClLogDriverModel GetCrewDriver(Guid gVehicleID) => throw new NotImplementedException("MOB-11 (lookup par véhicule)");
     public void AckInstruction(int instructionId) => throw new NotImplementedException("MOB-5 (instructions post-MVP)");
-    public List<Guid> GetCrewIdList(DateOnly id) => throw new NotImplementedException("MOB-4");
+    public List<Guid> GetCrewIdList(DateOnly id) => throw new NotImplementedException("MOB-4 (liste crews du jour)");
 }

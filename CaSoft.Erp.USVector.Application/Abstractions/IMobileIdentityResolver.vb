@@ -28,6 +28,13 @@ Namespace Port
         Function ResolveActiveCrewIds(personnelId As Guid, onDate As DateOnly) As IReadOnlyList(Of Guid)
 
         ''' <summary>
+        ''' L'équipage unique pertinent du personnel à l'instant <paramref name="at"/> (endpoint
+        ''' Driver token-canonique). S'il en a plusieurs actifs ce jour-là, on retient celui dont la
+        ''' fenêtre de service couvre <paramref name="at"/>, sinon le premier. <c>Nothing</c> si aucun.
+        ''' </summary>
+        Function ResolveActiveCrewId(personnelId As Guid, at As DateTime) As Guid?
+
+        ''' <summary>
         ''' Le personnel peut-il consulter le détail de cette mission ? Vrai si la
         ''' mission est affectée à l'un de ses crews actifs à la date de la mission.
         ''' Garde-fou d'accès du détail (un personnel mappé ne voit pas toutes les

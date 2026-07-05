@@ -23,6 +23,22 @@ public class MobileIdentityResolver : IMobileIdentityResolver
         => _erp.ListCrewIdsAsync(personnelId, onDate, 500, CancellationToken.None)
             .GetAwaiter().GetResult();
 
+    public Guid? ResolveActiveCrewId(Guid personnelId, DateTime at)
+    {
+        var ids = ResolveActiveCrewIds(personnelId, DateOnly.FromDateTime(at));
+        if (ids.Count == 0) return null;
+        if (ids.Count == 1) return ids[0];
+
+        // Plusieurs crews actifs : on privilégie celui dont la fenêtre de service couvre l'instant.
+        foreach (var id in ids)
+        {
+            var full = _erp.GetCrewFullAsync(id, CancellationToken.None).GetAwaiter().GetResult();
+            if (full is not null && full.ServiceStart <= at && (full.ServiceEnd is null || at <= full.ServiceEnd))
+                return id;
+        }
+        return ids[0];
+    }
+
     public bool IsMissionAccessible(Guid personnelId, Guid missionId)
     {
         var mission = _erp.GetMissionFullAsync(missionId, CancellationToken.None)

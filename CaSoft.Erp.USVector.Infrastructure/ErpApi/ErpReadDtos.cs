@@ -77,6 +77,42 @@ public sealed class ErpCrewListItemDto
     public Guid Id { get; set; }
 }
 
+/// <summary>
+/// GET /crews/{crewId} — détail complet d'un équipage (MOB-4/MOB-11) : membres (avec Id),
+/// conducteur actif, véhicule, fenêtre de service. Endpoint additif côté Orders.Api.
+/// </summary>
+public sealed class ErpCrewFullDto
+{
+    public Guid Id { get; set; }
+    public DateTime ServiceStart { get; set; }
+    public DateTime? ServiceEnd { get; set; }
+    public ErpCrewVehicleDto? Vehicle { get; set; }
+    /// <summary>Conducteur actif, ou null si aucun n'a encore été désigné.</summary>
+    public ErpCrewDriverDto? ActiveDriver { get; set; }
+    public List<ErpCrewMemberDto> Members { get; set; } = new();
+}
+
+/// <summary>Membre d'équipage (personnel) — Id = PER_ID.</summary>
+public sealed class ErpCrewMemberDto
+{
+    public Guid Id { get; set; }
+    public string? FirstName { get; set; }
+    public string? LastName { get; set; }
+}
+
+public sealed class ErpCrewVehicleDto
+{
+    public Guid Id { get; set; }
+    public string? Immatriculation { get; set; }
+}
+
+/// <summary>Conducteur actif d'un équipage : le personnel désigné et depuis quand.</summary>
+public sealed class ErpCrewDriverDto
+{
+    public Guid PersonnelId { get; set; }
+    public DateTime From { get; set; }
+}
+
 /// <summary>GET /missions/{id} — on ne lit que le statut de transfert (gel terrain, TRF-7).</summary>
 public sealed class ErpMissionStatusDto
 {

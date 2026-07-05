@@ -16,4 +16,10 @@ public interface IErpWriteApiClient
         DateTime? ackAt, DateTime? readAt, DateTime? goAt,
         DateTime? onsiteAt, DateTime? terminateAt,
         Guid? sourceCrewId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Désigne le conducteur d'un équipage (PUT /crews/{id}/driver, MOB-11). Endpoint additif
+    /// côté Orders.Api : le personnel indiqué devient le conducteur actif à la date fournie.
+    /// </summary>
+    Task SetCrewDriverAsync(Guid crewId, Guid driverPersonnelId, DateTime from, CancellationToken ct = default);
 }

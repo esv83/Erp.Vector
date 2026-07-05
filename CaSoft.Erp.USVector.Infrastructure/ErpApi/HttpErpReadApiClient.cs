@@ -53,6 +53,9 @@ public sealed class HttpErpReadApiClient : IErpReadApiClient
         return list is null ? Array.Empty<Guid>() : list.Select(c => c.Id).ToList();
     }
 
+    public async Task<ErpCrewFullDto?> GetCrewFullAsync(Guid crewId, CancellationToken ct = default)
+        => await GetOrNullAsync<ErpCrewFullDto>($"crews/{crewId}", ct);
+
     public async Task<Guid?> ResolvePersonnelIdByKeycloakAsync(Guid keycloakSub, CancellationToken ct = default)
     {
         // sub Keycloak → PER_ID via PER_KEYCLOAK_MAP (Orders.Api). 404 → null (compte non rattaché).

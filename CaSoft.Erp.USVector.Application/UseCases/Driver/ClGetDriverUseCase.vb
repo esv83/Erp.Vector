@@ -16,13 +16,17 @@ Public Class ClGetDriverUseCase
             Try
 
                 Dim crew = _repository.GetCrew(_query)
+                Dim lastDriver = crew.LastDriver
 
                 Dim LogDriverModel As New ClLogDriverModel
                 With LogDriverModel
-                    .ChangeDate = crew.LastDriver.From
                     .DriversCollection = New ClDriverListModel(crew.EmployeeList)
-                    .SelectedDriver = New ClDriverModel(crew.LastDriver.Employee)
                     .VehicleModel = New ClVehicleModel(crew.Vehicle)
+                    ' Conducteur non encore désigné : SelectedDriver/ChangeDate restent Nothing.
+                    If lastDriver IsNot Nothing Then
+                        .ChangeDate = lastDriver.From
+                        .SelectedDriver = New ClDriverModel(lastDriver.Employee)
+                    End If
                 End With
 
                 Response.SetResult(LogDriverModel)
