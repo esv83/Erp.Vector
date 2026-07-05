@@ -11,6 +11,15 @@
         Public Property IsSerial As Boolean
         ' « Mission vue » (spec §10) : true = mission reçue/vue par l'équipage → l'UI masque l'icône.
         Public Property IsSeen As Boolean
+
+        ' ⚠️ Compat TEMPORAIRE (dev UI injoignable) : ancien nom du flag, alias de IsSeen.
+        ' Les deux champs sortent dans le JSON avec la même valeur. À RETIRER une fois l'UI
+        ' basculée sur IsSeen.
+        Public ReadOnly Property IsAck As Boolean
+            Get
+                Return IsSeen
+            End Get
+        End Property
         Public Property IsTerminated As Boolean
         ''' <summary>MOB-8 — Présence d'une signature patient (reflète MI_SIGNATURE_EXISTS).</summary>
         Public Property SignatureExists As Boolean
