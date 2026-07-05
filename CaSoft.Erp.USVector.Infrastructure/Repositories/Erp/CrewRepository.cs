@@ -18,6 +18,9 @@ namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Erp;
 /// </summary>
 public class CrewRepository : IMobileCrewRepository
 {
+    // Statut mission Orders.Api à partir duquel la mission n'apparaît plus au terrain (clôturée). Cf. spec §14.
+    private const int ClosedMissionStatus = 4;
+
     private readonly IErpReadApiClient _erp;
     private readonly IErpWriteApiClient _erpWrite;
     private readonly MobileDbContext _mobileDb;
@@ -51,8 +54,11 @@ public class CrewRepository : IMobileCrewRepository
             .GetAwaiter().GetResult();
 
         // Union des missions des crews du personnel (dédupliquée par mission).
+        // Affichées jusqu'à « Terminé » (status 3) ; les missions clôturées (status ≥ 4) disparaissent
+        // du terrain (spec §14 : accès autorisé jusqu'au statut clôturé).
         var crewMissions = missions
-            .Where(m => m.AssignedCrewId.HasValue && crewSet.Contains(m.AssignedCrewId.Value))
+            .Where(m => m.AssignedCrewId.HasValue && crewSet.Contains(m.AssignedCrewId.Value)
+                        && m.Status < ClosedMissionStatus)
             .GroupBy(m => m.Id)
             .Select(g => g.First())
             .OrderBy(m => m.MissionDate)

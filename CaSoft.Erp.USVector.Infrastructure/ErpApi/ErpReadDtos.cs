@@ -36,6 +36,10 @@ public sealed class ErpMissionFullDto
 public sealed class ErpMissionListItemDto
 {
     public Guid Id { get; set; }
+
+    /// <summary>Statut mission Orders.Api : 1=Engagé/À faire, 2=EnCours, 3=Terminé, 4=Clôturé
+    /// (visualStatus « Closed »). Le mobile affiche jusqu'à « Terminé » ; ≥ 4 (clôturé) est masqué (spec §14).</summary>
+    public int Status { get; set; }
     public Guid? AssignedCrewId { get; set; }
     public string? BeneficiaryDisplayName { get; set; }
     public int TransportModeId { get; set; }
