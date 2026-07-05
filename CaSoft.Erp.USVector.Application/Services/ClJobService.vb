@@ -66,13 +66,15 @@ Public Class ClJobService
         Dim jobTimeCommand = New ClJobTimeCommand(gJobId, jobTimeModel)
         Dim useCase = New ClUpdateTimeUseCase(jobTimeCommand, _jobRepository)
 
-        useCase.execute(handler)
+        Dim adapter As New ClResultUseCaseAdapter(Of Boolean)(useCase)
+        adapter.Execute(handler)
 
     End Sub
     Public Sub ClearJobTime(gJobId As Guid, jalon As String, handler As IResponseHandler) Implements IJobService.ClearJobTime
 
         Dim useCase = New ClClearJobTimeUseCase(gJobId, jalon, _jobRepository)
-        useCase.execute(handler)
+        Dim adapter As New ClResultUseCaseAdapter(Of Boolean)(useCase)
+        adapter.Execute(handler)
 
     End Sub
     Public Sub EditMission()
@@ -83,7 +85,8 @@ Public Class ClJobService
 
         Dim useCase As New ClGetTimeUseCase(gJobId, _jobRepository)
 
-        useCase.execute(handler)
+        Dim adapter As New ClResultUseCaseAdapter(Of ClJobTimeModel)(useCase)
+        adapter.Execute(handler)
 
 
 
