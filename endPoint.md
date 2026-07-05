@@ -1,8 +1,9 @@
-# Orders.Api — endpoints à implémenter pour la feature « Driver » (MOB-4 / MOB-11)
+# Orders.Api — contrats attendus par Vector.Api
 
-Ce document est le **contrat** que Vector.Api attend d'Orders.Api pour la fonctionnalité
-« conducteur d'équipage ». Le code Vector est déjà écrit et appelle ces deux routes ; il suffit
-de les implémenter côté Orders au contrat ci-dessous.
+Ce document est le **contrat** que Vector.Api attend d'Orders.Api. Le code Vector est déjà écrit et
+appelle ces routes ; il suffit de les implémenter/ajuster côté Orders au contrat ci-dessous.
+- **§1–§2** : feature « Driver » (conducteur d'équipage, MOB-4/MOB-11).
+- **§3** : avancement terrain `PUT missions/{id}/operational` — **sémantique autoritaire `null = effacé`** (retour arrière).
 
 ## Contexte
 
@@ -134,6 +135,67 @@ Le personnel devient le conducteur actif à la date `from` → doit ensuite ress
 
 ---
 
+## 3) `PUT /missions/{missionId}/operational` — avancement terrain (⚠️ passe en `null = effacé`)
+
+Vector projette l'avancement opérationnel terrain (jalons) pour que la **régulation reste
+synchronisée**. Cet endpoint **existe déjà** ; le seul changement demandé est **sémantique**.
+
+### Requête
+```
+PUT /missions/{missionId:guid}/operational
+Content-Type: application/json
+```
+```jsonc
+{
+  "ack":       null,                   // legacy/dormant — généralement null
+  "read":      "2026-07-05T15:20:00",  // « Mission vue » (Seen)
+  "go":        "2026-07-05T15:30:00",  // « En route »
+  "onsite":    "2026-07-05T15:45:00",  // « Sur place »
+  "terminate": null,                   // « Terminé » — ici NON atteint / annulé
+  "sourceCrewId": null
+}
+```
+```csharp
+public sealed class ProjectOperationalRequest
+{
+    public DateTime? Ack { get; init; }
+    public DateTime? Read { get; init; }       // Mission vue (Seen)
+    public DateTime? Go { get; init; }         // En route
+    public DateTime? Onsite { get; init; }     // Sur place
+    public DateTime? Terminate { get; init; }  // Terminé
+    public Guid? SourceCrewId { get; init; }
+}
+```
+
+### 🔴 Changement de sémantique (le point à implémenter)
+Le corps est désormais un **snapshot AUTORITAIRE** de la timeline terrain :
+
+| Champ | Avant (`null = ignorer`) | **Nouveau (`null = effacé`)** |
+|---|---|---|
+| valeur (datetime) | pose le jalon | pose le jalon |
+| **`null`** | ~~ne touche pas au jalon~~ | **efface le jalon** (jalon non atteint / **annulé**) |
+
+**Pourquoi** : permet le **retour arrière** (spec §10). L'ambulancier annule un jalon (ex. « Terminé »
+posé par erreur) → Vector projette le snapshot avec `terminate: null` → Orders doit **remettre le jalon
+à vide** (et re-dériver le statut, ex. repasser de Terminé à En cours).
+
+Vector envoie **toujours le snapshot COMPLET courant** (les 5 jalons, `null` inclus) via son worker
+Outbox → Orders applique l'état verbatim. Aucun autre changement Vector nécessaire.
+
+### Réponses
+| Code | Cas |
+|------|-----|
+| `200` / `204` | appliqué (Vector teste `IsSuccessStatusCode`) |
+
+### Effet statut (règles Orders.Api, inchangées)
+`go` → **InProgress** ; `terminate` → **Terminé** ; l'effacement d'un jalon doit **re-dériver** le
+statut en conséquence (retour arrière). `read` (Seen) = marqueur, sans transition de statut.
+
+> ⚠️ Tant que ce n'est pas basculé en `null = effacé`, l'annulation reste **locale** côté Vector
+> (BD Mobile) sans remonter à la régulation.
+
+---
+
 ## Côté Vector (déjà en place — pour info)
 
 | Élément Vector | Appelle |
@@ -142,6 +204,8 @@ Le personnel devient le conducteur actif à la date `from` → doit ensuite ress
 | `HttpErpWriteApiClient.SetCrewDriverAsync(crewId, driverPersonnelId, from)` | `PUT crews/{crewId}/driver` |
 | `GET /vector/api/Driver` (token-canonique) | résout l'équipage du token puis lit le détail |
 | `POST /vector/api/Driver/{crewId}` (body = PER_ID) | change le conducteur |
+| `HttpErpWriteApiClient.ProjectOperationalAsync(...)` (worker Outbox) | `PUT missions/{id}/operational` (snapshot complet) |
 
-Une fois ces 2 endpoints livrés, la feature Driver fonctionne de bout en bout, **sans
-redéploiement Vector supplémentaire** au-delà de celui de la feature elle-même.
+Une fois §1–§2 livrés, la feature Driver fonctionne de bout en bout. Pour §3, dès qu'Orders.Api
+traite `null = effacé`, le **retour arrière** remonte automatiquement à la régulation, **sans
+changement Vector supplémentaire** (le worker envoie déjà le snapshot complet).
