@@ -9,7 +9,8 @@
 
         Dim useCase = New ClGetMechanicLogUseCase(gCrewId, _repository)
         Dim handler As New ClResponseHandler(Of List(Of cllogentrymodel))
-        useCase.Execute(handler)
+        Dim adapter As New ClResultUseCaseAdapter(Of List(Of ClLogEntryModel))(useCase)
+        adapter.Execute(handler)
 
         Return handler
 
@@ -19,7 +20,8 @@
 
         Dim useCase = New ClGetLogAnalyzeUseCase(intLogId, _repository)
         Dim handler As New ClResponseHandler(Of ClGetLogAnalyzeModel)
-        useCase.Execute(handler)
+        Dim adapter As New ClResultUseCaseAdapter(Of ClGetLogAnalyzeModel)(useCase)
+        adapter.Execute(handler)
 
         Return handler
 
@@ -28,7 +30,8 @@
 
         Dim useCase = New ClInsertLogAnalyzeUseCase(analyze, _repository)
         Dim handler As New ClNoResponseHandler
-        useCase.Execute(handler)
+        Dim adapter As New ClResultUseCaseAdapter(Of Boolean)(useCase)
+        adapter.Execute(handler)
 
         Return handler
 
@@ -36,14 +39,16 @@
     Public Function UpdateAnalyze(analyze As ClEditLogAnalyzeModel) As ClNoResponseHandler
         Dim useCase = New ClUpdateLogAnalyzeUseCase(analyze, _repository)
         Dim handler As New ClNoResponseHandler
-        useCase.Execute(handler)
+        Dim adapter As New ClResultUseCaseAdapter(Of Boolean)(useCase)
+        adapter.Execute(handler)
 
         Return handler
     End Function
     Public Function DeleteAnalyze(intId As Integer) As ClNoResponseHandler
         Dim useCase = New ClDeleteLogAnalyzeUseCase(intId, _repository)
         Dim handler As New ClNoResponseHandler
-        useCase.Execute(handler)
+        Dim adapter As New ClResultUseCaseAdapter(Of Boolean)(useCase)
+        adapter.Execute(handler)
 
         Return handler
 

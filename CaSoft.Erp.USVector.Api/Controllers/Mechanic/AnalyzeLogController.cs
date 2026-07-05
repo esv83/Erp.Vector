@@ -2,6 +2,7 @@
 
 namespace CaSoft.Erp.USVector.Api.Controllers
 {
+    using CaSoft.Erp.USVector.Api.Infrastructure;
     using CaSoft.Erp.USVector.Application;
     using Microsoft.AspNetCore.Mvc;
     using System;
@@ -28,10 +29,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             {
          
 
-            ClGetLogAnalyzeUseCase useCase = new ClGetLogAnalyzeUseCase(intlogId, _repository);
-            ClUseCaseHandler handler = new ClUseCaseHandler(useCase);
-
-            return handler.Execute();
+            return new ClGetLogAnalyzeUseCase(intlogId, _repository).Handle().ToActionResult();
 
         }
 

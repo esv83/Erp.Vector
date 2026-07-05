@@ -1,4 +1,5 @@
-﻿using CaSoft.Erp.USVector.Application;
+﻿using CaSoft.Erp.USVector.Api.Infrastructure;
+using CaSoft.Erp.USVector.Application;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CaSoft.Erp.USVector.Api.Controllers
@@ -19,22 +20,14 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         public IActionResult GetLogs()
         {
 
-            ClGetMechanicLogUseCase UseCase = new ClGetMechanicLogUseCase(_logRepository);
-            ClWebApiPresenter presenter = new ClWebApiPresenter();
-            UseCase.Execute(presenter);
-
-            return presenter.Result;
+            return new ClGetMechanicLogUseCase(_logRepository).Handle().ToActionResult();
 
         }
         [HttpGet("{intCrewId}")]
         public IActionResult GetLogs(Guid intCrewId)
         {
 
-            ClGetMechanicLogUseCase UseCase = new ClGetMechanicLogUseCase(intCrewId,_logRepository);
-            ClWebApiPresenter presenter = ClWebApiPresenter.GetPresenter();
-                   UseCase.Execute(presenter);
-            
-            return presenter.Result;
+            return new ClGetMechanicLogUseCase(intCrewId, _logRepository).Handle().ToActionResult();
 
         }
 
@@ -42,12 +35,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         public IActionResult PostMechanicLog([FromBody] ClInsertLogModel model)
 
         {
-            ClWebApiPresenter presenter = new ClWebApiPresenter();
-            ClInsertMechanicLogUseCase UseCase = new ClInsertMechanicLogUseCase(model, _logRepository);
-
-            UseCase.Execute(presenter);
-
-            return presenter.Result;
+            return new ClInsertMechanicLogUseCase(model, _logRepository).Handle().ToActionResult();
 
         }
     

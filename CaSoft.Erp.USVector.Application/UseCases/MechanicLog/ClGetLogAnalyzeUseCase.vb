@@ -1,18 +1,18 @@
-﻿
+' Lecture de l'analyse d'un log mécanique — Result pattern. (Analyse absente → Ok(Nothing) → 404.)
 Public Class ClGetLogAnalyzeUseCase
-    Inherits ClUseCaseBase
+    Implements IResultUseCase(Of ClGetLogAnalyzeModel)
 
-    Private _logId As Integer
-    Private _repository As ILogAnalyzeRepository
+    Private ReadOnly _logId As Integer
+    Private ReadOnly _repository As ILogAnalyzeRepository
+
     Public Sub New(intLogId As Integer, repository As ILogAnalyzeRepository)
         _logId = intLogId
         _repository = repository
     End Sub
 
-    Public Overrides Sub Execute(presenter As IResponseHandler)
-        Try
-            Before()
+    Public Function Handle() As ClResult(Of ClGetLogAnalyzeModel) Implements IResultUseCase(Of ClGetLogAnalyzeModel).Handle
 
+        Try
             Dim logAnalyze = _repository.GetAnalyze(_logId)
 
             Dim analyzeModel As ClGetLogAnalyzeModel = Nothing
@@ -20,20 +20,12 @@ Public Class ClGetLogAnalyzeUseCase
                 analyzeModel = logAnalyze.ToLogAnalyzeModel()
             End If
 
-
-            Response.SetResult(analyzeModel)
+            Return ClResult(Of ClGetLogAnalyzeModel).Ok(analyzeModel)
 
         Catch ex As Exception
-            Response.AddError(ex.Message)
-
-        Finally
-            presenter.Handle(Response)
-
+            Return ClResult(Of ClGetLogAnalyzeModel).Fail(ClError.Application(ex.Message, ex))
         End Try
 
-    End Sub
-
-    Public Overrides Sub Before()
-    End Sub
+    End Function
 
 End Class

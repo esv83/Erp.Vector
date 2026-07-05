@@ -1,33 +1,25 @@
-﻿Public Class ClDeleteLogAnalyzeUseCase
-    Inherits ClUseCaseBase
+' Suppression d'un log mécanique — Result pattern.
+Public Class ClDeleteLogAnalyzeUseCase
+    Implements IResultUseCase(Of Boolean)
 
-    Private _logId As Integer
-    Private _repository As ILogRepository
-
-
+    Private ReadOnly _logId As Integer
+    Private ReadOnly _repository As ILogRepository
 
     Public Sub New(intLogId As Integer, repository As ILogAnalyzeRepository)
         _logId = intLogId
         _repository = repository
     End Sub
 
-    Public Overrides Sub Execute(Handler As IResponseHandler)
+    Public Function Handle() As ClResult(Of Boolean) Implements IResultUseCase(Of Boolean).Handle
+
         Try
-            If CanExecute() Then
-                _repository.DeleteLog(_logId)
-            End If
+            _repository.DeleteLog(_logId)
+            Return ClResult(Of Boolean).Ok(True)
 
         Catch ex As Exception
-            Response.AddError(ex)
-        Finally
-            Handler.Handle(Response)
+            Return ClResult(Of Boolean).Fail(ClError.Application(ex.Message, ex))
         End Try
 
-    End Sub
-
-    Public Overrides Sub Before()
-    End Sub
+    End Function
 
 End Class
-
-

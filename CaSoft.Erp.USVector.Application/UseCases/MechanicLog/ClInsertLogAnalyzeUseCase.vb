@@ -1,38 +1,27 @@
-﻿Public Class ClInsertLogAnalyzeUseCase
-    Inherits ClUseCaseBase
+' Création d'une analyse de log mécanique — Result pattern.
+Public Class ClInsertLogAnalyzeUseCase
+    Implements IResultUseCase(Of Boolean)
 
-    Private _repository As ILogAnalyzeRepository
-    Private _analyzeModel As ClEditLogAnalyzeModel
+    Private ReadOnly _repository As ILogAnalyzeRepository
+    Private ReadOnly _analyzeModel As ClEditLogAnalyzeModel
 
     Public Sub New(analyzeModel As ClEditLogAnalyzeModel, repository As ILogAnalyzeRepository)
         _analyzeModel = analyzeModel
         _repository = repository
-
     End Sub
 
-    Public Overrides Sub Execute(Handler As IResponseHandler)
+    Public Function Handle() As ClResult(Of Boolean) Implements IResultUseCase(Of Boolean).Handle
+
         Try
-            Before()
-
-            If CanExecute() Then
-
-                Dim analyze = _analyzeModel.ToLogAnalyze
-                analyze.MarkAsNew()
-
-                _repository.SaveAnalyze(analyze)
-
-                SetResult(True)
-            End If
+            Dim analyze = _analyzeModel.ToLogAnalyze
+            analyze.MarkAsNew()
+            _repository.SaveAnalyze(analyze)
+            Return ClResult(Of Boolean).Ok(True)
 
         Catch ex As Exception
-            Response.AddError(ex)
-        Finally
-            Handler.Handle(Response)
+            Return ClResult(Of Boolean).Fail(ClError.Application(ex.Message, ex))
         End Try
-    End Sub
 
-    Public Overrides Sub Before()
+    End Function
 
-
-    End Sub
 End Class

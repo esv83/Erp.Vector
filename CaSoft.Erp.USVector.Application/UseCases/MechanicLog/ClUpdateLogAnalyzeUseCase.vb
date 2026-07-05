@@ -1,69 +1,50 @@
-﻿Public Class ClUpdateLogAnalyzeUseCase
-    Inherits ClUseCaseBase
+' Mise à jour d'une analyse de log mécanique (fusion des actions) — Result pattern.
+Public Class ClUpdateLogAnalyzeUseCase
+    Implements IResultUseCase(Of Boolean)
 
-    Private _model As ClEditLogAnalyzeModel
-    Private _repository As ILogAnalyzeRepository
-
-
+    Private ReadOnly _model As ClEditLogAnalyzeModel
+    Private ReadOnly _repository As ILogAnalyzeRepository
 
     Public Sub New(model As ClEditLogAnalyzeModel, repository As ILogAnalyzeRepository)
         _model = model
         _repository = repository
-
     End Sub
 
-    Public Overrides Sub Execute(Handler As IResponseHandler)
+    Public Function Handle() As ClResult(Of Boolean) Implements IResultUseCase(Of Boolean).Handle
+
         Try
-            If CanExecute() Then
+            Dim oldAnalyze = _repository.GetAnalyze(_model.LogId)
+            Dim newAnalyze = _model.ToLogAnalyze
 
-                Dim oldAnalyze = _repository.GetAnalyze(_model.LogId)
-                Dim newAnalyze = _model.ToLogAnalyze
+            oldAnalyze.Analyze = newAnalyze.Analyze
+            oldAnalyze.Concerning = newAnalyze.Concerning
+            oldAnalyze.Detail = newAnalyze.Detail
+            oldAnalyze.ImmobilizeVehicle = newAnalyze.ImmobilizeVehicle
+            oldAnalyze.Nature = newAnalyze.Nature
 
-                oldAnalyze.Analyze = newAnalyze.Analyze
-                oldAnalyze.Concerning = newAnalyze.Concerning
-                oldAnalyze.Detail = newAnalyze.Detail
-                oldAnalyze.ImmobilizeVehicle = newAnalyze.ImmobilizeVehicle
-                oldAnalyze.Nature = newAnalyze.Nature
+            For Each oldAction In oldAnalyze.ActionsList
+                Dim newAction = newAnalyze.ActionsList.FirstOrDefault(Function(f) f.Id = oldAction.Id)
+                If newAction Is Nothing Then
+                    oldAction.MarkAsDeleted()
+                Else
+                    oldAction.Merge(newAction)
+                End If
+            Next
 
-                For Each oldAction In oldAnalyze.ActionsList
+            For Each newAction In newAnalyze.ActionsList
+                Dim oldAction = oldAnalyze.ActionsList.FirstOrDefault(Function(f) f.Id = newAction.Id)
+                If oldAction Is Nothing Then
+                    oldAnalyze.ActionsList.Add(newAction)
+                End If
+            Next
 
-                    Dim newAction = newAnalyze.ActionsList.FirstOrDefault(Function(f) f.Id = oldAction.Id)
-                    If newAction Is Nothing Then
-                        oldAction.MarkAsDeleted()
-                    Else
-                        oldAction.Merge(newAction)
-                    End If
-
-                Next
-
-                For Each newAction In newAnalyze.ActionsList
-                    Dim oldAction = oldAnalyze.ActionsList.FirstOrDefault(Function(f) f.Id = newAction.Id)
-                    If oldAction Is Nothing Then
-                        oldAnalyze.ActionsList.Add(newAction)
-                    End If
-
-                Next
-
-
-
-                '  f
-                _repository.SaveAnalyze(oldAnalyze)
-
-            End If
+            _repository.SaveAnalyze(oldAnalyze)
+            Return ClResult(Of Boolean).Ok(True)
 
         Catch ex As Exception
-            Response.AddError(ex)
-
-        Finally
-            Handler.Handle(Response)
+            Return ClResult(Of Boolean).Fail(ClError.Application(ex.Message, ex))
         End Try
 
-    End Sub
-
-    Public Overrides Sub Before()
-
-    End Sub
+    End Function
 
 End Class
-
-
