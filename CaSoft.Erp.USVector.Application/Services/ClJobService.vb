@@ -1,116 +1,30 @@
-﻿
+
 Public Class ClJobService
     Implements IJobService
 
-    Private _jobRepository As IJobRepository
-    Private _jobTimeRepository As IJobTimeRepository
-    ' Private _responseHandler As IResponseHandler
-    Private _jobCache As ClJobListCache
+    Private ReadOnly _jobRepository As IJobRepository
+    Private ReadOnly _jobTimeRepository As IJobTimeRepository
 
     Public Sub New(jobRepository As IJobRepository, jobTimeRepository As IJobTimeRepository)
         _jobRepository = jobRepository
         _jobTimeRepository = jobTimeRepository
-        ' _responseHandler = presenter
-        ' _jobCache = New ClJobListCache(_repository)
-    End Sub
-    Public Sub SignJob()
-
     End Sub
 
-#Region "Public properties"
-    Public Sub GetJobEditFormStructure(gJobId As Guid, handler As IResponseHandler) Implements IJobService.GetJobEditFormStructure
-
-
-        Dim useCase = New ClGetJobEditFormStructureUseCase(gJobId, _jobRepository)
-
-        Dim adapter As New ClResultUseCaseAdapter(Of List(Of ClMobileAppFieldModel))(useCase)
-        adapter.Execute(handler)
-
-    End Sub
-    Public Function GetJobValue(gJobId As Guid) As Object Implements IJobService.GetJobValue
-
-
-        Dim UseCase = New ClGetJobUseCase(gJobId, _jobCache)
-        Dim presenter As New ClDefaultPresenter
-        Dim adapter As New ClResultUseCaseAdapter(Of ClJobDetailModel)(UseCase)
-        adapter.Execute(presenter)
-
-        Return presenter
-
+    Public Function MarkMissionSeen(gJobId As Guid) As ClResult(Of Boolean) Implements IJobService.MarkMissionSeen
+        Return New ClMarkMissionSeenUseCase(gJobId, _jobTimeRepository).Handle()
     End Function
-    <Obsolete> Public Function UpdateAttributValues(gJobId As Guid, attributsValues As List(Of ClAttributValueModel)) As Boolean Implements IJobService.UpdateAttributValues
 
-        Dim Cmd = New ClUpdateJobEditCommand(gJobId, attributsValues)
-        Dim presenter As New ClDefaultPresenter()
-        Dim UseCase = New ClUpdateJobEditUseCase(Cmd, _jobCache, _jobRepository)
-
-        Dim adapter As New ClResultUseCaseAdapter(Of List(Of ClAttributValueModel))(UseCase)
-        adapter.Execute(presenter)
-
-        Return presenter.Response.Data
-
+    Public Function GetJobTime(gJobId As Guid) As ClResult(Of ClJobTimeModel) Implements IJobService.GetJobTime
+        Return New ClGetTimeUseCase(gJobId, _jobRepository).Handle()
     End Function
-    '<Obsolete> Public Function ReadJob(gJobId As Guid) As IUseCaseResponse(Of Boolean) Implements IJobService.ReadJob
 
-    '    Dim UseCase = New ClReadJobUseCase(gJobId, _jobCache, _repository)
-
-    '    Dim presenter As New ClDefaultPresenter
-    '    UseCase.execute(presenter)
-
-    '    Return presenter.Response.Data
-
-    'End Function
-
-
-#End Region
-
-    Public Sub SetJobTime(gJobId As Guid, jobTimeModel As ClJobTimeModel, handler As IResponseHandler) Implements IJobService.SetJobTime
-
+    Public Function SetJobTime(gJobId As Guid, jobTimeModel As ClJobTimeModel) As ClResult(Of Boolean) Implements IJobService.SetJobTime
         Dim jobTimeCommand = New ClJobTimeCommand(gJobId, jobTimeModel)
-        Dim useCase = New ClUpdateTimeUseCase(jobTimeCommand, _jobRepository)
-
-        Dim adapter As New ClResultUseCaseAdapter(Of Boolean)(useCase)
-        adapter.Execute(handler)
-
-    End Sub
-    Public Sub ClearJobTime(gJobId As Guid, jalon As String, handler As IResponseHandler) Implements IJobService.ClearJobTime
-
-        Dim useCase = New ClClearJobTimeUseCase(gJobId, jalon, _jobRepository)
-        Dim adapter As New ClResultUseCaseAdapter(Of Boolean)(useCase)
-        adapter.Execute(handler)
-
-    End Sub
-    Public Sub EditMission()
-
-    End Sub
-
-    Public Sub GetJobTime(gJobId As Guid, handler As IResponseHandler) Implements IJobService.GetJobTime
-
-        Dim useCase As New ClGetTimeUseCase(gJobId, _jobRepository)
-
-        Dim adapter As New ClResultUseCaseAdapter(Of ClJobTimeModel)(useCase)
-        adapter.Execute(handler)
-
-
-
-    End Sub
-    <Obsolete> Public Function GetJobDetail(gJobId As Guid) As Object Implements IJobService.GetJobDetail
-
-        'Dim UseCase = New ClGetJobUseCase(gJobId)
-        'Dim presenter As New ClDefaultPresenter
-        'UseCase.Execute(presenter)
-
-        'Return presenter.Response.Data
-
+        Return New ClUpdateTimeUseCase(jobTimeCommand, _jobRepository).Handle()
     End Function
 
-    Public Sub MarkMissionSeen(gJobId As Guid, handler As IResponseHandler) Implements IJobService.MarkMissionSeen
-        ' Use case migré au Result pattern : branché dans la plomberie legacy via l'adaptateur
-        ' (parité HTTP stricte). Le contrôleur reste inchangé.
-        Dim useCase As New ClMarkMissionSeenUseCase(gJobId, _jobTimeRepository)
-        Dim adapter As New ClResultUseCaseAdapter(Of Boolean)(useCase)
-        adapter.Execute(handler)
-
-    End Sub
+    Public Function ClearJobTime(gJobId As Guid, jalon As String) As ClResult(Of Boolean) Implements IJobService.ClearJobTime
+        Return New ClClearJobTimeUseCase(gJobId, jalon, _jobRepository).Handle()
+    End Function
 
 End Class

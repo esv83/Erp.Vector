@@ -97,13 +97,10 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         [HttpPatch()]
         public IActionResult PatchSeen(ClReadJobModel ReadModel)
         {
-            ClWebApiPresenter presenter = ClWebApiPresenter.GetPresenter();
-            if (ReadModel.IsJob)
-            {
-                _jobSce.MarkMissionSeen(ReadModel.JobId, presenter);
-            }
+            if (!ReadModel.IsJob)
+                return BadRequest("Requête invalide : IsJob attendu à true.");
 
-            return presenter.Result;
+            return _jobSce.MarkMissionSeen(ReadModel.JobId).ToActionResult();
         }
     }
 }

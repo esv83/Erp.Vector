@@ -37,19 +37,8 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             public IActionResult AddAnalyze([FromBody] ClEditLogAnalyzeModel model)
             {
 
-            ClNoResponseHandler result= _mechanicService.InsertAnalyze(model);
-            if (result.IsSuccess)
-            {
-              return  Ok();
-            }
-            else
-            {
-               return BadRequest(result.ErrorText);
-            }
-            //    ClInsertLogAnalyzeUseCase useCase = new ClInsertLogAnalyzeUseCase(model, _repository);
-            //ClUseCaseHandler handler = new ClUseCaseHandler(useCase);
-
-            //return handler.Execute();
+            var result = _mechanicService.InsertAnalyze(model);
+            return result.IsSucces ? Ok() : BadRequest(result.InnerError?.ErrorText);
         }
 
             [HttpPut]
@@ -57,20 +46,8 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             {
 
 
-            ClNoResponseHandler result = _mechanicService.UpdateAnalyze(model);
-            if (result.IsSuccess)
-            {
-                return Ok();
-            }
-            else
-            {
-                return BadRequest(result.ErrorText);
-            }
-
-            //ClUpdateLogAnalyzeUseCase useCase = new ClUpdateLogAnalyzeUseCase(model, _repository);
-            //ClUseCaseHandler handler = new ClUseCaseHandler(useCase);
-
-            //return handler.Execute();
+            var result = _mechanicService.UpdateAnalyze(model);
+            return result.IsSucces ? Ok() : BadRequest(result.InnerError?.ErrorText);
         }
 
             //[HttpPatch("{logId}")]
@@ -99,20 +76,8 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         {
 
 
-            ClNoResponseHandler result = _mechanicService.DeleteAnalyze(intLogId);
-            if (result.IsSuccess)
-            {
-                return Ok();
-            }
-            else
-            {
-                return BadRequest(result.ErrorText);
-            }
-
-            //ClDeleteLogAnalyzeUseCase useCase = new ClDeleteLogAnalyzeUseCase(logId, _repository);
-            //ClUseCaseHandler handler = new ClUseCaseHandler(useCase);
-
-            //return handler.Execute();
+            var result = _mechanicService.DeleteAnalyze(intLogId);
+            return result.IsSucces ? Ok() : BadRequest(result.InnerError?.ErrorText);
         }
 
         [HttpDelete("{logId}/actions/{actionId}")]

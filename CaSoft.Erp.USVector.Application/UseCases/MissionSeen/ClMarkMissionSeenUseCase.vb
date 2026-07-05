@@ -3,9 +3,6 @@
 ' « vue », pas un acquittement). L'ambulancier signale à la régulation qu'il a reçu/vu la mission
 ' depuis la JobList (icône « bien reçu »). Pose l'horodatage « vue » (MST_READ_AT via
 ' ClJobTimeData.ReadTime). Le Save projette aussi l'info vers Orders.Api (régulation, MissionSeen).
-'
-' PILOTE de migration vers le Result pattern : renvoie ClResult(Of Boolean) via Handle() (au lieu de
-' l'ancien Execute(presenter)). Se branche dans la plomberie existante via ClResultUseCaseAdapter.
 Public Class ClMarkMissionSeenUseCase
     Implements IResultUseCase(Of Boolean)
 

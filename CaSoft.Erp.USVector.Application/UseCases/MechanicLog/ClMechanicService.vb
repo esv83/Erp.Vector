@@ -1,105 +1,29 @@
-﻿Public Class ClMechanicService
+Public Class ClMechanicService
 
-    Private _repository As ILogAnalyzeRepository
+    Private ReadOnly _repository As ILogAnalyzeRepository
 
     Public Sub New(repository As ILogAnalyzeRepository)
         _repository = repository
     End Sub
-    Public Function GetLogs(gCrewId As Guid) As ClResponseHandler(Of List(Of ClLogEntryModel))
 
-        Dim useCase = New ClGetMechanicLogUseCase(gCrewId, _repository)
-        Dim handler As New ClResponseHandler(Of List(Of cllogentrymodel))
-        Dim adapter As New ClResultUseCaseAdapter(Of List(Of ClLogEntryModel))(useCase)
-        adapter.Execute(handler)
-
-        Return handler
-
-    End Function
-    Public Function GetAnalyze(intLogId As Integer) As ClResponseHandler(Of ClGetLogAnalyzeModel)
-
-
-        Dim useCase = New ClGetLogAnalyzeUseCase(intLogId, _repository)
-        Dim handler As New ClResponseHandler(Of ClGetLogAnalyzeModel)
-        Dim adapter As New ClResultUseCaseAdapter(Of ClGetLogAnalyzeModel)(useCase)
-        adapter.Execute(handler)
-
-        Return handler
-
-    End Function
-    Public Function InsertAnalyze(analyze As ClEditLogAnalyzeModel) As ClNoResponseHandler
-
-        Dim useCase = New ClInsertLogAnalyzeUseCase(analyze, _repository)
-        Dim handler As New ClNoResponseHandler
-        Dim adapter As New ClResultUseCaseAdapter(Of Boolean)(useCase)
-        adapter.Execute(handler)
-
-        Return handler
-
-    End Function
-    Public Function UpdateAnalyze(analyze As ClEditLogAnalyzeModel) As ClNoResponseHandler
-        Dim useCase = New ClUpdateLogAnalyzeUseCase(analyze, _repository)
-        Dim handler As New ClNoResponseHandler
-        Dim adapter As New ClResultUseCaseAdapter(Of Boolean)(useCase)
-        adapter.Execute(handler)
-
-        Return handler
-    End Function
-    Public Function DeleteAnalyze(intId As Integer) As ClNoResponseHandler
-        Dim useCase = New ClDeleteLogAnalyzeUseCase(intId, _repository)
-        Dim handler As New ClNoResponseHandler
-        Dim adapter As New ClResultUseCaseAdapter(Of Boolean)(useCase)
-        adapter.Execute(handler)
-
-        Return handler
-
+    Public Function GetLogs(gCrewId As Guid) As ClResult(Of List(Of ClLogEntryModel))
+        Return New ClGetMechanicLogUseCase(gCrewId, _repository).Handle()
     End Function
 
-End Class
+    Public Function GetAnalyze(intLogId As Integer) As ClResult(Of ClGetLogAnalyzeModel)
+        Return New ClGetLogAnalyzeUseCase(intLogId, _repository).Handle()
+    End Function
 
+    Public Function InsertAnalyze(analyze As ClEditLogAnalyzeModel) As ClResult(Of Boolean)
+        Return New ClInsertLogAnalyzeUseCase(analyze, _repository).Handle()
+    End Function
 
-Public Class ClResponseHandler(Of T)
-    Implements IResponseHandler
+    Public Function UpdateAnalyze(analyze As ClEditLogAnalyzeModel) As ClResult(Of Boolean)
+        Return New ClUpdateLogAnalyzeUseCase(analyze, _repository).Handle()
+    End Function
 
-    Private _response As ClUseCaseResponseBase
-    Public Sub Handle(response As ClUseCaseResponseBase) Implements IResponseHandler.Handle
-        _response = response.Data
-
-    End Sub
-    Public ReadOnly Property Result As T
-        Get
-            Return _response.Data
-        End Get
-    End Property
-    Public ReadOnly Property IsSuccess As Boolean
-        Get
-            Return _response.IsSuccess
-        End Get
-    End Property
-    Public ReadOnly Property ErrorText As String
-        Get
-            Return _response.ErrorText
-        End Get
-    End Property
-
-End Class
-
-Public Class ClNoResponseHandler
-    Implements IResponseHandler
-
-    Private _response As ClUseCaseResponseBase
-    Public Sub Handle(response As ClUseCaseResponseBase) Implements IResponseHandler.Handle
-        _response = response
-
-    End Sub
-    Public ReadOnly Property IsSuccess As Boolean
-        Get
-            Return _response.IsSuccess
-        End Get
-    End Property
-    Public ReadOnly Property ErrorText As String
-        Get
-            Return _response.ErrorText
-        End Get
-    End Property
+    Public Function DeleteAnalyze(intId As Integer) As ClResult(Of Boolean)
+        Return New ClDeleteLogAnalyzeUseCase(intId, _repository).Handle()
+    End Function
 
 End Class

@@ -32,9 +32,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             var error = ResolveCurrentCrew(out var crewId);
             if (error is not null) return error;
 
-            ClWebApiPresenter presenter = ClWebApiPresenter.GetPresenter();
-            _crewService.GetDriver(crewId, presenter);
-            return presenter.Result;
+            return _crewService.GetDriver(crewId).ToActionResult();
         }
 
         // POST api/driver — canonique : change le conducteur de l'équipage actif du token.
@@ -46,28 +44,18 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             if (error is not null) return error;
 
             _logger.LogInformation("POST api/driver — équipage {CrewId}, nouveau conducteur {DriverId}.", crewId, DriverId);
-            ClWebApiPresenter presenter = ClWebApiPresenter.GetPresenter();
-            _crewService.ChangeDriver(crewId, DriverId, presenter);
-            return presenter.Result;
+            return _crewService.ChangeDriver(crewId, DriverId).ToActionResult();
         }
 
         // GET api/driver/{CrewId} — équipage explicite (compat).
         [HttpGet("{CrewId}")]
         public IActionResult GetDriver(Guid CrewId)
-        {
-            ClWebApiPresenter presenter = ClWebApiPresenter.GetPresenter();
-            _crewService.GetDriver(CrewId, presenter);
-            return presenter.Result;
-        }
+            => _crewService.GetDriver(CrewId).ToActionResult();
 
         // POST api/driver/{CrewId} — équipage explicite (compat).
         [HttpPost("{CrewId}")]
         public IActionResult PostDriver(Guid CrewId, [FromBody] Guid DriverId)
-        {
-            ClWebApiPresenter presenter = ClWebApiPresenter.GetPresenter();
-            _crewService.ChangeDriver(CrewId, DriverId, presenter);
-            return presenter.Result;
-        }
+            => _crewService.ChangeDriver(CrewId, DriverId).ToActionResult();
 
         // Résolution token → équipage actif « maintenant » (pipeline commun GET/POST canoniques,
         // aligné sur JobListController). Renvoie un IActionResult d'erreur, ou null si OK (crewId posé).
