@@ -26,12 +26,14 @@ public class FieldDataReaderTests
             => Task.FromResult(MissionExists ? new ErpMissionFullDto { Id = id, OrderId = Order } : null);
         public Task<ErpOrderEditDto?> GetOrderAsync(Guid id, CancellationToken ct = default)
             => Task.FromResult<ErpOrderEditDto?>(new ErpOrderEditDto { Order = new ErpOrderBodyDto { BeneficiaryId = Ben } });
-        public Task<IReadOnlyList<ErpMissionListItemDto>> ListMissionsAsync(DateTime f, DateTime t, int take, CancellationToken ct = default)
+        public Task<IReadOnlyList<ErpMissionListItemDto>> ListMissionsAsync(DateTime f, DateTime t, int take, IReadOnlyCollection<Guid>? crews = null, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<ErpMissionListItemDto>>(new List<ErpMissionListItemDto>());
         public Task<ErpBeneficiaryDetailDto?> GetBeneficiaryAsync(Guid id, CancellationToken ct = default)
             => Task.FromResult<ErpBeneficiaryDetailDto?>(null);
         public Task<IReadOnlyList<Guid>> ListCrewIdsAsync(Guid p, DateOnly d, int take, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<Guid>>(Array.Empty<Guid>());
+        public Task<ErpCrewFullDto?> GetCrewFullAsync(Guid crewId, CancellationToken ct = default)
+            => Task.FromResult<ErpCrewFullDto?>(null);
         public Task<Guid?> ResolvePersonnelIdByKeycloakAsync(Guid sub, CancellationToken ct = default)
             => Task.FromResult<Guid?>(null);
         public Task<int?> GetMissionTransferStatusAsync(Guid id, CancellationToken ct = default)
