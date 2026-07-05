@@ -90,15 +90,16 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             return result;
         }
 
-        // PATCH api/joblist — « Bien reçu » : acquitte la mission (pose MST_ACK_AT + projette
-        // vers Orders.Api pour la régulation). Idempotent. L'UI masque l'icône quand IsAck=true.
+        // PATCH api/joblist — « Mission vue » (spec §10) : l'ambulancier signale « bien reçu »
+        // → pose MST_READ_AT + projette MissionSeen à la régulation. Idempotent.
+        // L'UI masque l'icône quand IsSeen=true.
         [HttpPatch()]
-        public IActionResult PatchAck(ClReadJobModel ReadModel)
+        public IActionResult PatchSeen(ClReadJobModel ReadModel)
         {
             ClWebApiPresenter presenter = ClWebApiPresenter.GetPresenter();
             if (ReadModel.IsJob)
             {
-                _jobSce.AckJob(ReadModel.JobId, presenter);
+                _jobSce.MarkMissionSeen(ReadModel.JobId, presenter);
             }
 
             return presenter.Result;

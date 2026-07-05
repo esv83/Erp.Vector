@@ -9,7 +9,8 @@
         Public Property TransportType As Integer
         Public Property TransportSens As Integer
         Public Property IsSerial As Boolean
-        Public Property IsAck As Boolean
+        ' « Mission vue » (spec §10) : true = mission reçue/vue par l'équipage → l'UI masque l'icône.
+        Public Property IsSeen As Boolean
         Public Property IsTerminated As Boolean
         ''' <summary>MOB-8 — Présence d'une signature patient (reflète MI_SIGNATURE_EXISTS).</summary>
         Public Property SignatureExists As Boolean

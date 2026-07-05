@@ -88,7 +88,7 @@ public class CrewRepository : IMobileCrewRepository
                     : null,
                 Departure = m.PickupLabel ?? string.Empty,
                 Arrival = m.DropoffLabel ?? string.Empty,
-                IsAck = state?.MST_ACK_AT is not null,
+                IsSeen = state?.MST_READ_AT is not null,   // « Mission vue » (spec §10)
                 IsTerminated = state?.MST_TERMINATED_AT is not null,
                 SignatureExists = signed.Contains(m.Id)
             });

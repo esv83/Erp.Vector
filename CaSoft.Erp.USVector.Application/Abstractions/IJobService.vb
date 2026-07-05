@@ -1,7 +1,7 @@
 ﻿Public Interface IJobService
 
-    ''' <summary>« Bien reçu » : acquitte la mission (pose MST_ACK_AT + projette vers Orders).</summary>
-    Sub AckJob(gJobId As Guid, handler As IResponseHandler)
+    ''' <summary>« Mission vue » : marque la mission reçue/vue (pose MST_READ_AT + projette MissionSeen à la régulation).</summary>
+    Sub MarkMissionSeen(gJobId As Guid, handler As IResponseHandler)
     Sub GetJobEditFormStructure(gJobId As Guid, Handler As IResponseHandler)
     Sub GetJobTime(gJobId As Guid, Handler As IResponseHandler)
     Sub SetJobTime(gJobId As Guid, jobTime As ClJobTimeModel, handler As IResponseHandler)

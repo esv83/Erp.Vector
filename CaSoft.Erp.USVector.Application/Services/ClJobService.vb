@@ -92,8 +92,8 @@ Public Class ClJobService
 
     End Function
 
-    Public Sub AckJob(gJobId As Guid, handler As IResponseHandler) Implements IJobService.AckJob
-        Dim useCase As New ClAckJobUseCase(gJobId, _jobTimeRepository)
+    Public Sub MarkMissionSeen(gJobId As Guid, handler As IResponseHandler) Implements IJobService.MarkMissionSeen
+        Dim useCase As New ClMarkMissionSeenUseCase(gJobId, _jobTimeRepository)
         useCase.execute(handler)
 
     End Sub
