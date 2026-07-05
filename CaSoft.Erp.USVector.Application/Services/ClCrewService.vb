@@ -1,4 +1,5 @@
-﻿
+﻿Imports CaSoft.Erp.USVector.Application.Dto
+
 Public Class ClCrewService
     Implements ICrewService
 
@@ -15,7 +16,8 @@ Public Class ClCrewService
     Public Sub GetDriver(gCrewId As Guid, handler As IResponseHandler) Implements ICrewService.GetDriver
 
         Dim useCase = New ClGetDriverUseCase(gCrewId, _repository)
-        useCase.execute(handler)
+        Dim adapter As New ClResultUseCaseAdapter(Of ClLogDriverModel)(useCase)
+        adapter.Execute(handler)
 
     End Sub
     Public Sub ChangeDriver(gCrewId As Guid, gEmployeeId As Guid, handler As IResponseHandler) Implements ICrewService.ChangeDriver
@@ -122,7 +124,8 @@ Public Class ClCrewService
 
         Dim UseCase = New ClGetCrewIdListUseCase(dteDate, _repository)
         Dim presenter As New ClDefaultPresenter
-        UseCase.execute(presenter)
+        Dim adapter As New ClResultUseCaseAdapter(Of List(Of Guid))(UseCase)
+        adapter.Execute(presenter)
 
 
 
@@ -165,7 +168,8 @@ Public Class ClCrewService
 
             Dim useCase As New ClGetCrewUseCase(gCrewId, _repository)
             Dim presenter As New ClDefaultPresenter
-            useCase.execute(presenter)
+            Dim adapter As New ClResultUseCaseAdapter(Of ClCrew)(useCase)
+            adapter.Execute(presenter)
 
             Return presenter.Response
 

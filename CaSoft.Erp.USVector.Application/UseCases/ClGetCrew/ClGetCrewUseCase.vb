@@ -1,33 +1,24 @@
-﻿Friend Class ClGetCrewUseCase
-    Inherits ClUseCaseBase
+' Détail d'un équipage (ERP-backed) — Result pattern.
+Friend Class ClGetCrewUseCase
+    Implements IResultUseCase(Of ClCrew)
 
-    Private _query As Guid
-    Private _repository As ICrewRepository
+    Private ReadOnly _query As Guid
+    Private ReadOnly _repository As ICrewRepository
+
     Public Sub New(query As Guid, repository As ICrewRepository)
         _query = query
         _repository = repository
-
     End Sub
-    Public Overrides Sub execute(presenter As IResponseHandler)
+
+    Public Function Handle() As ClResult(Of ClCrew) Implements IResultUseCase(Of ClCrew).Handle
+
         Try
             Dim crew = _repository.GetCrew(_query)
-            Response.SetResult(crew)
+            Return ClResult(Of ClCrew).Ok(crew)
         Catch ex As Exception
-            Response.AddError(ex.Message)
-        Finally
-            presenter.Handle(Response)
+            Return ClResult(Of ClCrew).Fail(ClError.Application(ex.Message, ex))
         End Try
 
-    End Sub
-
-    Public Overrides Sub Before()
-        If IsNull(_query) Then
-
-            Response.AddError("Le CrewId est null")
-
-        End If
-    End Sub
-
-
+    End Function
 
 End Class

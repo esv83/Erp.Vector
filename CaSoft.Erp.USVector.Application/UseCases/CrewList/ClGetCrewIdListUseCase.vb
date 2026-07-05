@@ -1,32 +1,24 @@
-﻿Public Class ClGetCrewIdListUseCase
-    Inherits ClUseCaseBase
+' Liste des équipages d'une date (ids) — Result pattern.
+Public Class ClGetCrewIdListUseCase
+    Implements IResultUseCase(Of List(Of Guid))
 
-    Private _query As DateOnly
-    Private _repository As ICrewRepository
+    Private ReadOnly _query As DateOnly
+    Private ReadOnly _repository As ICrewRepository
 
     Public Sub New(query As DateOnly, repository As ICrewRepository)
         _query = query
         _repository = repository
-
-    End Sub
-    Public Overrides Sub execute(presenter As IResponseHandler)
-
-        If CanExecute() Then
-
-            Try
-                Dim crewIdList As List(Of Guid) = _repository.GetCrewIdList(_query)
-                Response.SetResult(crewIdList)
-            Catch ex As Exception
-                Response.AddError(ex.Message)
-            Finally
-                presenter.Handle(Response)
-            End Try
-
-        End If
-
     End Sub
 
-    Public Overrides Sub Before()
+    Public Function Handle() As ClResult(Of List(Of Guid)) Implements IResultUseCase(Of List(Of Guid)).Handle
 
-    End Sub
+        Try
+            Dim crewIdList As List(Of Guid) = _repository.GetCrewIdList(_query)
+            Return ClResult(Of List(Of Guid)).Ok(crewIdList)
+        Catch ex As Exception
+            Return ClResult(Of List(Of Guid)).Fail(ClError.Application(ex.Message, ex))
+        End Try
+
+    End Function
+
 End Class
