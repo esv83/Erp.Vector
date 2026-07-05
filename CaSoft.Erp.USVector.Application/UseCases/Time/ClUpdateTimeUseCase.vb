@@ -18,9 +18,17 @@ Public Class ClUpdateTimeUseCase
             Try
                 Dim jobTime As ClJobTimeData = _repository.GetJobTime(_command.JobId)
 
-                jobTime.GoTime = New ClTimeFormatAdapter(_command.JobTime.GoTime).ToDateTime
-                jobTime.OnSiteTime = New ClTimeFormatAdapter(_command.JobTime.OnSiteTime).ToDateTime
-                jobTime.TerminateTime = New ClTimeFormatAdapter(_command.JobTime.TerminatedTime).ToDateTime
+                ' Cumulatif : on ne pose QUE les jalons réellement fournis (non-null) ; les autres
+                ' conservent leur valeur existante. Le client peut ainsi n'envoyer que le jalon franchi
+                ' sans effacer les précédents (aligné sur la projection ERP cumulative).
+                Dim goTime = New ClTimeFormatAdapter(_command.JobTime.GoTime).ToDateTime
+                If goTime.HasValue Then jobTime.GoTime = goTime
+
+                Dim onSiteTime = New ClTimeFormatAdapter(_command.JobTime.OnSiteTime).ToDateTime
+                If onSiteTime.HasValue Then jobTime.OnSiteTime = onSiteTime
+
+                Dim terminateTime = New ClTimeFormatAdapter(_command.JobTime.TerminatedTime).ToDateTime
+                If terminateTime.HasValue Then jobTime.TerminateTime = terminateTime
 
                 _repository.SaveJobTime(jobTime)
                 ' _repository.Save(job)
