@@ -29,6 +29,12 @@ if (keycloakEnabled)
             options.Audience = "us-ambulance";//builder.Configuration["Keycloak:Audience"];
             options.RequireHttpsMetadata = builder.Configuration.GetValue("Keycloak:RequireHttpsMetadata", true);
 
+            // Conserver les claims JWT bruts (sub, iss, exp…) : sinon .NET remappe par défaut « sub »
+            // vers ClaimTypes.NameIdentifier (URI XML long), et toute lecture de « sub » (log ci-dessous,
+            // GetKeycloakSubject) tombe à vide → « impossible d'extraire le user id du sub ». On lit le
+            // sub tel que Keycloak l'émet. (Correctif canonique Keycloak + ASP.NET Core.)
+            options.MapInboundClaims = false;
+
             // ⚠️ DEV/TEST UNIQUEMENT (Keycloak:DisableValidation=true) : décode le token et lit les
             // claims (sub…) SANS vérifier signature / issuer / audience / expiration, et SANS contacter
             // Keycloak. Permet de tester la lecture du sub quand l'Authority n'est pas joignable.
