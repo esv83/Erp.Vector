@@ -16,9 +16,13 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Éléments de solution", "Éléments de solution", "{9C8CB701-102D-CF49-A3E0-89AC09D42C2C}"
 	ProjectSection(SolutionItems) = preProject
 		AppMobile_specifications.md = AppMobile_specifications.md
+		endPoint.md = endPoint.md
 		MOB-13_devplan.md = MOB-13_devplan.md
 		mobile_devplan.md = mobile_devplan.md
+		MUTUELLE_CARD_devplan.md = MUTUELLE_CARD_devplan.md
 		README.md = README.md
+		TRANSFER_devplan.md = TRANSFER_devplan.md
+		VECTOR_ORDERS_DECOUPLING_devplan.md = VECTOR_ORDERS_DECOUPLING_devplan.md
 	EndProjectSection
 EndProject
 Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "CaSoft.Erp.USVector.Framework", "CaSoft.Erp.USVector.Framework\CaSoft.Erp.USVector.Framework.vbproj", "{F5FDCBFC-2C62-4D9A-A281-D8C09B56D942}"

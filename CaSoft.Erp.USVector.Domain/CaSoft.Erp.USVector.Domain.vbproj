@@ -6,6 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="CaSoft.Framework.Domain" Version="2.3.5" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\CaSoft.Erp.USVector.Framework\CaSoft.Erp.USVector.Framework.vbproj" />
   </ItemGroup>
 

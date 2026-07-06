@@ -16,5 +16,9 @@
     <Import Include="CaSoft.Erp.USVector.Domain" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="CaSoft.Framework.Application" Version="2.3.5" />
+  </ItemGroup>
+
 </Project>
 
