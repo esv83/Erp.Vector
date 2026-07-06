@@ -20,8 +20,22 @@ public class MobileIdentityResolver : IMobileIdentityResolver
             .GetAwaiter().GetResult();
 
     public IReadOnlyList<Guid> ResolveActiveCrewIds(Guid personnelId, DateOnly onDate)
-        => _erp.ListCrewIdsAsync(personnelId, onDate, 500, CancellationToken.None)
+    {
+        var candidates = _erp.ListCrewIdsAsync(personnelId, onDate, 500, CancellationToken.None)
             .GetAwaiter().GetResult();
+
+        // Garde-fou défensif : Orders.Api peut remonter des équipages qui ne partagent que le
+        // VÉHICULE (bug de jointure côté ERP) et non l'appartenance réelle du personnel. On revérifie
+        // donc que le personnel est bien MEMBRE de chaque équipage (ErpCrewFullDto.Members, Id = PER_ID).
+        // Même philosophie « le filtre client garantit le résultat » que la joblist ; corrige à la fois
+        // l'affichage de faux crews ET le trou d'autorisation (le garde-fou valide crewId ∈ ce résultat).
+        return candidates
+            .Select(id => _erp.GetCrewFullAsync(id, CancellationToken.None).GetAwaiter().GetResult())
+            .OfType<ErpCrewFullDto>()
+            .Where(crew => crew.Members.Any(m => m.Id == personnelId))
+            .Select(crew => crew.Id)
+            .ToList();
+    }
 
     // Source HTTP : « frais » et « normal » sont identiques (le cache est ajouté par le décorateur).
     public IReadOnlyList<Guid> ResolveActiveCrewIdsFresh(Guid personnelId, DateOnly onDate)
