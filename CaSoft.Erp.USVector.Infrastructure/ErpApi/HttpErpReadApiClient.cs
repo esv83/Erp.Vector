@@ -42,6 +42,13 @@ public sealed class HttpErpReadApiClient : IErpReadApiClient
         return list ?? new List<ErpMissionListItemDto>(0);
     }
 
+    public async Task<IReadOnlyList<ErpMissionListItemDto>> ListMissionsByCrewAsync(Guid crewId, CancellationToken ct = default)
+    {
+        // Endpoint crew-only : Orders.Api renvoie directement les missions de l'équipage, aucune date.
+        var list = await _http.GetFromJsonAsync<List<ErpMissionListItemDto>>($"crews/{crewId}/missions", JsonOptions, ct);
+        return list ?? new List<ErpMissionListItemDto>(0);
+    }
+
     public async Task<ErpOrderEditDto?> GetOrderAsync(Guid orderId, CancellationToken ct = default)
         => await GetOrNullAsync<ErpOrderEditDto>($"orders/{orderId}", ct);
 

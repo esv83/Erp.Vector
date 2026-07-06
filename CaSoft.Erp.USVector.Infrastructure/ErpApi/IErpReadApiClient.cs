@@ -20,6 +20,13 @@ public interface IErpReadApiClient
         DateTime from, DateTime to, int take,
         IReadOnlyCollection<Guid>? assignedCrewIds = null, CancellationToken ct = default);
 
+    /// <summary>
+    /// Toutes les missions affectées à un équipage, <b>sans borne de date</b>
+    /// (<c>GET /crews/{crewId}/missions</c>). Le crew (cycle de vie ≤ 18h) EST le périmètre : la liste
+    /// terrain se filtre par équipage uniquement, plus par jour. Liste vide si l'équipage n'a aucune mission.
+    /// </summary>
+    Task<IReadOnlyList<ErpMissionListItemDto>> ListMissionsByCrewAsync(Guid crewId, CancellationToken ct = default);
+
     Task<ErpOrderEditDto?> GetOrderAsync(Guid orderId, CancellationToken ct = default);
 
     Task<ErpBeneficiaryDetailDto?> GetBeneficiaryAsync(Guid beneficiaryId, CancellationToken ct = default);

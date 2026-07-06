@@ -37,6 +37,7 @@ public class MobileIdentityResolverTests
         // Non sollicités par ces tests.
         public Task<ErpMissionFullDto?> GetMissionFullAsync(Guid missionId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<ErpMissionListItemDto>> ListMissionsAsync(DateTime from, DateTime to, int take, IReadOnlyCollection<Guid>? assignedCrewIds = null, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<ErpMissionListItemDto>> ListMissionsByCrewAsync(Guid crewId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ErpOrderEditDto?> GetOrderAsync(Guid orderId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ErpBeneficiaryDetailDto?> GetBeneficiaryAsync(Guid beneficiaryId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<Guid?> ResolvePersonnelIdByKeycloakAsync(Guid keycloakSub, CancellationToken ct = default) => throw new NotSupportedException();

@@ -45,22 +45,14 @@ public class CrewRepository : IMobileCrewRepository
 
         var crewSet = gCrewIds.ToHashSet();
 
-        // Fenêtre du jour. Orders.Api liste les missions affectées ; on filtre ensuite
-        // sur les équipages du personnel (pas de filtre crew natif).
-        var today = DateTime.Today;
-
-        // Pont sync/async : le contrat legacy ICrewRepository est synchrone.
-        // On passe les équipages du personnel : Orders.Api filtre côté serveur si supporté (payload réduit,
-        // plafond take non tronquant) ; sinon renvoie tout et le filtre client ci-dessous garantit le résultat.
-        var missions = _erp.ListMissionsAsync(today, today.AddDays(1).AddTicks(-1), 500, crewSet, CancellationToken.None)
-            .GetAwaiter().GetResult();
-
-        // Union des missions des crews du personnel (dédupliquée par mission).
-        // Affichées jusqu'à « Terminé » (status 3) ; les missions clôturées (status ≥ 4) disparaissent
-        // du terrain (spec §14 : accès autorisé jusqu'au statut clôturé).
-        var crewMissions = missions
-            .Where(m => m.AssignedCrewId.HasValue && crewSet.Contains(m.AssignedCrewId.Value)
-                        && m.Status < ClosedMissionStatus)
+        // Périmètre = LE CREW (cycle de vie ≤ 18h), JAMAIS la date. Orders.Api renvoie directement
+        // toutes les missions affectées à l'équipage via GET /crews/{crewId}/missions (aucune borne
+        // de date) → la joblist se filtre par crewId uniquement (missions de tous les jours du crew).
+        // Union dédupliquée si plusieurs crews. Affichées jusqu'à « Terminé » (status 3) ; les missions
+        // clôturées (status ≥ 4) disparaissent du terrain (spec §14 : accès autorisé jusqu'au clôturé).
+        var crewMissions = crewSet
+            .SelectMany(id => _erp.ListMissionsByCrewAsync(id, CancellationToken.None).GetAwaiter().GetResult())
+            .Where(m => m.Status < ClosedMissionStatus)
             .GroupBy(m => m.Id)
             .Select(g => g.First())
             .OrderBy(m => m.MissionDate)
