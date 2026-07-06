@@ -18,4 +18,8 @@ Public Class ClCrewService
         Return New ClSetDriverUseCase(command, _repository).Handle()
     End Function
 
+    Public Function GetMyActiveCrews(crewIds As IReadOnlyList(Of Guid), at As DateTime) As ClResult(Of ClActiveCrewSelectionDtoOut) Implements ICrewService.GetMyActiveCrews
+        Return New ClGetMyActiveCrewsUseCase(crewIds, at, _repository).Handle()
+    End Function
+
 End Class

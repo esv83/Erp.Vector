@@ -19,6 +19,13 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         public IActionResult Get(Guid gJobId)
             => _jobService.GetJobTime(gJobId).ToActionResult();
 
+        // GET api/time/{id}/timeline — contrat riche (Option A) : liste ordonnée de jalons
+        // { Order, Code, Label, At } prête à afficher, sans inférence côté UI. L'ancien endpoint
+        // plat ci-dessus reste servi pour compatibilité (app mobile) le temps de la migration.
+        [HttpGet("{gJobId}/timeline")]
+        public IActionResult GetTimeline(Guid gJobId)
+            => _jobService.GetJobTimeline(gJobId).ToActionResult();
+
         // PATCH api/time/{id}
         [HttpPatch("{gJobId}")]
         [FreezeOnTransfer]

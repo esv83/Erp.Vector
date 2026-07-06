@@ -18,6 +18,10 @@ Public Class ClJobService
         Return New ClGetTimeUseCase(gJobId, _jobRepository).Handle()
     End Function
 
+    Public Function GetJobTimeline(gJobId As Guid) As ClResult(Of ClJobTimelineDtoOut) Implements IJobService.GetJobTimeline
+        Return New ClGetJobTimelineUseCase(gJobId, _jobRepository).Handle()
+    End Function
+
     Public Function SetJobTime(gJobId As Guid, jobTimeModel As ClJobTimeModel) As ClResult(Of Boolean) Implements IJobService.SetJobTime
         Dim jobTimeCommand = New ClJobTimeCommand(gJobId, jobTimeModel)
         Return New ClUpdateTimeUseCase(jobTimeCommand, _jobRepository).Handle()

@@ -22,17 +22,17 @@ Namespace Port
 
         ''' <summary>
         ''' Crews dont le personnel est membre et dont la vacation couvre la date.
-        ''' Peut en renvoyer plusieurs (changement d'équipage en cours de journée) :
-        ''' le joblist en fait l'union. Vide si aucun crew actif ce jour-là.
+        ''' Peut en renvoyer plusieurs (changement d'équipage en cours de journée).
+        ''' Vide si aucun crew actif ce jour-là. Chemin mis en cache (garde-fou des endpoints).
         ''' </summary>
         Function ResolveActiveCrewIds(personnelId As Guid, onDate As DateOnly) As IReadOnlyList(Of Guid)
 
         ''' <summary>
-        ''' L'équipage unique pertinent du personnel à l'instant <paramref name="at"/> (endpoint
-        ''' Driver token-canonique). S'il en a plusieurs actifs ce jour-là, on retient celui dont la
-        ''' fenêtre de service couvre <paramref name="at"/>, sinon le premier. <c>Nothing</c> si aucun.
+        ''' Idem, mais garantit une lecture <b>fraîche</b> (contourne tout cache) — pour la
+        ''' (re)sélection d'équipage (<c>GET /api/crew/mine</c>) : un crew créé le jour même doit
+        ''' y apparaître immédiatement. Rafraîchit le cache au passage.
         ''' </summary>
-        Function ResolveActiveCrewId(personnelId As Guid, at As DateTime) As Guid?
+        Function ResolveActiveCrewIdsFresh(personnelId As Guid, onDate As DateOnly) As IReadOnlyList(Of Guid)
 
         ''' <summary>
         ''' Le personnel peut-il consulter le détail de cette mission ? Vrai si la

@@ -172,7 +172,22 @@ builder.Services.AddScoped<ICrewRepository, CaSoft.Erp.USVector.Infrastructure.R
 // MOB-6 : détail mission (mission + commande + bénéficiaire ERP → ClJob).
 builder.Services.AddScoped<IJobRepository, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.JobRepository>();
 // MOB-4a : résolution identité Keycloak (sub → PER_ID → crews actifs).
-builder.Services.AddScoped<IMobileIdentityResolver, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.MobileIdentityResolver>();
+// Décoré par un cache (chemin chaud : garde-fou crew de chaque requête). TTLs configurables :
+// - PersonnelMinutes : mapping sub→PER_ID quasi-immuable → long (défaut 8h).
+// - ActiveCrewsMinutes : crews actifs volatils intra-journée → court (défaut 15 min) ;
+//   la (re)sélection /api/crew/mine lit frais (bypass) → crew créé le jour même visible aussitôt.
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.MobileIdentityResolver>();
+builder.Services.AddScoped<IMobileIdentityResolver>(sp =>
+{
+    var cfg = sp.GetRequiredService<IConfiguration>().GetSection("MobileIdentityCache");
+    var personnelTtl = TimeSpan.FromMinutes(cfg.GetValue<double?>("PersonnelMinutes") ?? 480);
+    var activeCrewsTtl = TimeSpan.FromMinutes(cfg.GetValue<double?>("ActiveCrewsMinutes") ?? 15);
+    return new CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.CachingMobileIdentityResolver(
+        sp.GetRequiredService<CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.MobileIdentityResolver>(),
+        sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(),
+        personnelTtl, activeCrewsTtl);
+});
 
 // ── Ports ERP → stubs (remplacés itération par itération, MOB-4+) ────────────
 builder.Services.AddScoped<ILogRepository, LogRepositoryStub>();

@@ -23,34 +23,9 @@ public class MobileIdentityResolver : IMobileIdentityResolver
         => _erp.ListCrewIdsAsync(personnelId, onDate, 500, CancellationToken.None)
             .GetAwaiter().GetResult();
 
-    public Guid? ResolveActiveCrewId(Guid personnelId, DateTime at)
-    {
-        var ids = ResolveActiveCrewIds(personnelId, DateOnly.FromDateTime(at));
-        if (ids.Count == 0) return null;
-        if (ids.Count == 1) return ids[0];
-
-        // Plusieurs crews le même jour : on départage sur la fenêtre de service pour ne pas retomber
-        // sur un crew clôturé (Orders.Api interdit toute modif dessus → 400 « crew clôturé »).
-        var fulls = ids
-            .Select(id => _erp.GetCrewFullAsync(id, CancellationToken.None).GetAwaiter().GetResult())
-            .OfType<ErpCrewFullDto>()
-            .ToList();
-        if (fulls.Count == 0) return ids[0];
-
-        // 1. Crew dont la fenêtre couvre l'instant (vacation en cours).
-        var covering = fulls.FirstOrDefault(f => f.ServiceStart <= at && (f.ServiceEnd is null || at <= f.ServiceEnd));
-        if (covering is not null) return covering.Id;
-
-        // 2. Sinon, crew ouvert (pas encore clôturé), le plus proche à démarrer (prochaine vacation).
-        var open = fulls
-            .Where(f => f.ServiceEnd is null || f.ServiceEnd >= at)
-            .OrderBy(f => f.ServiceStart)
-            .FirstOrDefault();
-        if (open is not null) return open.Id;
-
-        // 3. Tout est clôturé → le plus récemment terminé (affichage en lecture, modif refusée côté ERP).
-        return fulls.OrderByDescending(f => f.ServiceEnd ?? DateTime.MinValue).First().Id;
-    }
+    // Source HTTP : « frais » et « normal » sont identiques (le cache est ajouté par le décorateur).
+    public IReadOnlyList<Guid> ResolveActiveCrewIdsFresh(Guid personnelId, DateOnly onDate)
+        => ResolveActiveCrewIds(personnelId, onDate);
 
     public bool IsMissionAccessible(Guid personnelId, Guid missionId)
     {
