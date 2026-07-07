@@ -45,7 +45,13 @@ public sealed class HttpErpReadApiClient : IErpReadApiClient
     public async Task<IReadOnlyList<ErpMissionListItemDto>> ListMissionsByCrewAsync(Guid crewId, CancellationToken ct = default)
     {
         // Endpoint crew-only : Orders.Api renvoie directement les missions de l'équipage, aucune date.
-        var list = await _http.GetFromJsonAsync<List<ErpMissionListItemDto>>($"crews/{crewId}/missions", JsonOptions, ct);
+        // engagedOnly=true : ne remonter au terrain que les missions ENGAGÉES par la régulation.
+        // L'engagement est un axe DISTINCT de la progression (à faire / en cours / terminé) et n'est PAS
+        // porté par le DTO de liste → filtre AUTORITATIF côté serveur, aucun repli client possible.
+        // Envoyé d'avance : sans effet tant qu'Orders.Api ne l'honore pas, puis corrige la visibilité
+        // sans redéploiement Vector. Cf. endPoint.md §5.
+        var list = await _http.GetFromJsonAsync<List<ErpMissionListItemDto>>(
+            $"crews/{crewId}/missions?engagedOnly=true", JsonOptions, ct);
         return list ?? new List<ErpMissionListItemDto>(0);
     }
 

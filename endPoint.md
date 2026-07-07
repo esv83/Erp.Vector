@@ -4,6 +4,8 @@ Ce document est le **contrat** que Vector.Api attend d'Orders.Api. Le code Vecto
 appelle ces routes ; il suffit de les implémenter/ajuster côté Orders au contrat ci-dessous.
 - **§1–§2** : feature « Driver » (conducteur d'équipage, MOB-4/MOB-11).
 - **§3** : avancement terrain `PUT missions/{id}/operational` — **sémantique autoritaire `null = effacé`** (retour arrière).
+- **§4** : `GET /missions` — filtre équipage répétable `assignedCrewId` (perf + anti-troncature).
+- **§5** : `GET /crews/{crewId}/missions` — filtre `engagedOnly` (ne montrer au terrain que les missions **engagées**).
 
 ## Contexte
 
@@ -227,6 +229,45 @@ Effet : payload réduit à la poignée de missions de l'équipage, plafond `take
 
 ---
 
+## 5) `GET /crews/{crewId}/missions` — filtre `engagedOnly` (ne montrer au terrain que les missions **engagées**)
+
+### Problème
+L'ambulancier voit **toutes les missions qui lui sont affectées** (équipage assigné), alors qu'il ne
+devrait voir que les missions **engagées** par la régulation. L'engagement est un **axe distinct de la
+progression** : une mission visible peut être *à faire / en retard / en cours / terminée* — la seule
+condition d'affichage est **engagée ET ≠ clôturée**. « Affectée » (équipage posé au planning) ne suffit pas.
+
+Aujourd'hui Vector ne peut pas corriger seul : le DTO de liste (`ErpMissionListItemDto`) ne porte que
+`status` (progression) et `assignedCrewId` (affectation) — **aucun champ d'engagement**. Il n'existe donc
+**aucun repli client possible** (le filtrage doit se faire côté serveur).
+
+> La joblist terrain lit désormais la route **crew-scopée** `GET /crews/{crewId}/missions`
+> (`ListMissionsByCrewAsync`, périmètre = équipage, sans borne de date) — c'est **sur cette route** que
+> le filtre `engagedOnly` doit s'appliquer (et non sur `GET /missions`).
+
+### Demande — variante **A** (filtre serveur, retenue)
+Accepter un booléen **`engagedOnly`** sur `GET /crews/{crewId}/missions` :
+```
+GET /crews/{crewId}/missions?engagedOnly=true
+```
+| Cas | Comportement attendu |
+|-----|----------------------|
+| `engagedOnly=true` | ne renvoyer que les missions **engagées** (peu importe la progression : à faire / en retard / en cours / terminé), **hors clôturées / annulées** |
+| `engagedOnly=false` ou absent | comportement actuel inchangé (rétro-compatible) |
+
+- **Autorité** : c'est la régulation qui engage → le filtrage doit être **serveur** (autoritatif), pas déductible côté mobile.
+- **Payload** : réduit à la poignée de missions réellement engagées de l'équipage.
+
+> **Pourquoi A (param serveur) et pas un champ `isEngaged` dans le DTO** : l'engagement est piloté par
+> la régulation → le serveur est la source d'autorité, et le param évite de rapatrier des missions
+> non engagées pour les filtrer ensuite. (Variante B — exposer `isEngaged` dans le DTO — resterait
+> possible si un besoin d'affichage/diagnostic client de l'état d'engagement apparaissait.)
+
+> Vector envoie **déjà** `engagedOnly=true` (`HttpErpReadApiClient.ListMissionsByCrewAsync`). Sans effet
+> tant qu'Orders.Api l'ignore ; dès qu'il l'honore, la visibilité se corrige **sans redéploiement Vector**.
+
+---
+
 ## Côté Vector (déjà en place — pour info)
 
 | Élément Vector | Appelle |
@@ -236,6 +277,7 @@ Effet : payload réduit à la poignée de missions de l'équipage, plafond `take
 | `GET /vector/api/Driver` (token-canonique) | résout l'équipage du token puis lit le détail |
 | `POST /vector/api/Driver/{crewId}` (body = PER_ID) | change le conducteur |
 | `HttpErpWriteApiClient.ProjectOperationalAsync(...)` (worker Outbox) | `PUT missions/{id}/operational` (snapshot complet) |
+| `HttpErpReadApiClient.ListMissionsByCrewAsync(crewId)` (joblist terrain) | `GET crews/{crewId}/missions?engagedOnly=true` (§5 — envoyé d'avance) |
 
 Une fois §1–§2 livrés, la feature Driver fonctionne de bout en bout. Pour §3, dès qu'Orders.Api
 traite `null = effacé`, le **retour arrière** remonte automatiquement à la régulation, **sans
