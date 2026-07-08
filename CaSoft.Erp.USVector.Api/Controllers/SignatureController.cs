@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Contracts;
@@ -15,7 +15,6 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         [HttpGet("{gJobId}")]
         public ActionResult<ClSignatureGetModel> GetSignature(Guid gJobId, [FromServices] ISignatureRepository getSignatureRepository)
         {
-
             if (!ClAutorizationCommand.AutorizeJob(Request, gJobId))
             {
                 return BadRequest("Autorisation refusée");
@@ -24,44 +23,44 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             ClGetSignatureUseCase GetSignatureUseCase = new ClGetSignatureUseCase(gJobId, getSignatureRepository);
             // Use case migré au Result pattern : consommé via le pont Result→ActionResult.
             return GetSignatureUseCase.Handle().ToActionResult();
-
-
         }
 
-        [HttpPut("{gJobId}")]
+        // Enregistrement de la signature (verbe unique côté contrat : POST).
+        // Idempotent (relation 1:1 mission) : si une signature existe déjà — re-signature
+        // ou double envoi du front — on met à jour au lieu de renvoyer une 400 (violation
+        // de clé primaire sur MOB_SIGNATURE).
+        [HttpPost("{gJobId}")]
         [FreezeOnTransfer]
-        public ActionResult PutSignature( Guid gJobId ,ClSignatureGetModel signatureModel, [FromServices] ISignatureRepository repository)
+        public ActionResult PostSignature(Guid gJobId, ClSignatureGetModel signatureModel, [FromServices] ISignatureRepository repository)
         {
-            //Update les infos de la mission
             try
             {
-                
-                repository.Insert(gJobId, signatureModel.Data);    
+                if (repository.Exists(gJobId))
+                    repository.Update(gJobId, signatureModel.Data);
+                else
+                    repository.Insert(gJobId, signatureModel.Data);
 
-            return Ok();
+                return Ok();
             }
             catch (Exception ex)
             {
-                //todo Renvoyer error 500
                 return BadRequest(ex.Message);
             }
-                       }
+        }
 
         [HttpPatch("{gJobId}")]
         [FreezeOnTransfer]
-        public ActionResult PatchSignature(Guid gJobId,ClSignatureGetModel signatureModel, [FromServices] ISignatureRepository repository)
+        public ActionResult PatchSignature(Guid gJobId, ClSignatureGetModel signatureModel, [FromServices] ISignatureRepository repository)
         {
             //Update les infos de la mission
             try
             {
-        
                 repository.Update(gJobId, signatureModel.Data);
 
                 return Ok();
             }
             catch (Exception ex)
             {
-
                 return BadRequest(ex.Message);
             }
         }
@@ -70,7 +69,8 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         [FreezeOnTransfer]
         public ActionResult DeleteSignature(Guid gJobId, [FromServices] ISignatureRepository Repository)
         {
-            try {
+            try
+            {
                 // TODO legacy résolu en MOB-2 : suppression réellement câblée sur MOB_SIGNATURE.
                 Repository.Delete(gJobId, string.Empty);
 
@@ -78,17 +78,8 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             }
             catch (Exception ex)
             {
-
                 return BadRequest(ex.Message);
             }
-
-
-
-
-
         }
-
-
     }
-    
 }
