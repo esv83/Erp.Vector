@@ -20,10 +20,20 @@ Public Class ClGetMyActiveCrewsUseCase
     Public Function Handle() As ClResult(Of ClActiveCrewSelectionDtoOut) Implements IResultUseCase(Of ClActiveCrewSelectionDtoOut).Handle
 
         Try
+            ' Ne conserver que les équipages ACTIFS à l'instant demandé : commencé, non clôturé, non obsolète
+            ' (règle domaine ClCrew.IsSelectableAt). Un crew non démarré / clôturé / expiré n'est pas sélectionnable.
             Dim crews As New List(Of ClActiveCrewDtoOut)
             For Each id In _crewIds
-                crews.Add(_repository.GetCrew(id).ToActiveCrewDtoOut(_at))
+                Dim crew = _repository.GetCrew(id)
+                If crew.IsSelectableAt(_at) Then
+                    crews.Add(crew.ToActiveCrewDtoOut(_at))
+                End If
             Next
+
+            If crews.Count = 0 Then
+                Return ClResult(Of ClActiveCrewSelectionDtoOut).Fail(
+                    ClError.NotFound("Aucun équipage actif à cet instant (service non commencé, clôturé ou expiré)."))
+            End If
 
             ' Pré-sélection : l'équipage qui couvre « maintenant » ; à défaut l'unique équipage.
             Dim recommended = crews.FirstOrDefault(Function(c) c.IsCurrent)

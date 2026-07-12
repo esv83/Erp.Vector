@@ -3,12 +3,14 @@
 Public Class ClCrew
 
 
-    Public Sub New(gCrewId As Guid, lstEmployee As List(Of ClEmployee), dteServiceStartDate As DateTime, objVehicle As ClVehicle)
+    Public Sub New(gCrewId As Guid, lstEmployee As List(Of ClEmployee), dteServiceStartDate As DateTime, objVehicle As ClVehicle, Optional dteServiceEndDate As DateTime? = Nothing)
 
         _serviceEndDateR = New ClReliableEndOfService
 
         _crewId = gCrewId
         _employeeList = lstEmployee
+        _serviceStart = dteServiceStartDate
+        _serviceEnd = dteServiceEndDate
         _vehicle = objVehicle
 
     End Sub
@@ -44,6 +46,22 @@ Public Class ClCrew
     End Property
 
     Public Property IsServiceEnded As Boolean
+
+    ''' <summary>Durée max d'une vacation avant de la considérer obsolète (vacation vraisemblablement oubliée, non clôturée).</summary>
+    Public Const MaxServiceDurationHours As Integer = 18
+
+    ''' <summary>
+    ''' L'équipage est-il sélectionnable par le terrain à l'instant <paramref name="at"/> ? Trois conditions
+    ''' cumulatives : <b>commencé</b> (début &lt;= <paramref name="at"/>), <b>non clôturé</b> (ni fin de service
+    ''' déclarée, ni fenêtre de vacation dépassée) et <b>non obsolète</b> (durée écoulée &lt;=
+    ''' <see cref="MaxServiceDurationHours"/> h — au-delà, vacation probablement oubliée).
+    ''' </summary>
+    Public Function IsSelectableAt(at As DateTime) As Boolean
+        Dim started = _serviceStart <= at
+        Dim closed = IsServiceEnded OrElse (_serviceEnd.HasValue AndAlso _serviceEnd.Value < at)
+        Dim obsolete = (at - _serviceStart) > TimeSpan.FromHours(MaxServiceDurationHours)
+        Return started AndAlso Not closed AndAlso Not obsolete
+    End Function
 
 
 

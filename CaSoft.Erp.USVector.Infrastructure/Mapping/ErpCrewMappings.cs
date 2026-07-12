@@ -21,7 +21,7 @@ internal static class ErpCrewMappings
             ? new ClVehicle(dto.Vehicle.Id, dto.Vehicle.Immatriculation ?? string.Empty, new ClKilometers())
             : new ClVehicle(Guid.Empty, string.Empty, new ClKilometers());
 
-        var crew = new ClCrew(dto.Id, employees, dto.ServiceStart, vehicle)
+        var crew = new ClCrew(dto.Id, employees, dto.ServiceStart, vehicle, dto.ServiceEnd)
         {
             HasVehicle = dto.Vehicle is not null
         };
