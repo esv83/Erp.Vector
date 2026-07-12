@@ -15,17 +15,13 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             [FromServices] IJobCache jobCache,
             [FromServices] IMobileIdentityResolver identity)
         {
-            // MOB-4a : autorisation depuis le token Keycloak (remplace AutorizeJob).
-            var sub = User.GetKeycloakSubject();
-            if (sub is null)
-                return Unauthorized("Authentification Keycloak requise.");
-
-            var personnelId = identity.ResolvePersonnelId(sub.Value);
-            if (personnelId is null)
-                return StatusCode(403, "Compte non rattaché à un personnel. Contactez la régulation.");
+            // MOB-4a : personnel résolu depuis le token (sub → personnel via Orders.Api),
+            // via le chokepoint mutualisé CrewAccess.
+            var error = CrewAccess.ResolvePersonnel(this, identity, out var personnelId);
+            if (error is not null) return error;
 
             // Le personnel ne voit que les missions de ses crews.
-            if (!identity.IsMissionAccessible(personnelId.Value, gJobId))
+            if (!identity.IsMissionAccessible(personnelId, gJobId))
                 return StatusCode(403, "Mission hors de vos équipages.");
 
             ClGetJobUseCase useCase = new ClGetJobUseCase(gJobId, jobCache);

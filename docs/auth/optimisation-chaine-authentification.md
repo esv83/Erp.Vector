@@ -63,6 +63,13 @@ Ajouter à Keycloak un *protocol mapper* qui injecte un claim `per_id` (le PER_I
 - ⚠️ Touche la **config Keycloak** (hors code applicatif) + la synchro de l'attribut `per_id` côté annuaire. Un rattachement modifié n'est reflété qu'au **prochain login** (renouvellement du token) — acceptable pour un lien quasi-immuable.
 - ➖ N'aide **pas** le maillon crews (trop volatil pour un claim figé au login) : celui-ci reste un lookup caché.
 
-### Reco
+### Décision (2026-07-12) — option NON retenue
 
-Garder le claim `per_id` en **option** : à activer si la charge le justifie ou lors de la bascule Track B. Le cache actuel couvre le besoin immédiat sans dépendance à l'infra Keycloak.
+Évaluée puis **écartée à cause du turnover** sur `PER_KEYCLOAK_MAP` : un claim est **figé dans le token** jusqu'au prochain refresh/login et **n'est pas invalidable** côté API. Sous turnover (même occasionnel), la **résolution HTTP cachée** est préférée car son cache **s'invalide**.
+
+**Retenu à la place :**
+- On conserve `CachingMobileIdentityResolver` (résolution `sub→personnelId` via Orders.Api, cache mémoire).
+- **TTL personnel raccourci** : `MobileIdentityCache:PersonnelMinutes` passé de 480 (8 h) à **30 min** → borne la staleness d'un changement de mapping à ≤ 30 min, **sans plomberie inter-service**.
+- Option ouverte (si un jour on veut du temps réel) : **éviction ciblée** — Orders notifie Vector (`Invalidate(sub)`) quand `PER_KEYCLOAK_MAP` change.
+
+**Conservé du travail claim :** le refactor `JobDetailController → CrewAccess.ResolvePersonnel` (chokepoint unique) — bon indépendamment du claim. **Retirés :** le lecteur `GetPersonnelId`, le bloc claim-first de `CrewAccess`, le `per_id` dans `whoami`.
