@@ -195,6 +195,11 @@ builder.Services.AddScoped<IMobileIdentityResolver>(sp =>
         personnelTtl, activeCrewsTtl);
 });
 
+// Diagnostic développeur (dev-only) de la chaîne d'identité (sub → PER_ID → crews actifs). Cf. DiagController.
+builder.Services.AddScoped<CaSoft.Erp.USVector.Infrastructure.Diagnostics.CrewChainDiagnostic>();
+// Support diag : résolution username → sub via l'Admin API Keycloak (service account, dev-only).
+builder.Services.AddHttpClient<CaSoft.Erp.USVector.Infrastructure.Diagnostics.KeycloakAdminClient>();
+
 // ── Ports ERP → stubs (remplacés itération par itération, MOB-4+) ────────────
 builder.Services.AddScoped<ILogRepository, LogRepositoryStub>();
 builder.Services.AddScoped<ILogAnalyzeRepository, LogAnalyzeRepositoryStub>();
