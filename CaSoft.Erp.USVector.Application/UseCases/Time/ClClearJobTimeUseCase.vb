@@ -21,6 +21,7 @@ Public Class ClClearJobTimeUseCase
         Try
             Dim jobTime As ClJobTimeData = _repository.GetJobTime(_jobId)
 
+            'TODO remplacer par enum quand VB.NET le supportera.
             Select Case _jalon?.Trim().ToLowerInvariant()
                 Case "seen", "read"
                     jobTime.ReadTime = Nothing
@@ -28,11 +29,11 @@ Public Class ClClearJobTimeUseCase
                     jobTime.GoTime = Nothing
                 Case "onsite", "surplace"
                     jobTime.OnSiteTime = Nothing
-                Case "terminate", "terminated", "termine"
+                Case "terminate", "terminated", "termine", "disponible"
                     jobTime.TerminateTime = Nothing
                 Case Else
                     Return ClResult(Of Boolean).Fail(
-                        ClError.Application($"Jalon inconnu : « {_jalon} ». Attendu : seen | go | onsite | terminate."))
+                        ClError.Application($"Jalon inconnu : « {_jalon} ». Attendu : seen | go | onsite | terminate | disponible."))
             End Select
 
             ' Upsert BD Mobile (jalon effacé) + enqueue Outbox → projection consolidée (retour arrière).
