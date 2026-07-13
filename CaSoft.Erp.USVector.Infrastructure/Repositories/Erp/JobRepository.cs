@@ -171,7 +171,13 @@ public class JobRepository : IJobRepository
         loc.Nom = S(stage.LocationName);
         loc.Adresse = S(stage.AddressLine1);
         loc.Residence = S(stage.AddressLine2);
-        loc.BatEtage = !string.IsNullOrWhiteSpace(stage.AddressLine3) ? S(stage.AddressLine3) : S(stage.ServiceLabel);
+        // ServiceLabel (service médical, ex. « Cardiologie ») n'existe que pour HealthFacility/FreeText,
+        // jamais pour une adresse bénéficiaire. On concatène AVEC AddressLine3 (et non l'un OU l'autre)
+        // pour ne rien perdre quand les deux sont présents sur un établissement.
+        // TODO (dette) : ajouter un champ dédié « Service » à ClJobLocation/ClJobLocationDto (contrat UI,
+        // coord. Alex + note_ui_alex.md) et remettre BatEtage = AddressLine3 seul. Cf. legacy ClHelper.GetSiteString.
+        loc.BatEtage = string.Join(" ",
+            new[] { stage.ServiceLabel, stage.AddressLine3 }.Where(v => !string.IsNullOrWhiteSpace(v)).Select(S));
         loc.Commune = string.Join(" ",
             new[] { stage.PostalCode, stage.City }.Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
         loc.Complement = S(stage.Complement);

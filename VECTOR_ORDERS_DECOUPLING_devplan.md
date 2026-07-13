@@ -120,3 +120,9 @@ Orders, il lui faut ces formes autrement. Deux options :
 
 **4 (trancher 4a/4b) → DEC-4 (gap personnel) → DEC-1 → DEC-2 → DEC-3 → DEC-5 → DEC-7 → DEC-8**,
 DEC-6 si auth activée. DEC-4 peut démarrer en parallèle (côté Orders.Api).
+
+## 9. Dette technique
+
+| # | Dette | Contexte / correctif propre |
+|---|---|---|
+| **DET-1** | **Champ `Service` absent des lieux détaillés** — `ClStageDetailDtoOut.ServiceLabel` (service médical, ex. « Cardiologie ») n'existe que pour HealthFacility/FreeText, jamais pour une adresse bénéficiaire. Faute de champ dédié dans `ClJobLocation`/`ClJobLocationDto`, il est aujourd'hui **concaténé dans `BatEtage`** avec `AddressLine3` (`JobRepository.ToJobLocation`, correctif provisoire — auparavant l'un OU l'autre, ce qui perdait le service). | Ajouter un champ **`Service`** à `ClJobLocation` **et** `ClJobLocationDto` ; mapper `Service = ServiceLabel` et remettre `BatEtage = AddressLine3` seul. **Impact contrat UI mobile** → coord. Alex + màj `note_ui_alex.md` (ligne `Service` après `Nom`, cf. ordre legacy `ClHelper.GetSiteString` : Site → Service → lignes → CP/Commune). |

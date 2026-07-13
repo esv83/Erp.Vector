@@ -72,6 +72,8 @@ L'équipage est **dérivé du token** (plus besoin de passer un `crewId`).
 ```
 > ⚠️ **Lieux non référencés** (EHPAD, domicile…) : l'ERP ne fournit pas de champs structurés — seul **`Nom`** est rempli (avec le libellé complet, ex. « EHPAD LES TAMARIS - CHAM 38 RDC - La Valette-du-Var »), les autres champs sont vides. Gère donc le cas « une seule ligne ».
 
+> 🧩 **Dette connue — champ `Service` à venir** : pour un **établissement de santé** (et un lieu FreeText), l'ERP porte un **service** (ex. « Cardiologie ») distinct du bâtiment/étage. Aujourd'hui, faute de champ dédié, le service est **concaténé dans `BatEtage`** (service puis ligne 3). Un futur champ **`Service`** sera ajouté à `PickupLocation`/`DropoffLocation` ; `BatEtage` ne portera alors plus que la ligne 3. Prévois l'affichage d'une ligne `Service` (après `Nom`) le moment venu — je te préviens avant de basculer le contrat.
+
 Champs inchangés utiles : `TransportSens`, `IsSerial`, `IsSign`, `Appointment`, `Beneficiary` (`CompleteName`, `DDN`, `Age`, `Phones`).
 
 ---
