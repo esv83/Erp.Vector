@@ -48,8 +48,7 @@ public sealed class HttpErpReadApiClient : IErpReadApiClient
         // engagedOnly=true : ne remonter au terrain que les missions ENGAGÉES par la régulation.
         // L'engagement est un axe DISTINCT de la progression (à faire / en cours / terminé) et n'est PAS
         // porté par le DTO de liste → filtre AUTORITATIF côté serveur, aucun repli client possible.
-        // Envoyé d'avance : sans effet tant qu'Orders.Api ne l'honore pas, puis corrige la visibilité
-        // sans redéploiement Vector. Cf. endPoint.md §5.
+        // Honoré par Orders.Api (ListCrewMissions → ListByCrewAsync filtre MIS_IS_ENGAGED). Cf. endPoint.md §5.
         var list = await _http.GetFromJsonAsync<List<ErpMissionListItemDto>>(
             $"crews/{crewId}/missions?engagedOnly=true", JsonOptions, ct);
         return list ?? new List<ErpMissionListItemDto>(0);

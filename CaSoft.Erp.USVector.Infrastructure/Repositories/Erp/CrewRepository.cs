@@ -52,8 +52,8 @@ public class CrewRepository : IMobileCrewRepository
         // clôturées (status ≥ 4) disparaissent du terrain (spec §14 : accès autorisé jusqu'au clôturé).
         // Le filtre « engagée » (axe distinct de la progression, cf. endPoint.md §5) est délégué à Orders
         // via engagedOnly=true sur cette route crew-missions : pas de repli client ici, le DTO liste ne
-        // porte pas l'état d'engagement — tant qu'Orders ne l'honore pas, les missions affectées non
-        // engagées fuient.
+        // porte pas l'état d'engagement. Désormais honoré côté Orders.Api (ListByCrewAsync filtre
+        // MIS_IS_ENGAGED) → les missions affectées mais non engagées ne remontent plus au terrain.
         var crewMissions = crewSet
             .SelectMany(id => _erp.ListMissionsByCrewAsync(id, CancellationToken.None).GetAwaiter().GetResult())
             .Where(m => m.Status < ClosedMissionStatus)
