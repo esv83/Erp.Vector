@@ -1,5 +1,7 @@
 using CaSoft.Erp.USVector.Application.Port;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CaSoft.Erp.USVector.Api.Infrastructure;
 
@@ -33,7 +35,22 @@ public static class CrewAccess
 
         var sub = ctrl.User.GetKeycloakSubject();
         if (sub is null)
+        {
+            // Piège de déploiement : si Keycloak est désactivé côté serveur (Keycloak:Enabled=false),
+            // le pipeline JWT n'est pas branché → le token n'est JAMAIS décodé → aucun claim « sub »,
+            // alors même qu'un header Authorization est présent. Le message « claim sub absent » est
+            // alors trompeur : le vrai problème est la config serveur, pas le token du client.
+            var keycloakEnabled = http.RequestServices
+                .GetRequiredService<IConfiguration>()
+                .GetValue("Keycloak:Enabled", false);
+            if (!keycloakEnabled)
+                return ctrl.StatusCode(500,
+                    "Authentification Keycloak désactivée côté serveur (Keycloak:Enabled=false) : le token n'est pas "
+                    + "décodé, le claim « sub » est donc introuvable. Activer Keycloak sur le serveur "
+                    + "(variable Keycloak__Enabled=true, ou appsettings.{Environnement}.json).");
+
             return ctrl.Unauthorized("Token valide mais claim « sub » (identifiant Keycloak) absent ou non-Guid.");
+        }
 
         var pid = identity.ResolvePersonnelId(sub.Value);
         if (pid is null)
