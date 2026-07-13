@@ -63,12 +63,20 @@ USVector.Api valide chaque token porté par `Authorization: Bearer …` :
 | **Signature** | JWKS du realm (récupéré via l'Authority) | middleware JwtBearer |
 | **Claim `sub`** | l'ID utilisateur Keycloak (= le sub) | lu par l'app (résolution PER_ID) |
 
+**Validation de l'appartenance (`azp`, pas `aud`)** : Keycloak émet par défaut **`aud: account`**
+(aucun *audience mapper*). Plutôt que d'imposer un mapper côté realm, l'API **désactive la validation
+d'audience** et valide l'**`azp`** (*authorized party* = client émetteur) : il doit valoir
+`us-ambulance`. Signature / issuer / expiration restent validés. Un token émis pour un autre client
+est donc rejeté (`azp '…' non autorisé`). Cf. `Program.cs`, `OnTokenValidated`.
+
+> 🔒 *Durcissement optionnel* : si tu ajoutes un *Audience mapper* Keycloak (Client scopes →
+> « Audience » → *Included Client Audience* = `us-ambulance`, *Add to access token* = ON) pour que le
+> token porte `aud: us-ambulance`, on pourra repasser à une validation d'audience stricte
+> (`ValidateAudience = true`) en plus de l'`azp`.
+
 **Côté Keycloak**, sur le client de l'app mobile :
 
-1. Le token doit porter **`aud: us-ambulance`**. Si ce n'est pas le cas nativement, ajouter un
-   *Audience mapper* (Client scopes → mapper « Audience » → *Included Client Audience* = `us-ambulance`,
-   *Add to access token* = ON).
-2. `RequireHttpsMetadata = true` en prod → l'Authority **doit** être joignable en HTTPS par le
+1. `RequireHttpsMetadata = true` en prod → l'Authority **doit** être joignable en HTTPS par le
    serveur (le middleware récupère la config OIDC + les clés JWKS au démarrage / à la volée).
 
 > ⚠ **Limitation connue** : dans `Program.cs`, `options.Authority` et `options.Audience` sont

@@ -39,7 +39,8 @@ if (keycloakEnabled)
             // claims (sub…) SANS vérifier signature / issuer / audience / expiration, et SANS contacter
             // Keycloak. Permet de tester la lecture du sub quand l'Authority n'est pas joignable.
             // NE JAMAIS activer en production — désactivé par défaut.
-            if (builder.Configuration.GetValue("Keycloak:DisableValidation", false))
+            var disableValidation = builder.Configuration.GetValue("Keycloak:DisableValidation", false);
+            if (disableValidation)
             {
                 options.Authority = null; // évite le fetch OIDC metadata (placeholder)
                 options.TokenValidationParameters = new TokenValidationParameters
@@ -51,6 +52,13 @@ if (keycloakEnabled)
                     SignatureValidator = (token, _) => new JsonWebToken(token)
                 };
             }
+
+            // Audience : Keycloak émet par défaut « aud: account » (aucun audience mapper configuré sur
+            // le realm). Plutôt que d'imposer un mapper côté Keycloak, on désactive la validation d'aud
+            // et on valide l'« azp » (authorized party = client émetteur du token) dans OnTokenValidated.
+            // Signature / issuer / expiration restent validés. (Si un audience mapper est ajouté plus
+            // tard, on pourra revenir à une validation d'audience stricte.)
+            options.TokenValidationParameters.ValidateAudience = false;
 
             // ── Interception JWT observable/testable (MOB-4a) ────────────────────
             // On trace chaque étape du pipeline et on dépose la raison d'un rejet
@@ -70,8 +78,24 @@ if (keycloakEnabled)
                 {
                     var log = ctx.HttpContext.RequestServices
                         .GetRequiredService<ILoggerFactory>().CreateLogger("Keycloak.Jwt");
-                    log.LogInformation("JWT validé : sub={Sub} iss={Iss} aud={Aud} exp={Exp}.",
+
+                    // Cloisonnement API (remplace la validation d'aud) : le token doit avoir été émis POUR
+                    // le client mobile. On l'exige via « azp ». Ignoré en mode DisableValidation (dev pur).
+                    const string expectedAzp = "us-ambulance"; // aligné sur options.Audience (cf. hardcode, doc §1.2)
+                    var azp = ctx.Principal?.FindFirst("azp")?.Value;
+                    if (!disableValidation && !string.Equals(azp, expectedAzp, StringComparison.Ordinal))
+                    {
+                        var reason = $"azp '{azp}' non autorisé (attendu '{expectedAzp}').";
+                        // Déposé pour lecture par les controllers (cf. MobileCallerExtensions.GetJwtError).
+                        ctx.HttpContext.Items[MobileCallerExtensions.JwtErrorKey] = reason;
+                        log.LogWarning("JWT REJETÉ sur {Path} : {Reason}.", ctx.HttpContext.Request.Path, reason);
+                        ctx.Fail(reason);
+                        return Task.CompletedTask;
+                    }
+
+                    log.LogInformation("JWT validé : sub={Sub} azp={Azp} iss={Iss} aud={Aud} exp={Exp}.",
                         ctx.Principal?.FindFirst("sub")?.Value,
+                        azp,
                         ctx.Principal?.FindFirst("iss")?.Value,
                         ctx.Principal?.FindFirst("aud")?.Value,
                         ctx.Principal?.FindFirst("exp")?.Value);
