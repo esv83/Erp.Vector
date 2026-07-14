@@ -60,6 +60,7 @@ Public Class ClJobDetailAdapter
             dto.BatEtage = loc.BatEtage
             dto.Commune = loc.Commune
             dto.Complement = loc.Complement
+            dto.DisplayLines = New List(Of String)(loc.DisplayLines)
         End If
         Return dto
     End Function

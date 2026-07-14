@@ -48,9 +48,12 @@ affiché **après `Nom`**. `BatEtage` ne porte plus que `AddressLine3`.
 
 ## 4. Règles spéciales
 
-- **Repli label figé** : si les 6 champs structurés sont vides (jointure orpheline / lieu
-  supprimé), Vector met le `Label` figé dans **`Nom`** (ex. « EHPAD LES TAMARIS - … »)
-  → affichage 1 ligne.
+- **Repli label figé** : si les champs structurés sont vides (jointure orpheline / lieu
+  supprimé / lieu non référencé), Vector met le `Label` figé dans **`Nom`** (compat champ-à-champ).
+- **`DisplayLines` (harmonisation, 2026-07-14)** : chaque lieu porte un tableau `DisplayLines` de
+  lignes prêtes à afficher, **homogène quel que soit le type**. Site → champs non vides dans l'ordre ;
+  lieu non référencé → **label éclaté** (séparateur « - ») en lignes. L'UI rend `DisplayLines` telles
+  quelles → **plus de cas « une seule ligne »** (`JobRepository.ToJobLocation` + `SplitLabel`).
 - **Champs ERP non mappés par Vector** (donc non affichés) : `LocationType`, `LocationId`,
   `CityId`, `Latitude/Longitude`, `IsActive`, `BeneficiaryId`, `UnreferencedLocationStatus`.
 

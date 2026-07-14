@@ -3,6 +3,7 @@ using CaSoft.Erp.USVector.Application.Dto;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.ErpApi;
+using Microsoft.Extensions.Logging;
 
 namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Erp;
 
@@ -25,17 +26,20 @@ public class JobRepository : IJobRepository
     private readonly IJobTimeRepository _jobTimeRepository;
     private readonly ISignatureRepository _signatures;
     private readonly IJobAttributeOverlay _overlay;
+    private readonly ILogger<JobRepository> _logger;
 
     public JobRepository(
         IErpReadApiClient erp,
         IJobTimeRepository jobTimeRepository,
         ISignatureRepository signatures,
-        IJobAttributeOverlay overlay)
+        IJobAttributeOverlay overlay,
+        ILogger<JobRepository> logger)
     {
         _erp = erp;
         _jobTimeRepository = jobTimeRepository;
         _signatures = signatures;
         _overlay = overlay;
+        _logger = logger;
     }
 
     public ClJob GetJob(Guid gJobId)
@@ -139,8 +143,8 @@ public class JobRepository : IJobRepository
             TransportSubCategoryLabel = body?.TransportSubCategoryLabel ?? string.Empty,
             Departure = ToAddressLines(mission.Pickup),   // compat : version paragraphe
             Arrival = ToAddressLines(mission.Dropoff),
-            PickupLocation = ToJobLocation(mission.Pickup),
-            DropoffLocation = ToJobLocation(mission.Dropoff),
+            PickupLocation = ToJobLocation(mission.Pickup, jobId, "pickup"),
+            DropoffLocation = ToJobLocation(mission.Dropoff, jobId, "dropoff"),
             Comments = mission.Comment ?? string.Empty
         };
     }
@@ -159,9 +163,11 @@ public class JobRepository : IJobRepository
 
     /// <summary>
     /// Stage ERP → lieu détaillé structuré (mapping « au mieux » des champs disponibles).
-    /// Lieu non référencé (structuré vide) : repli du Label figé dans Nom.
+    /// Lieu non référencé (structuré vide) : repli du Label figé dans Nom + éclatement en DisplayLines,
+    /// ET log d'anomalie — une adresse devrait toujours être structurée (a minima ligne1 + commune, DET-3).
+    /// <paramref name="stage"/> null (aucune adresse) = repli silencieux : c'est un autre problème.
     /// </summary>
-    private static ClJobLocation ToJobLocation(ErpStageDto? stage)
+    private ClJobLocation ToJobLocation(ErpStageDto? stage, Guid missionId, string stageName)
     {
         var loc = new ClJobLocation();
         if (stage is null) return loc;
@@ -180,13 +186,42 @@ public class JobRepository : IJobRepository
             new[] { stage.PostalCode, stage.City }.Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
         loc.Complement = S(stage.Complement);
 
-        // Aucun champ structuré → repli sur le label figé.
-        var hasStructured = new[] { loc.Nom, loc.Service, loc.Adresse, loc.Residence, loc.BatEtage, loc.Commune, loc.Complement }
-            .Any(v => !string.IsNullOrWhiteSpace(v));
-        if (!hasStructured) loc.Nom = S(stage.Label);
+        // Représentation « prête à afficher » homogène : liste ordonnée des lignes non vides. L'UI la rend
+        // telle quelle, sans champ-à-champ ni cas « une seule ligne » (cf. docs/ui-web/jobdetail-champ-service.md).
+        loc.DisplayLines = new[] { loc.Nom, loc.Service, loc.Adresse, loc.Residence, loc.BatEtage, loc.Commune, loc.Complement }
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .ToList();
+
+        // Aucun champ structuré (lieu non référencé) → repli sur le label figé, éclaté en lignes (séparateur
+        // « - ») pour un rendu multi-lignes cohérent. Nom garde le label complet (compat champ-à-champ).
+        if (loc.DisplayLines.Count == 0)
+        {
+            loc.Nom = S(stage.Label);
+            loc.DisplayLines = SplitLabel(stage.Label);
+
+            // Anomalie normalement impossible : un lieu devrait toujours être structuré (a minima ligne1 +
+            // commune). Ce repli sur le label figé = donnée non normalisée / référence orpheline côté ERP →
+            // à corriger en amont (DET-3). On loggue pour le DÉTECTER en prod plutôt que de le masquer.
+            _logger.LogWarning(
+                "Lieu non structuré (repli sur label figé) — mission {MissionId}, {Stage} : « {Label} ». " +
+                "Une adresse devrait toujours porter au moins ligne1 + commune (cf. DET-3).",
+                missionId, stageName, loc.Nom);
+        }
 
         return loc;
     }
+
+    /// <summary>
+    /// Éclate le label figé d'un lieu non référencé en lignes d'affichage : découpe sur les sauts de ligne
+    /// et le séparateur « - » (espace-tiret-espace → « La Valette-du-Var » reste intact), trim, vides retirés.
+    /// </summary>
+    internal static List<string> SplitLabel(string? label) =>
+        (label ?? string.Empty)
+            .Split('\n', '\r')
+            .SelectMany(part => part.Split(" - "))
+            .Select(part => part.Trim())
+            .Where(part => part.Length > 0)
+            .ToList();
 
     private static ClJobBeneficiary BuildBeneficiary(ErpBeneficiaryDetailDto? dto)
     {

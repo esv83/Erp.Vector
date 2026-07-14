@@ -50,6 +50,9 @@ Public Class ClJobDetailModel
         Public Property BatEtage As String = String.Empty
         Public Property Commune As String = String.Empty
         Public Property Complement As String = String.Empty
+        ''' <summary>Lignes prêtes à afficher (ordre + vides déjà filtrés), identiques quel que soit le type de
+        ''' lieu. <b>Le plus simple pour l'UI</b> : rendre ces lignes une par une (plus de cas « une seule ligne »).</summary>
+        Public Property DisplayLines As List(Of String) = New List(Of String)
     End Class
 
 End Class

@@ -71,7 +71,7 @@ L'équipage est **dérivé du token** (plus besoin de passer un `crewId`).
   "Complement": ""
 }
 ```
-> ⚠️ **Lieux non référencés** (EHPAD, domicile…) : l'ERP ne fournit pas de champs structurés — seul **`Nom`** est rempli (avec le libellé complet, ex. « EHPAD LES TAMARIS - CHAM 38 RDC - La Valette-du-Var »), les autres champs sont vides. Gère donc le cas « une seule ligne ».
+> ✅ **Plus simple — `DisplayLines`** : chaque lieu porte aussi un tableau **`DisplayLines`** (lignes prêtes à afficher, déjà ordonnées et filtrées, `Service` inclus). **Rends-le tel quel** → identique pour un établissement et un lieu non référencé, **plus de cas « une seule ligne »**. Pour un lieu non référencé, le libellé figé (« EHPAD LES TAMARIS - CHAM 38 RDC - … ») y est déjà **éclaté en lignes**. Détails : `docs/ui-web/jobdetail-champ-service.md`.
 
 > 🧩 **Contrat basculé (DET-1, 2026-07-14) — champ `Service` désormais présent** : pour un **établissement de santé** (et un lieu FreeText), l'ERP porte un **service** (ex. « Cardiologie ») distinct du bâtiment/étage. Il a maintenant son **champ dédié `Service`** dans `PickupLocation`/`DropoffLocation`, et **`BatEtage` ne porte plus que la ligne 3** (le service n'y est plus concaténé).
 >

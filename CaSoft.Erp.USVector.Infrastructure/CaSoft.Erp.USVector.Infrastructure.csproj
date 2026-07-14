@@ -24,4 +24,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Expose les membres internal aux tests (ex. JobRepository.SplitLabel). -->
+    <InternalsVisibleTo Include="CaSoft.Erp.USVector.Tests" />
+  </ItemGroup>
+
 </Project>
