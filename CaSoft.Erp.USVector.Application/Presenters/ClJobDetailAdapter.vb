@@ -54,6 +54,7 @@ Public Class ClJobDetailAdapter
         Dim dto As New ClJobLocationDto
         If loc IsNot Nothing Then
             dto.Nom = loc.Nom
+            dto.Service = loc.Service
             dto.Adresse = loc.Adresse
             dto.Residence = loc.Residence
             dto.BatEtage = loc.BatEtage

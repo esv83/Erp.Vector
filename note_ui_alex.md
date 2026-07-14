@@ -63,6 +63,7 @@ L'équipage est **dérivé du token** (plus besoin de passer un `crewId`).
 ```json
 {
   "Nom":        "CHITS CH SAINTE MUSSE",
+  "Service":    "Cardiologie",
   "Adresse":    "54 R HENRI SAINTE CLAIRE DEVILLE",
   "Residence":  "",
   "BatEtage":   "CS 31412",
@@ -72,7 +73,9 @@ L'équipage est **dérivé du token** (plus besoin de passer un `crewId`).
 ```
 > ⚠️ **Lieux non référencés** (EHPAD, domicile…) : l'ERP ne fournit pas de champs structurés — seul **`Nom`** est rempli (avec le libellé complet, ex. « EHPAD LES TAMARIS - CHAM 38 RDC - La Valette-du-Var »), les autres champs sont vides. Gère donc le cas « une seule ligne ».
 
-> 🧩 **Dette connue — champ `Service` à venir** : pour un **établissement de santé** (et un lieu FreeText), l'ERP porte un **service** (ex. « Cardiologie ») distinct du bâtiment/étage. Aujourd'hui, faute de champ dédié, le service est **concaténé dans `BatEtage`** (service puis ligne 3). Un futur champ **`Service`** sera ajouté à `PickupLocation`/`DropoffLocation` ; `BatEtage` ne portera alors plus que la ligne 3. Prévois l'affichage d'une ligne `Service` (après `Nom`) le moment venu — je te préviens avant de basculer le contrat.
+> 🧩 **Contrat basculé (DET-1, 2026-07-14) — champ `Service` désormais présent** : pour un **établissement de santé** (et un lieu FreeText), l'ERP porte un **service** (ex. « Cardiologie ») distinct du bâtiment/étage. Il a maintenant son **champ dédié `Service`** dans `PickupLocation`/`DropoffLocation`, et **`BatEtage` ne porte plus que la ligne 3** (le service n'y est plus concaténé).
+>
+> ⚠️ **Action requise** : afficher la ligne `Service` **juste après `Nom`** → ordre complet : `Nom → Service → Adresse → Residence → BatEtage → Commune → Complement`. **Tant que tu ne l'affiches pas, le service n'apparaît plus** (il a quitté `BatEtage`). À déployer **en même temps** que la mise à jour serveur.
 
 Champs inchangés utiles : `TransportSens`, `IsSerial`, `IsSign`, `Appointment`, `Beneficiary` (`CompleteName`, `DDN`, `Age`, `Phones`).
 
@@ -101,7 +104,7 @@ L'access token Keycloak est **court (5 min)** — c'est normal. Pour éviter une
 ## Récap actions UI
 1. **JobList** : icône « bien reçu » sur `IsSeen` (+ `PATCH` au clic). Migrer `IsAck` → `IsSeen`.
 2. **Driver** : `GET`/`POST /api/Driver` (token, sans crewId) ; garder la garde null sur `SelectedDriver`.
-3. **JobDetail** : basculer sur `ScheduleLabel`, `TransportModeLabel`, `PickupLocation`/`DropoffLocation`, `Comments`.
+3. **JobDetail** : basculer sur `ScheduleLabel`, `TransportModeLabel`, `PickupLocation`/`DropoffLocation`, `Comments`. **+ afficher la ligne `Service` (après `Nom`) — DET-1, sinon le service disparaît.**
 4. **Auth** : implémenter le **silent refresh** (refresh token) pour la session 15 h.
 
 Questions / besoin d'exemples de payloads réels : reviens vers moi.

@@ -43,6 +43,8 @@ Public Class ClJobDetailModel
     ''' <summary>Lieu détaillé multi-lignes. Chaque champ peut être vide → l'UI ne l'affiche pas.</summary>
     Public Class ClJobLocationDto
         Public Property Nom As String = String.Empty
+        ''' <summary>Service médical (ex. « Cardiologie »), à afficher après Nom. Vide hors établissement de santé / FreeText.</summary>
+        Public Property Service As String = String.Empty
         Public Property Adresse As String = String.Empty
         Public Property Residence As String = String.Empty
         Public Property BatEtage As String = String.Empty

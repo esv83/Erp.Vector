@@ -4,6 +4,8 @@
 ' (structuré absent côté ERP), seul Nom est renseigné (= label figé).
 Public Class ClJobLocation
     Public Property Nom As String = String.Empty
+    ''' <summary>Service médical (ex. « Cardiologie ») — établissement de santé / lieu FreeText. DET-1 : champ dédié (avant, concaténé dans BatEtage).</summary>
+    Public Property Service As String = String.Empty
     Public Property Adresse As String = String.Empty
     Public Property Residence As String = String.Empty
     Public Property BatEtage As String = String.Empty

@@ -169,21 +169,19 @@ public class JobRepository : IJobRepository
         static string S(string? v) => v?.Trim() ?? string.Empty;
 
         loc.Nom = S(stage.LocationName);
+        // DET-1 : le service médical (ServiceLabel, ex. « Cardiologie » — établissement de santé / FreeText,
+        // jamais une adresse bénéficiaire) a désormais un champ dédié, affiché après Nom. BatEtage ne porte
+        // plus que la ligne 3. Contrat UI basculé (cf. note_ui_alex.md) : l'app doit rendre la ligne Service.
+        loc.Service = S(stage.ServiceLabel);
         loc.Adresse = S(stage.AddressLine1);
         loc.Residence = S(stage.AddressLine2);
-        // ServiceLabel (service médical, ex. « Cardiologie ») n'existe que pour HealthFacility/FreeText,
-        // jamais pour une adresse bénéficiaire. On concatène AVEC AddressLine3 (et non l'un OU l'autre)
-        // pour ne rien perdre quand les deux sont présents sur un établissement.
-        // TODO (dette) : ajouter un champ dédié « Service » à ClJobLocation/ClJobLocationDto (contrat UI,
-        // coord. Alex + note_ui_alex.md) et remettre BatEtage = AddressLine3 seul. Cf. legacy ClHelper.GetSiteString.
-        loc.BatEtage = string.Join(" ",
-            new[] { stage.ServiceLabel, stage.AddressLine3 }.Where(v => !string.IsNullOrWhiteSpace(v)).Select(S));
+        loc.BatEtage = S(stage.AddressLine3);
         loc.Commune = string.Join(" ",
             new[] { stage.PostalCode, stage.City }.Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
         loc.Complement = S(stage.Complement);
 
         // Aucun champ structuré → repli sur le label figé.
-        var hasStructured = new[] { loc.Nom, loc.Adresse, loc.Residence, loc.BatEtage, loc.Commune, loc.Complement }
+        var hasStructured = new[] { loc.Nom, loc.Service, loc.Adresse, loc.Residence, loc.BatEtage, loc.Commune, loc.Complement }
             .Any(v => !string.IsNullOrWhiteSpace(v));
         if (!hasStructured) loc.Nom = S(stage.Label);
 

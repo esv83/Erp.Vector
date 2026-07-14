@@ -27,9 +27,10 @@ BD ERP (ORD_SITE | BEN_BENEFICIARY_ADDRESS | REF_UNREFERENCED_LOCATION)
 | Ligne (`ClJobLocationDto`) | ← `ClJobLocation` (Vector) | ← `ClStageDetailDtoOut` (ERP) | Type 1 **Établissement** `ORD_SITE` | Type 2 **Adr. bénéf.** `BEN_..._ADDRESS` | Type 3 **Libre** `REF_UNREF_LOCATION` |
 |---|---|---|---|---|---|
 | **Nom** | `Nom` | `LocationName` | `SITE_LABEL` | `BEN_ADR_LABEL` | `URL_LOCATION_NAME` |
+| **Service** *(DET-1)* | `Service` | `ServiceLabel` | `SITE_SERVICE` / commande | *(pas de service)* | `URL_SERVICE_LABEL` / commande |
 | **Adresse** | `Adresse` | `AddressLine1` | `SITE_ADDR_LINE_1` | `BEN_ADR_LINE_1` | `URL_ADDR_LINE_1` |
 | **Residence** | `Residence` | `AddressLine2` | `SITE_ADDR_LINE_2` | `BEN_ADR_LINE_2` | `URL_ADDR_LINE_2` |
-| **BatEtage** | `Service` + ` ` + `AddressLine3` | `ServiceLabel` **+** `AddressLine3` | (service ↓) **+** `SITE_ADDR_LINE_3` | *(pas de service)* `BEN_ADR_LINE_3` | (service ↓) **+** `URL_ADDR_LINE_3` |
+| **BatEtage** | `AddressLine3` | `AddressLine3` | `SITE_ADDR_LINE_3` | `BEN_ADR_LINE_3` | `URL_ADDR_LINE_3` |
 | **Commune** | `PostalCode` + ` ` + `City` | `PostalCode` + `City` | `SITE_POSTAL_CODE` + `SITE_CITY` | `BEN_ADR_POSTAL_CODE` + `BEN_ADR_CITY` | `URL_POSTAL_CODE` + `URL_CITY` |
 | **Complement** | `Complement` | `Complement` | `SITE_COMPLEMENT` | *(vide)* | `URL_COMPLEMENT` |
 
@@ -42,9 +43,8 @@ BD ERP (ORD_SITE | BEN_BENEFICIARY_ADDRESS | REF_UNREFERENCED_LOCATION)
    **apparié par id de lieu** (retour-safe : une mission retour inverse pickup/dropoff).
    → *le service d'un transport est choisi par commande, PAS porté par le site.*
 
-Côté Vector, `ServiceLabel` **n'a pas de ligne dédiée** : il est **concaténé dans `BatEtage`**
-(service d'abord, puis `AddressLine3`). Donc aujourd'hui le service s'affiche sur la ligne
-« Bât./Étage ».
+Côté Vector, `ServiceLabel` a désormais son **champ dédié `Service`** (DET-1, résolu le 2026-07-14),
+affiché **après `Nom`**. `BatEtage` ne porte plus que `AddressLine3`.
 
 ## 4. Règles spéciales
 
@@ -58,21 +58,20 @@ Côté Vector, `ServiceLabel` **n'a pas de ligne dédiée** : il est **concatén
 
 - ✅ **Service pickup/dropoff** rapatrié depuis la commande — `Erp.Order`,
   `MissionDetailQueryService` (branche `fix/missions-engaged-only-exclude-closed`).
-- ✅ **Concaténation `Service` + `AddressLine3` dans `BatEtage`** — `Erp.Vector`,
-  `JobRepository.ToJobLocation` (stopgap, ne perd plus le service).
+- ✅ **DET-1 — champ `Service` dédié** (2026-07-14) — `Erp.Vector`. Voir §6.
 
-## 6. Dette ouverte — DET-1 : champ `Service` dédié
+## 6. DET-1 — champ `Service` dédié ✅ RÉSOLU (2026-07-14)
 
-Le service est logé dans `BatEtage` faute de champ dédié. À terme :
+Le service a désormais son propre champ (plus concaténé dans `BatEtage`). Livré côté serveur :
 
-1. Ajouter `Service As String` à `ClJobLocation` **et** `ClJobLocationDto`.
-2. `ToJobLocation` : `Service = ServiceLabel` ; `BatEtage = AddressLine3` seul.
-3. `ClJobDetailAdapter.ToLocationDto` : mapper le nouveau champ.
-4. **Contrat UI mobile** → coord. Alex + `note_ui_alex.md` : afficher une ligne `Service`
-   **après `Nom`** (ordre legacy `ClHelper.GetSiteString` : Site → Service → lignes → CP/Commune).
+1. ✅ `Service As String` ajouté à `ClJobLocation` (Domain) **et** `ClJobLocationDto` (contrat).
+2. ✅ `ToJobLocation` : `Service = ServiceLabel` ; `BatEtage = AddressLine3` seul.
+3. ✅ `ClJobDetailAdapter.ToLocationDto` : mappe le nouveau champ ; le repli `Nom`←`Label`
+   tient compte de `Service`.
+4. ✅ **Contrat UI** basculé dans `note_ui_alex.md` (ligne `Service` après `Nom`).
 
-⚠️ Changer le contrat : tant qu'Alex n'affiche pas la ligne `Service`, la remettre hors de
-`BatEtage` la ferait **disparaître** de l'UI actuelle → basculer les deux côtés ensemble.
+⚠️ **Bascule de contrat** : le service ayant quitté `BatEtage`, l'app mobile **doit** afficher la
+ligne `Service` (après `Nom`) — sinon il disparaît de l'UI. **Déployer serveur + app ensemble.**
 
 ## 7. Fichiers clés
 
@@ -92,7 +91,8 @@ Le service est logé dans `BatEtage` faute de champ dédié. À terme :
 
 ## 8. Checklist de reprise
 
-- [ ] Décider si on implémente DET-1 (champ `Service` dédié) ou on garde `BatEtage`.
-- [ ] Si DET-1 : coordonner avec Alex la ligne `Service` (ordre après `Nom`).
+- [x] Décider si on implémente DET-1 (champ `Service` dédié) ou on garde `BatEtage`. → **DET-1**.
+- [x] Implémenter le champ `Service` dédié côté serveur (Domain / DTO / adapter / mapping).
+- [ ] **Coordonner avec Alex** la ligne `Service` (après `Nom`) + **déployer serveur + app ensemble**.
 - [ ] Vérifier l'affichage sur une mission **retour** (service non inversé).
 - [ ] Vérifier un lieu **non référencé** (FreeText) : service référentiel conservé.
