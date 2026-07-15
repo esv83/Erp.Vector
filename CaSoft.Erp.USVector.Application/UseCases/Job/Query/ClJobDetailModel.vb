@@ -6,6 +6,8 @@ Public Class ClJobDetailModel
         Beneficiary = New ClPatientDto
         PickupLocation = New ClJobLocationDto
         DropoffLocation = New ClJobLocationDto
+        PickupDisplay = New ClLocationDisplayDto
+        DropoffDisplay = New ClLocationDisplayDto
     End Sub
 
     ' ── Champs historiques (compat — seront retirés une fois l'UI basculée) ──────────
@@ -32,6 +34,11 @@ Public Class ClJobDetailModel
     ''' <summary>Lieu de dépose, détaillé (l'UI affiche les champs non vides).</summary>
     Public Property DropoffLocation As ClJobLocationDto
 
+    ''' <summary>DET-2 — prise en charge : affichage piloté serveur (sections de lignes + coords). L'UI rend tel quel.</summary>
+    Public Property PickupDisplay As ClLocationDisplayDto
+    ''' <summary>DET-2 — dépose : affichage piloté serveur (sections de lignes + coords). L'UI rend tel quel.</summary>
+    Public Property DropoffDisplay As ClLocationDisplayDto
+
     Public Class ClPatientDto
         Public Property CompleteName As String
         Public Property DDN As String
@@ -53,6 +60,19 @@ Public Class ClJobDetailModel
         ''' <summary>Lignes prêtes à afficher (ordre + vides déjà filtrés), identiques quel que soit le type de
         ''' lieu. <b>Le plus simple pour l'UI</b> : rendre ces lignes une par une (plus de cas « une seule ligne »).</summary>
         Public Property DisplayLines As List(Of String) = New List(Of String)
+
+        ''' <summary>
+        ''' Coordonnées du lieu — sous-objet à part, hors des champs-lignes : l'UI affiche
+        ''' les champs texte non vides, et consomme celui-ci séparément (carto).
+        ''' Nothing si l'ERP n'a pas géocodé le lieu.
+        ''' </summary>
+        Public Property Coordinates As ClJobCoordinatesDto
+    End Class
+
+    ''' <summary>Coordonnées WGS84 d'un lieu.</summary>
+    Public Class ClJobCoordinatesDto
+        Public Property Latitude As Double
+        Public Property Longitude As Double
     End Class
 
 End Class

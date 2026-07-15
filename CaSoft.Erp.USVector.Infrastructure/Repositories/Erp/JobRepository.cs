@@ -185,6 +185,8 @@ public class JobRepository : IJobRepository
         loc.Commune = string.Join(" ",
             new[] { stage.PostalCode, stage.City }.Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
         loc.Complement = S(stage.Complement);
+        loc.Latitude = stage.Latitude;
+        loc.Longitude = stage.Longitude;
 
         // Représentation « prête à afficher » homogène : liste ordonnée des lignes non vides. L'UI la rend
         // telle quelle, sans champ-à-champ ni cas « une seule ligne » (cf. docs/ui-web/jobdetail-champ-service.md).

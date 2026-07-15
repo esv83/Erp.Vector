@@ -15,4 +15,9 @@ Public Class ClJobLocation
     ''' type de lieu (établissement ou non référencé). L'UI rend ces lignes telles quelles, sans logique
     ''' champ-à-champ ni cas « une seule ligne ».</summary>
     Public Property DisplayLines As List(Of String) = New List(Of String)
+
+    ' Coordonnées du lieu source, hors du flux d'affichage ligne par ligne (l'UI les
+    ' consomme à part). Nothing tant que l'ERP n'a pas géocodé le lieu.
+    Public Property Latitude As Double?
+    Public Property Longitude As Double?
 End Class

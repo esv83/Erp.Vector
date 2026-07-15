@@ -33,9 +33,12 @@ Public Class ClJobDetailAdapter
             ' Mode : secondaire (sous-catégorie) si présent, sinon principal.
             .TransportModeLabel = If(String.IsNullOrWhiteSpace(job.TransportSubCategoryLabel),
                                      job.TransportModeLabel, job.TransportSubCategoryLabel)
-            ' Lieux détaillés structurés.
+            ' Lieux détaillés structurés (champs typés — compat UI actuelle).
             .PickupLocation = ToLocationDto(job.PickupLocation)
             .DropoffLocation = ToLocationDto(job.DropoffLocation)
+            ' DET-2 — affichage piloté serveur (sections de lignes) : le builder décide quoi/comment afficher.
+            .PickupDisplay = ClLocationDisplayBuilder.Build(job.PickupLocation)
+            .DropoffDisplay = ClLocationDisplayBuilder.Build(job.DropoffLocation)
 
         End With
 
@@ -61,6 +64,14 @@ Public Class ClJobDetailAdapter
             dto.Commune = loc.Commune
             dto.Complement = loc.Complement
             dto.DisplayLines = New List(Of String)(loc.DisplayLines)
+            ' Sous-objet présent seulement si le lieu est réellement géocodé : l'UI teste
+            ' sa présence plutôt que deux 0.0 qui pointeraient au large du golfe de Guinée.
+            If loc.Latitude.HasValue AndAlso loc.Longitude.HasValue Then
+                dto.Coordinates = New ClJobCoordinatesDto With {
+                    .Latitude = loc.Latitude.Value,
+                    .Longitude = loc.Longitude.Value
+                }
+            End If
         End If
         Return dto
     End Function
