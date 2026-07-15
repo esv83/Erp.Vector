@@ -15,6 +15,11 @@ public sealed class ErpStageDto
     public string? City { get; set; }
     public string? Complement { get; set; }
     public string? Label { get; set; }
+
+    /// <summary>Latitude WGS84 du lieu source. null tant que l'ERP n'a pas géocodé.</summary>
+    public double? Latitude { get; set; }
+    /// <summary>Longitude WGS84 du lieu source. null tant que l'ERP n'a pas géocodé.</summary>
+    public double? Longitude { get; set; }
 }
 
 /// <summary>GET /missions/{id}/full</summary>

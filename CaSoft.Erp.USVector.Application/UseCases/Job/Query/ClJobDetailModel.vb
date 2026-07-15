@@ -43,11 +43,26 @@ Public Class ClJobDetailModel
     ''' <summary>Lieu détaillé multi-lignes. Chaque champ peut être vide → l'UI ne l'affiche pas.</summary>
     Public Class ClJobLocationDto
         Public Property Nom As String = String.Empty
+        ''' <summary>Service médical (ex. « Cardiologie »). Vide pour une adresse bénéficiaire.</summary>
+        Public Property Service As String = String.Empty
         Public Property Adresse As String = String.Empty
         Public Property Residence As String = String.Empty
         Public Property BatEtage As String = String.Empty
         Public Property Commune As String = String.Empty
         Public Property Complement As String = String.Empty
+
+        ''' <summary>
+        ''' Coordonnées du lieu — sous-objet à part, hors des champs-lignes : l'UI affiche
+        ''' les champs texte non vides, et consomme celui-ci séparément (carto).
+        ''' Nothing si l'ERP n'a pas géocodé le lieu.
+        ''' </summary>
+        Public Property Coordinates As ClJobCoordinatesDto
+    End Class
+
+    ''' <summary>Coordonnées WGS84 d'un lieu.</summary>
+    Public Class ClJobCoordinatesDto
+        Public Property Latitude As Double
+        Public Property Longitude As Double
     End Class
 
 End Class

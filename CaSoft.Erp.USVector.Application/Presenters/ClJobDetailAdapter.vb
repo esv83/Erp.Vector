@@ -54,11 +54,20 @@ Public Class ClJobDetailAdapter
         Dim dto As New ClJobLocationDto
         If loc IsNot Nothing Then
             dto.Nom = loc.Nom
+            dto.Service = loc.Service
             dto.Adresse = loc.Adresse
             dto.Residence = loc.Residence
             dto.BatEtage = loc.BatEtage
             dto.Commune = loc.Commune
             dto.Complement = loc.Complement
+            ' Sous-objet présent seulement si le lieu est réellement géocodé : l'UI teste
+            ' sa présence plutôt que deux 0.0 qui pointeraient au large du golfe de Guinée.
+            If loc.Latitude.HasValue AndAlso loc.Longitude.HasValue Then
+                dto.Coordinates = New ClJobCoordinatesDto With {
+                    .Latitude = loc.Latitude.Value,
+                    .Longitude = loc.Longitude.Value
+                }
+            End If
         End If
         Return dto
     End Function
