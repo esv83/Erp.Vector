@@ -6,6 +6,8 @@ Public Class ClJobDetailModel
         Beneficiary = New ClPatientDto
         PickupLocation = New ClJobLocationDto
         DropoffLocation = New ClJobLocationDto
+        PickupDisplay = New ClLocationDisplayDto
+        DropoffDisplay = New ClLocationDisplayDto
     End Sub
 
     ' ── Champs historiques (compat — seront retirés une fois l'UI basculée) ──────────
@@ -31,6 +33,11 @@ Public Class ClJobDetailModel
     Public Property PickupLocation As ClJobLocationDto
     ''' <summary>Lieu de dépose, détaillé (l'UI affiche les champs non vides).</summary>
     Public Property DropoffLocation As ClJobLocationDto
+
+    ''' <summary>DET-2 — prise en charge : affichage piloté serveur (sections de lignes + coords). L'UI rend tel quel.</summary>
+    Public Property PickupDisplay As ClLocationDisplayDto
+    ''' <summary>DET-2 — dépose : affichage piloté serveur (sections de lignes + coords). L'UI rend tel quel.</summary>
+    Public Property DropoffDisplay As ClLocationDisplayDto
 
     Public Class ClPatientDto
         Public Property CompleteName As String

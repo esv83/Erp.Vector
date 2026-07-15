@@ -223,4 +223,81 @@ public class JobLocationMappingTests
         // Absent plutôt que { 0, 0 } : l'UI teste la présence pour savoir si le lieu est cartographiable.
         dto.Coordinates.Should().BeNull();
     }
+
+    // ── DET-2 : affichage piloté serveur (sections de lignes) ─────────────────
+
+    /// <summary>Affichage tel que le mobile le reçoit (domaine → graphe piloté serveur).</summary>
+    private static ClLocationDisplayDto PickupDisplay(ErpStageDto stage)
+        => new ClJobDetailAdapter(BuildJob(stage)).PickupDisplay;
+
+    [Fact]
+    public void Display_compose_la_section_identite_puis_la_section_adresse()
+    {
+        var d = PickupDisplay(new ErpStageDto
+        {
+            LocationName = "CHITS CH SAINTE MUSSE",
+            ServiceLabel = "CARDIOLOGIE",
+            AddressLine1 = "54 R HENRI SAINTE CLAIRE DEVILLE",
+            AddressLine3 = "CS 31412",
+            PostalCode = "83000",
+            City = "Toulon"
+        });
+
+        d.Blocks.Should().HaveCount(2);
+        // Section identité : nom en gras (index 1) puis service labellisé (index 2).
+        d.Blocks[0][0].Value.Should().Be("CHITS CH SAINTE MUSSE");
+        d.Blocks[0][0].IsBold.Should().BeTrue();
+        d.Blocks[0][0].Index.Should().Be(1);
+        d.Blocks[0][1].Label.Should().Be("Service");
+        d.Blocks[0][1].Value.Should().Be("CARDIOLOGIE");
+        // Section adresse : les champs non vides.
+        d.Blocks[1].Select(l => l.Value).Should()
+            .Contain(new[] { "54 R HENRI SAINTE CLAIRE DEVILLE", "CS 31412", "83000 Toulon" });
+    }
+
+    [Fact]
+    public void Display_omet_les_lignes_vides()
+    {
+        // Adresse bénéficiaire (pas de service) → la section identité n'a que le nom, pas de ligne Service.
+        var d = PickupDisplay(new ErpStageDto
+        {
+            LocationName = "Domicile",
+            ServiceLabel = null,
+            AddressLine1 = "12 rue des Lilas",
+            PostalCode = "83100",
+            City = "Toulon"
+        });
+
+        d.Blocks[0].Should().HaveCount(1);
+        d.Blocks[0][0].Value.Should().Be("Domicile");
+        d.Blocks.SelectMany(b => b).Should().NotContain(l => l.Label == "Service");
+    }
+
+    [Fact]
+    public void Display_geocode_porte_le_sous_objet_Coordinates()
+    {
+        var d = PickupDisplay(new ErpStageDto
+        {
+            LocationName = "CHITS CH SAINTE MUSSE",
+            Latitude = 43.1242,
+            Longitude = 5.9280
+        });
+
+        d.Coordinates.Should().NotBeNull();
+        d.Coordinates!.Latitude.Should().Be(43.1242);
+        d.Coordinates.Longitude.Should().Be(5.9280);
+    }
+
+    [Fact]
+    public void Display_non_geocode_omet_les_Coordinates()
+    {
+        var d = PickupDisplay(new ErpStageDto
+        {
+            LocationName = "EHPAD LES TAMARIS",
+            Latitude = null,
+            Longitude = null
+        });
+
+        d.Coordinates.Should().BeNull();
+    }
 }

@@ -33,9 +33,12 @@ Public Class ClJobDetailAdapter
             ' Mode : secondaire (sous-catégorie) si présent, sinon principal.
             .TransportModeLabel = If(String.IsNullOrWhiteSpace(job.TransportSubCategoryLabel),
                                      job.TransportModeLabel, job.TransportSubCategoryLabel)
-            ' Lieux détaillés structurés.
+            ' Lieux détaillés structurés (champs typés — compat UI actuelle).
             .PickupLocation = ToLocationDto(job.PickupLocation)
             .DropoffLocation = ToLocationDto(job.DropoffLocation)
+            ' DET-2 — affichage piloté serveur (sections de lignes) : le builder décide quoi/comment afficher.
+            .PickupDisplay = ClLocationDisplayBuilder.Build(job.PickupLocation)
+            .DropoffDisplay = ClLocationDisplayBuilder.Build(job.DropoffLocation)
 
         End With
 
