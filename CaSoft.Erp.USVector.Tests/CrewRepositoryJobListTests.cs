@@ -70,11 +70,12 @@ public class CrewRepositoryJobListTests
         => new(new DbContextOptionsBuilder<MobileDbContext>()
             .UseInMemoryDatabase($"joblist-{Guid.NewGuid()}").Options);
 
-    private static ErpMissionListItemDto Mission(Guid id, int status, DateOnly? date = null, TimeOnly? sched = null)
+    private static ErpMissionListItemDto Mission(Guid id, int status, DateOnly? date = null, TimeOnly? sched = null, int kind = 1)
         => new()
         {
             Id = id,
             Status = status,
+            Kind = kind,
             MissionDate = date ?? new DateOnly(2026, 7, 7),
             SchedulingTime = sched ?? new TimeOnly(8, 0),
         };
@@ -198,5 +199,26 @@ public class CrewRepositoryJobListTests
         var result = NewSut(ctx, new FakeErp()).FetchJobList(Array.Empty<Guid>());
 
         result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Mappe_le_sens_de_transport_vers_TransportSens_1_aller_2_retour()
+    {
+        var aller = Guid.NewGuid();
+        var retour = Guid.NewGuid();
+
+        var erp = new FakeErp();
+        erp.ByCrew[CrewA] = new()
+        {
+            Mission(aller,  status: 1, kind: 1),  // Aller
+            Mission(retour, status: 1, kind: 2),  // Retour
+        };
+
+        using var ctx = NewContext();
+        var result = NewSut(ctx, erp).FetchJobList(new[] { CrewA });
+
+        // L'UI attend 1=Aller / 2=Retour dans TransportSens (MIS_KIND remonté par Orders).
+        result.Single(r => r.JobId == aller).TransportSens.Should().Be(1);
+        result.Single(r => r.JobId == retour).TransportSens.Should().Be(2);
     }
 }

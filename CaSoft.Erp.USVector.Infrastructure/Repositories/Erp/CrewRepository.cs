@@ -84,8 +84,9 @@ public class CrewRepository : IMobileCrewRepository
                 JobId = m.Id,
                 Patient = m.BeneficiaryDisplayName ?? string.Empty,
                 TransportMode = m.TransportModeId,
-                // TransportType / TransportSens / IsSerial absents du DTO liste léger ERP
-                // (portés par le détail Order) → renseignés en MOB-6.
+                // Sens de transport : l'UI attend 1=Aller / 2=Retour (MIS_KIND, exposé par Orders sur la liste crew).
+                TransportSens = m.Kind,
+                // TransportType / IsSerial absents du DTO liste léger ERP (portés par le détail Order) → MOB-6.
                 schedule = m.SchedulingTime.ToString("HH:mm"),
                 Appointment = m.AppointmentTime.HasValue
                     ? m.MissionDate.ToDateTime(m.AppointmentTime.Value)

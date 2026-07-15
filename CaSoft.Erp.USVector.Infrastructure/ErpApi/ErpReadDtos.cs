@@ -45,6 +45,8 @@ public sealed class ErpMissionListItemDto
     public Guid? AssignedCrewId { get; set; }
     public string? BeneficiaryDisplayName { get; set; }
     public int TransportModeId { get; set; }
+    /// <summary>Sens de transport (MIS_KIND) : 1=Aller, 2=Retour. Mappé vers ClJobListItemModel.TransportSens.</summary>
+    public int Kind { get; set; }
     public DateOnly MissionDate { get; set; }
     public TimeOnly SchedulingTime { get; set; }
     public TimeOnly? AppointmentTime { get; set; }
