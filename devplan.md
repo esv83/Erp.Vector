@@ -1,6 +1,7 @@
 # 📱 devplan — CaSoft.Erp.USVector (module mobile terrain)
 
 > **Statut global** : 🟡 En cours — MVP boucle ambulancier **livré** (hors UI login MOB-4b) · Transfert terrain→compta livré côté Orders+Vector, Certification à faire · Result pattern Vague 1 livrée.
+> **Prod** : `\\192.168.1.112\prod_api\Vector.Api` — déployée le **2026-08-02 13:06** depuis `main` (`0e76a70`), trafic servi et JWT validés dans la foulée.
 > **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **Dernière mise à jour** : 2026-08-02.
 >
 > _Devplan **unifié** du module Vector — synthèse des 8 docs de conception (voir §5). Organisé **par statut**
@@ -40,7 +41,8 @@
 | TRF-1..4 | Orders : `ORD_MISSION_OPERATIONAL` + statut transfert + endpoints | Transfert | SQL appliqué 2026-06-22, build vert |
 | TRF-5..10 | Vector : écriture avancement, gel 409, anomalies, documents, `field-data` | Transfert | **24 tests** |
 | DET-1 / DET-2 | Champ `Service` dédié · affichage pickup/dropoff **piloté serveur** | Lieux | DET-2 sur `feat/vector-service-location`, 12 tests |
-| CREW-1 | **Accès anticipé 30 min** avant la prise de service (missions visibles avant de démarrer la vacation) | Auth | `ClCrew.EarlyAccessMinutes`, 3 tests |
+| CREW-1 | **Accès anticipé 30 min** avant la prise de service (missions visibles avant de démarrer la vacation) | Auth | `ClCrew.EarlyAccessMinutes`, 3 tests · **en prod 2026-08-02** |
+| DEP-1 | **Cible PROD de `deploy.ps1`** (profil `IIS-ProdServer`) + garde-fous : confirmation explicite, pré-vol d'accessibilité du partage | Déploiement | publication réelle vérifiée 2026-08-02 |
 
 ### 🟡 En cours
 | Réf | Élément | Détail |
@@ -78,7 +80,9 @@ Mode **offline** (cache + sync différée) · **géoloc avancée** · **push Sig
 ### ⚠️ Dette & garde-fous
 | Réf | Point | Criticité |
 |---|---|---|
-| **C6** | `Keycloak:DisableValidation=true` | 🔴 **passer `false` avant prod** |
+| ~~**C6**~~ | ~~`Keycloak:DisableValidation=true`~~ — **résolu**, vérifié en prod le 2026-08-02 : `ASPNETCORE_ENVIRONMENT=Production` (web.config) → l'overlay `appsettings.Production.json` impose `Enabled=true` / `DisableValidation=false` / `RequireHttpsMetadata=true`, et les logs confirment une validation réelle (`JWT validé : sub=… iss=https://auth.ade-dev.fr/realms/delesse`) | 🟢 fermé |
+| **KC-1** | **`Keycloak:Authority` et `Keycloak:Audience` sont codés en dur** (`Program.cs:28-29`, la lecture de config est commentée). Les clés de config correspondantes sont donc **mortes** : `appsettings*.json` affiche `keycloak.placeholder` alors que la vraie valeur est `auth.ade-dev.fr/realms/delesse`. Changer de realm impose une modif de code + redéploiement, et le placeholder induit en erreur qui débogue l'auth. | 🔸 à recâbler sur la config |
+| **DEP-2** | **`appsettings.json` diverge entre dépôt et serveur** (`AddressApi:BaseUrl` : `localhost:5100` vs `api.urgencesante.net`). La publication ne l'a pas écrasé (MSBuild saute la copie, la cible étant plus récente que la source) — protection **accidentelle**, qui tombe dès qu'on touche au fichier du dépôt. Neutralisé par l'overlay `appsettings.Production.json` (DEP-1) ; reste à **aligner le fichier du dépôt** pour supprimer le piège. | 🔸 à aligner |
 | RGPD P4 | Données de santé (documents/mutuelle/anomalies) servies par Vector.Api | durcissement rétention/chiffrement/audit |
 | C1-C5 | Dette de compat MOB (`IsAck` alias, champs JobDetail legacy, filtre crew client…) | à retirer une fois l'UI basculée |
 | SQL Orders | Migration transfert numérotée **`027`** (§2.1 TRANSFER) vs **`034`** ailleurs | 🔸 à réconcilier |
@@ -111,7 +115,8 @@ Vector consomme `Orders.Api` en REST (DTO miroir `ErpApi/ErpReadDtos` + `IErpRea
 > Source : [`docs/auth/optimisation-chaine-authentification.md`](docs/auth/optimisation-chaine-authentification.md)
 
 Chaîne : `JWT local → sub→PER_ID (PER_KEYCLOAK_MAP) → crews actifs → crewId ∈ crews`, chokepoint `CrewAccess.ResolvePersonnel`. **Deux caches** (`CachingMobileIdentityResolver`) : personnel long (TTL 30 min), crews court + lecture fraîche sur `GET /api/crew/mine`. **Claim `per_id` écarté** (turnover → non invalidable ; le cache HTTP s'invalide). Config `MobileIdentityCache:{PersonnelMinutes, ActiveCrewsMinutes}`.
-> **CREW-1 — fenêtre d'accès (2026-08-02)** : `ClCrew.IsSelectableAt` ouvre l'équipage **`EarlyAccessMinutes` = 30 min avant `ServiceStart`**, pour consulter ses missions avant de démarrer sa vacation (les conditions *non clôturé* / *non obsolète 18 h* sont inchangées). Seul verrou horaire de la chaîne : `CrewAccess.Authorize` filtre par **date**, la joblist n'a aucun filtre d'heure. DTO : nouveau flag **`IsPending`** (`IsCurrent=false` tant que le service n'a pas commencé). Effet de bord assumé : en double vacation, `RequiresSelection` passe à `true` 30 min plus tôt. Limite connue → **CREW-2** (§1, différé).
+> **CREW-1 — fenêtre d'accès (2026-08-02, en prod)** : `ClCrew.IsSelectableAt` ouvre l'équipage **`EarlyAccessMinutes` = 30 min avant `ServiceStart`**, pour consulter ses missions avant de démarrer sa vacation (les conditions *non clôturé* / *non obsolète 18 h* sont inchangées). Seul verrou horaire de la chaîne : `CrewAccess.Authorize` filtre par **date**, la joblist n'a aucun filtre d'heure. DTO : nouveau flag **`IsPending`** (`IsCurrent=false` tant que le service n'a pas commencé) — contrat web décrit dans [`note_web_alexandre_acces_anticipe_missions.md`](note_web_alexandre_acces_anticipe_missions.md). Effet de bord assumé : en double vacation, `RequiresSelection` passe à `true` 30 min plus tôt. Limite connue → **CREW-2** (§1, différé).
+> ⚠️ **Authority/Audience en dur** dans `Program.cs:28-29` (KC-1) : les clés `Keycloak:Authority` / `Keycloak:Audience` de cette section ne sont **pas** lues. L'audience n'est volontairement pas validée (Keycloak émet `aud=account`, aucun mapper sur le realm) : c'est l'**`azp`** qui est contrôlé dans `OnTokenValidated`, signature/issuer/expiration restant validés.
 
 ### 2.5 Refactor Result pattern
 > Source : [`refactor_result_pattern.md`](refactor_result_pattern.md) — branche `ImplementCaSoftFramework` (fusionnée dans main puis **supprimée 2026-07-15**)
@@ -150,8 +155,21 @@ Cycle **Orders → Vector → Certification** : projection de l'avancement vers 
 ## 4. Configuration
 - `ConnectionStrings:MobileDb` · `ConnectionStrings:OrdersDb` **(inutilisé depuis le découplage 4a)**.
 - `OrdersApi:BaseUrl` (**slash final**, inclure le PathBase IIS) · `AddressApi:BaseUrl`.
-- `Keycloak:{Enabled, Authority, Audience, DisableValidation}` — **`DisableValidation=false` en prod (C6)**.
+- `Keycloak:{Enabled, DisableValidation, RequireHttpsMetadata}` — **`DisableValidation=false` en prod** (C6, fermé). ⚠️ `Keycloak:Authority` et `Keycloak:Audience` **ne sont pas lus** : valeurs en dur dans `Program.cs` (KC-1).
 - `MobileIdentityCache:{PersonnelMinutes=30, ActiveCrewsMinutes=15}` · secrets GpsGate/Sirus `__SET_VIA_ENV__`.
+
+### 4.1 Règle de config des serveurs (dev / prod)
+Trois couches, à ne pas confondre — c'est la source des régressions d'auth et de résolution d'adresses :
+1. **`web.config`** (serveur, **manuel**, jamais régénéré : `IsTransformWebConfigDisabled=true`) → `ASPNETCORE_ENVIRONMENT` + secrets (`ConnectionStrings__*`, `Sirus__Host`, `GpsGate__*`). Survit à toute publication.
+2. **`appsettings.json`** → **fait partie de la sortie de publication**, donc *écrasable* par un déploiement. Ne doit contenir **aucune** valeur spécifique à un serveur.
+3. **`appsettings.Production.json` / `.Staging.json`** → shippés **et** prioritaires sur la base : c'est **là** que vivent les valeurs par environnement (Keycloak activé, `AddressApi:BaseUrl`).
+
+> Règle : toute valeur qui diffère entre dev et prod va dans l'**overlay d'environnement** (couche 3), jamais dans `appsettings.json` ni « à la main sur le serveur » — un fichier édité à la main n'est protégé que par un hasard d'horodatage MSBuild (DEP-2).
+
+## 4.2 Déploiement
+`.\deploy.ps1 dev` · `.\deploy.ps1 prod` (confirmation à taper ; `-Force` en non-interactif). Profils `IIS-DevServer` / `IIS-ProdServer` → `\\192.168.1.112\{dev_api,prod_api}\Vector.Api`.
+Le script fait un **pré-vol** (partage accessible) avant de publier, puis vérifie l'horodatage bin↔UNC. Publication **portable** (pas de RID, sinon SqlClient casse). `app_offline.htm` est posé puis retiré → **coupure courte de l'API** à chaque publication.
+Prérequis : `net use \\192.168.1.112\prod_api /user:192.168.1.112\DeployApi *`.
 
 ## 5. Sources consolidées
 | Doc | Genre | Module |
