@@ -21,12 +21,39 @@ var builder = WebApplication.CreateBuilder(args);
 var keycloakEnabled = builder.Configuration.GetValue("Keycloak:Enabled", false);
 if (keycloakEnabled)
 {
+    // KC-1 — realm et client mobile viennent de la config (plus aucune valeur en dur ci-dessous).
+    // Les figer dans le code imposait une recompilation pour changer d'environnement, et laissait
+    // un « keycloak.placeholder » trompeur dans appsettings — qui donnait le change en débogage.
+    var authority = builder.Configuration["Keycloak:Authority"];
+    // Le client mobile est à la fois l'audience visée et l'« azp » attendu (cf. OnTokenValidated).
+    var audience = builder.Configuration["Keycloak:Audience"];
+    // ⚠️ DEV/TEST UNIQUEMENT : décode le token SANS vérifier signature / issuer / audience /
+    // expiration, et SANS contacter Keycloak (Authority inutile). NE JAMAIS activer en production.
+    var disableValidation = builder.Configuration.GetValue("Keycloak:DisableValidation", false);
+
+    // Garde-fou AU DÉMARRAGE (KC-1) : hors mode dégradé, une Authority absente ou restée au
+    // placeholder fait échouer le fetch OIDC et rejette SILENCIEUSEMENT tous les tokens (401 en
+    // série, sans cause lisible). Mieux vaut refuser de démarrer en le disant. Volontairement
+    // ICI et non dans le callback AddJwtBearer : celui-ci n'est exécuté qu'à la première requête
+    // authentifiée, l'erreur sortirait en 500 tardif au lieu d'un échec de démarrage.
+    if (!disableValidation)
+    {
+        if (string.IsNullOrWhiteSpace(authority) || authority.Contains("placeholder", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                $"Keycloak:Authority invalide ('{authority}'). Renseigner le realm dans "
+                + "appsettings.{Environnement}.json ou via la variable d'environnement Keycloak__Authority.");
+
+        if (string.IsNullOrWhiteSpace(audience))
+            throw new InvalidOperationException(
+                "Keycloak:Audience manquant : c'est aussi l'« azp » attendu du client mobile.");
+    }
+
     builder.Services
         .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
-            options.Authority = "https://auth.ade-dev.fr/realms/delesse"; //builder.Configuration["Keycloak:Authority"];
-            options.Audience = "us-ambulance";//builder.Configuration["Keycloak:Audience"];
+            options.Authority = authority;
+            options.Audience = audience;
             options.RequireHttpsMetadata = builder.Configuration.GetValue("Keycloak:RequireHttpsMetadata", true);
 
             // Conserver les claims JWT bruts (sub, iss, exp…) : sinon .NET remappe par défaut « sub »
@@ -35,14 +62,9 @@ if (keycloakEnabled)
             // sub tel que Keycloak l'émet. (Correctif canonique Keycloak + ASP.NET Core.)
             options.MapInboundClaims = false;
 
-            // ⚠️ DEV/TEST UNIQUEMENT (Keycloak:DisableValidation=true) : décode le token et lit les
-            // claims (sub…) SANS vérifier signature / issuer / audience / expiration, et SANS contacter
-            // Keycloak. Permet de tester la lecture du sub quand l'Authority n'est pas joignable.
-            // NE JAMAIS activer en production — désactivé par défaut.
-            var disableValidation = builder.Configuration.GetValue("Keycloak:DisableValidation", false);
             if (disableValidation)
             {
-                options.Authority = null; // évite le fetch OIDC metadata (placeholder)
+                options.Authority = null; // évite le fetch OIDC metadata
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = false,
@@ -81,7 +103,7 @@ if (keycloakEnabled)
 
                     // Cloisonnement API (remplace la validation d'aud) : le token doit avoir été émis POUR
                     // le client mobile. On l'exige via « azp ». Ignoré en mode DisableValidation (dev pur).
-                    const string expectedAzp = "us-ambulance"; // aligné sur options.Audience (cf. hardcode, doc §1.2)
+                    var expectedAzp = audience; // = Keycloak:Audience (KC-1 : plus de valeur en dur)
                     var azp = ctx.Principal?.FindFirst("azp")?.Value;
                     if (!disableValidation && !string.Equals(azp, expectedAzp, StringComparison.Ordinal))
                     {

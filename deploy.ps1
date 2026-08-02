@@ -103,8 +103,20 @@ function Publish-Target($key) {
         throw "Verif KO : $($localNewest.Name) sur $url ($uncWriteUtc) ne correspond pas au build local " +
               "($($localNewest.LastWriteTimeUtc)). La publication est peut-etre partie en local sans atteindre $url."
     }
+    # Verification de la CONFIG (KC-1) : depuis que Keycloak:Authority vient de la config, un binaire
+    # a jour pose sur un appsettings.json perime fait ECHOUER LE DEMARRAGE (garde-fou Program.cs).
+    # MSBuild peut sauter la copie d'un fichier de contenu (incrementalite) : on le verifie donc.
+    $cfgLocal = Join-Path $PSScriptRoot 'CaSoft.Erp.USVector.Api\appsettings.json'
+    $cfgUnc = Join-Path $url 'appsettings.json'
+    if (-not (Test-Path -LiteralPath $cfgUnc)) { throw "Verif KO : appsettings.json absent de $url." }
+    if ((Get-FileHash -LiteralPath $cfgLocal).Hash -ne (Get-FileHash -LiteralPath $cfgUnc).Hash) {
+        throw "Verif KO : appsettings.json de $url differe du depot. La publication ne l'a pas copie " +
+              "(incrementalite MSBuild) : copier le fichier a la main, sinon l'API refusera de demarrer."
+    }
+
     Write-Host "[OK] $($key.ToUpper()) publie et verifie -> $url" -ForegroundColor Green
     Write-Host "     Assembly verifie : $($localNewest.Name) @ $($localNewest.LastWriteTime)" -ForegroundColor DarkGray
+    Write-Host "     Config verifiee  : appsettings.json identique au depot" -ForegroundColor DarkGray
 }
 
 Publish-Target $Target
