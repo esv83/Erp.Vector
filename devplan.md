@@ -82,7 +82,7 @@ Mode **offline** (cache + sync différée) · **géoloc avancée** · **push Sig
 |---|---|---|
 | ~~**C6**~~ | ~~`Keycloak:DisableValidation=true`~~ — **résolu**, vérifié en prod le 2026-08-02 : `ASPNETCORE_ENVIRONMENT=Production` (web.config) → l'overlay `appsettings.Production.json` impose `Enabled=true` / `DisableValidation=false` / `RequireHttpsMetadata=true`, et les logs confirment une validation réelle (`JWT validé : sub=… iss=https://auth.ade-dev.fr/realms/delesse`) | 🟢 fermé |
 | **KC-1** | **`Keycloak:Authority` et `Keycloak:Audience` sont codés en dur** (`Program.cs:28-29`, la lecture de config est commentée). Les clés de config correspondantes sont donc **mortes** : `appsettings*.json` affiche `keycloak.placeholder` alors que la vraie valeur est `auth.ade-dev.fr/realms/delesse`. Changer de realm impose une modif de code + redéploiement, et le placeholder induit en erreur qui débogue l'auth. | 🔸 à recâbler sur la config |
-| **DEP-2** | **`appsettings.json` diverge entre dépôt et serveur** (`AddressApi:BaseUrl` : `localhost:5100` vs `api.urgencesante.net`). La publication ne l'a pas écrasé (MSBuild saute la copie, la cible étant plus récente que la source) — protection **accidentelle**, qui tombe dès qu'on touche au fichier du dépôt. Neutralisé par l'overlay `appsettings.Production.json` (DEP-1) ; reste à **aligner le fichier du dépôt** pour supprimer le piège. | 🔸 à aligner |
+| ~~**DEP-2**~~ | ~~`appsettings.json` diverge entre dépôt et serveur (`AddressApi:BaseUrl`)~~ — **résolu 2026-08-02** : la base porte l'URL de référence (prod), comme `OrdersApi:BaseUrl` ; `Development` et `Staging` redirigent vers l'`Address.Api` locale (comportement du serveur de dev **inchangé**) ; `Production` garde la surcharge explicite. Dépôt et serveur vérifiés **identiques bit-à-bit**, et résolution effective par environnement validée avec le vrai moteur de config. | 🟢 fermé |
 | RGPD P4 | Données de santé (documents/mutuelle/anomalies) servies par Vector.Api | durcissement rétention/chiffrement/audit |
 | C1-C5 | Dette de compat MOB (`IsAck` alias, champs JobDetail legacy, filtre crew client…) | à retirer une fois l'UI basculée |
 | SQL Orders | Migration transfert numérotée **`027`** (§2.1 TRANSFER) vs **`034`** ailleurs | 🔸 à réconcilier |
@@ -161,10 +161,11 @@ Cycle **Orders → Vector → Certification** : projection de l'avancement vers 
 ### 4.1 Règle de config des serveurs (dev / prod)
 Trois couches, à ne pas confondre — c'est la source des régressions d'auth et de résolution d'adresses :
 1. **`web.config`** (serveur, **manuel**, jamais régénéré : `IsTransformWebConfigDisabled=true`) → `ASPNETCORE_ENVIRONMENT` + secrets (`ConnectionStrings__*`, `Sirus__Host`, `GpsGate__*`). Survit à toute publication.
-2. **`appsettings.json`** → **fait partie de la sortie de publication**, donc *écrasable* par un déploiement. Ne doit contenir **aucune** valeur spécifique à un serveur.
-3. **`appsettings.Production.json` / `.Staging.json`** → shippés **et** prioritaires sur la base : c'est **là** que vivent les valeurs par environnement (Keycloak activé, `AddressApi:BaseUrl`).
+2. **`appsettings.json`** → **fait partie de la sortie de publication**, donc *écrasable* par un déploiement. Porte la **valeur de référence (celle de la prod)**, jamais une valeur de poste local : `OrdersApi:BaseUrl` et `AddressApi:BaseUrl` y pointent tous deux sur `api.urgencesante.net`.
+3. **`appsettings.Development.json` / `.Staging.json` / `.Production.json`** → shippés **et** prioritaires sur la base : c'est là qu'on décrit les **déviations** par environnement (Keycloak activé, redirection vers l'`Address.Api` locale en dev).
 
-> Règle : toute valeur qui diffère entre dev et prod va dans l'**overlay d'environnement** (couche 3), jamais dans `appsettings.json` ni « à la main sur le serveur » — un fichier édité à la main n'est protégé que par un hasard d'horodatage MSBuild (DEP-2).
+> Règle : le défaut sûr est dans la base, les écarts dans l'overlay — **jamais** une valeur éditée « à la main sur le serveur », qui n'est protégée que par un hasard d'incrémentalité MSBuild (cause de DEP-2).
+> Corollaire vérifié le 2026-08-02 : `Development` et `Staging` → `localhost:5100`, `Production` → `api.urgencesante.net`.
 
 ## 4.2 Déploiement
 `.\deploy.ps1 dev` · `.\deploy.ps1 prod` (confirmation à taper ; `-Force` en non-interactif). Profils `IIS-DevServer` / `IIS-ProdServer` → `\\192.168.1.112\{dev_api,prod_api}\Vector.Api`.
