@@ -15,6 +15,12 @@ Public Class ClActiveCrewDtoOut
     Public Property ServiceWindow As String = String.Empty
     ''' <summary>Vrai si la vacation couvre l'instant présent (véhicule « du moment » → à pré-cocher).</summary>
     Public Property IsCurrent As Boolean
+    ''' <summary>
+    ''' Vrai si la prise de service n'a pas encore eu lieu : l'équipage est proposé en avance
+    ''' (<see cref="ClCrew.EarlyAccessMinutes"/> min avant) pour consulter les missions à venir.
+    ''' L'UI peut l'indiquer (« prise de service à HH:mm ») ; <see cref="IsCurrent"/> est alors faux.
+    ''' </summary>
+    Public Property IsPending As Boolean
     ''' <summary>Vrai si la vacation est terminée (équipage en lecture seule : toute modif est refusée côté ERP).</summary>
     Public Property IsClosed As Boolean
 End Class

@@ -51,13 +51,27 @@ Public Class ClCrew
     Public Const MaxServiceDurationHours As Integer = 18
 
     ''' <summary>
+    ''' Accès anticipé : délai avant la prise de service pendant lequel l'équipage est déjà sélectionnable,
+    ''' pour que le terrain puisse consulter ses missions et s'organiser avant de démarrer sa vacation.
+    ''' </summary>
+    Public Const EarlyAccessMinutes As Integer = 30
+
+    ''' <summary>Instant à partir duquel l'équipage devient sélectionnable (prise de service moins <see cref="EarlyAccessMinutes"/> min).</summary>
+    Public ReadOnly Property SelectableFrom As DateTime
+        Get
+            Return _serviceStart.AddMinutes(-EarlyAccessMinutes)
+        End Get
+    End Property
+
+    ''' <summary>
     ''' L'équipage est-il sélectionnable par le terrain à l'instant <paramref name="at"/> ? Trois conditions
-    ''' cumulatives : <b>commencé</b> (début &lt;= <paramref name="at"/>), <b>non clôturé</b> (ni fin de service
-    ''' déclarée, ni fenêtre de vacation dépassée) et <b>non obsolète</b> (durée écoulée &lt;=
+    ''' cumulatives : <b>ouvert</b> (<see cref="SelectableFrom"/> &lt;= <paramref name="at"/>, soit la prise de
+    ''' service ou les <see cref="EarlyAccessMinutes"/> min qui la précèdent), <b>non clôturé</b> (ni fin de
+    ''' service déclarée, ni fenêtre de vacation dépassée) et <b>non obsolète</b> (durée écoulée &lt;=
     ''' <see cref="MaxServiceDurationHours"/> h — au-delà, vacation probablement oubliée).
     ''' </summary>
     Public Function IsSelectableAt(at As DateTime) As Boolean
-        Dim started = _serviceStart <= at
+        Dim started = SelectableFrom <= at
         Dim closed = IsServiceEnded OrElse (_serviceEnd.HasValue AndAlso _serviceEnd.Value < at)
         Dim obsolete = (at - _serviceStart) > TimeSpan.FromHours(MaxServiceDurationHours)
         Return started AndAlso Not closed AndAlso Not obsolete

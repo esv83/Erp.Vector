@@ -14,6 +14,8 @@ Public Module ModActiveCrewMapping
 
         ' Couvre l'instant présent : début passé et (fin absente OU pas encore atteinte).
         Dim isCurrent = crew.ServiceStart <= at AndAlso (Not crew.ServiceEnd.HasValue OrElse at <= crew.ServiceEnd.Value)
+        ' Accès anticipé : proposé avant la prise de service (fenêtre ClCrew.EarlyAccessMinutes).
+        Dim isPending = at < crew.ServiceStart
         ' Clôturé : fin de service marquée, ou fenêtre de vacation déjà passée.
         Dim isClosed = crew.IsServiceEnded OrElse (crew.ServiceEnd.HasValue AndAlso crew.ServiceEnd.Value < at)
 
@@ -25,6 +27,7 @@ Public Module ModActiveCrewMapping
             .Members = members,
             .ServiceWindow = FormatWindow(crew.ServiceStart, crew.ServiceEnd),
             .IsCurrent = isCurrent,
+            .IsPending = isPending,
             .IsClosed = isClosed,
             .DisplayLabel = label
         }

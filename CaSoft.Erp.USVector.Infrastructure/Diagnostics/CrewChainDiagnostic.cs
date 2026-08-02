@@ -46,7 +46,7 @@ public sealed class CrewChainDiagnostic
                     crewInfo.ServiceStart = dto.ServiceStart;
                     crewInfo.ServiceEnd = dto.ServiceEnd;
                     crewInfo.IsMember = dto.Members.Any(m => m.Id == personnelId.Value);
-                    crewInfo.Started = dto.ServiceStart <= at;
+                    crewInfo.Started = dto.ServiceStart.AddMinutes(-ClCrew.EarlyAccessMinutes) <= at;
                     crewInfo.NotClosed = !(dto.ServiceEnd.HasValue && dto.ServiceEnd.Value < at);
                     crewInfo.NotObsolete = at - dto.ServiceStart <= TimeSpan.FromHours(ClCrew.MaxServiceDurationHours);
                     crewInfo.Selectable = crew.IsSelectableAt(at); // règle domaine réelle
@@ -85,7 +85,7 @@ public sealed class CrewChainDiagnostic
     private static string Verdict(CrewChainCrew c)
     {
         if (!c.IsMember) return "Exclu : le personnel n'est pas membre de cet équipage";
-        if (!c.Started) return "Exclu : service pas encore démarré";
+        if (!c.Started) return $"Exclu : prise de service dans plus de {ClCrew.EarlyAccessMinutes} min";
         if (!c.NotClosed) return "Exclu : service clôturé (fin de service dépassée)";
         if (!c.NotObsolete) return $"Exclu : obsolète (durée > {ClCrew.MaxServiceDurationHours} h)";
         return "Sélectionnable";
@@ -112,6 +112,7 @@ public sealed class CrewChainCrew
     public DateTime? ServiceStart { get; set; }
     public DateTime? ServiceEnd { get; set; }
     public bool IsMember { get; set; }
+    /// <summary>Fenêtre d'accès ouverte : prise de service atteinte, ou dans moins de <see cref="ClCrew.EarlyAccessMinutes"/> min.</summary>
     public bool Started { get; set; }
     public bool NotClosed { get; set; }
     public bool NotObsolete { get; set; }
