@@ -1,7 +1,7 @@
 # 📱 devplan — CaSoft.Erp.USVector (module mobile terrain)
 
 > **Statut global** : 🟡 En cours — MVP boucle ambulancier **livré** (hors UI login MOB-4b) · Transfert terrain→compta livré côté Orders+Vector, Certification à faire · Result pattern Vague 1 livrée.
-> **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **Dernière mise à jour** : 2026-07-15.
+> **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **Dernière mise à jour** : 2026-08-02.
 >
 > _Devplan **unifié** du module Vector — synthèse des 8 docs de conception (voir §5). Organisé **par statut**
 > (le tableau de bord §1 donne la vue d'ensemble), puis par module (§2). Convention : Clean Architecture,
@@ -40,6 +40,7 @@
 | TRF-1..4 | Orders : `ORD_MISSION_OPERATIONAL` + statut transfert + endpoints | Transfert | SQL appliqué 2026-06-22, build vert |
 | TRF-5..10 | Vector : écriture avancement, gel 409, anomalies, documents, `field-data` | Transfert | **24 tests** |
 | DET-1 / DET-2 | Champ `Service` dédié · affichage pickup/dropoff **piloté serveur** | Lieux | DET-2 sur `feat/vector-service-location`, 12 tests |
+| CREW-1 | **Accès anticipé 30 min** avant la prise de service (missions visibles avant de démarrer la vacation) | Auth | `ClCrew.EarlyAccessMinutes`, 3 tests |
 
 ### 🟡 En cours
 | Réf | Élément | Détail |
@@ -70,6 +71,8 @@
 | TRF-12..15 | Certification : découverte → tirage `field-data` → agrégation → `transfer-status` | Certification (autre module) |
 
 ### ⚪ Différé (V2 / hors MVP)
+**CREW-2 — accès anticipé à cheval sur minuit** : la fenêtre CREW-1 ne franchit pas le changement de jour. `ResolveActiveCrewIds` interroge Orders sur la **date du jour** (`GET /crews?personnelId=&date=`) ; à 23:50, une vacation démarrant à 00:15 ne remonte donc pas. Correctif = élargir la requête à **J+1** quand `now + EarlyAccessMinutes` change de date (puis dédoublonner les crewIds). **Non prioritaire** : décision métier 2026-08-02 — les vacations de nuit ne sont pas concernées.
+
 Mode **offline** (cache + sync différée) · **géoloc avancée** · **push SignalR** (remplace le polling, spec §15) · assembly partagé **`Orders.Contracts`** (4b, anti-drift JSON) · **DMZ V2** (`Vd-1..8`, RabbitMQ, `DB_VECTOR`, masquage NIR) · **éviction ciblée** du cache (`Invalidate(sub)`) · renommage `CaSoft.Erp.USVector.*` → `CaSoft.Erp.Vector.*`.
 
 ### ⚠️ Dette & garde-fous
@@ -108,6 +111,7 @@ Vector consomme `Orders.Api` en REST (DTO miroir `ErpApi/ErpReadDtos` + `IErpRea
 > Source : [`docs/auth/optimisation-chaine-authentification.md`](docs/auth/optimisation-chaine-authentification.md)
 
 Chaîne : `JWT local → sub→PER_ID (PER_KEYCLOAK_MAP) → crews actifs → crewId ∈ crews`, chokepoint `CrewAccess.ResolvePersonnel`. **Deux caches** (`CachingMobileIdentityResolver`) : personnel long (TTL 30 min), crews court + lecture fraîche sur `GET /api/crew/mine`. **Claim `per_id` écarté** (turnover → non invalidable ; le cache HTTP s'invalide). Config `MobileIdentityCache:{PersonnelMinutes, ActiveCrewsMinutes}`.
+> **CREW-1 — fenêtre d'accès (2026-08-02)** : `ClCrew.IsSelectableAt` ouvre l'équipage **`EarlyAccessMinutes` = 30 min avant `ServiceStart`**, pour consulter ses missions avant de démarrer sa vacation (les conditions *non clôturé* / *non obsolète 18 h* sont inchangées). Seul verrou horaire de la chaîne : `CrewAccess.Authorize` filtre par **date**, la joblist n'a aucun filtre d'heure. DTO : nouveau flag **`IsPending`** (`IsCurrent=false` tant que le service n'a pas commencé). Effet de bord assumé : en double vacation, `RequiresSelection` passe à `true` 30 min plus tôt. Limite connue → **CREW-2** (§1, différé).
 
 ### 2.5 Refactor Result pattern
 > Source : [`refactor_result_pattern.md`](refactor_result_pattern.md) — branche `ImplementCaSoftFramework` (fusionnée dans main puis **supprimée 2026-07-15**)
