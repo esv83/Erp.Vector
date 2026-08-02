@@ -1,26 +1,41 @@
 <#
 .SYNOPSIS
-  Publie Vector.Api sur le serveur de DEV.
+  Publie Vector.Api sur le serveur de DEV ou de PROD.
 
 .DESCRIPTION
   La cible = un profil de publication (.pubxml) qui copie la build Release
-  sur le partage UNC du serveur (\\192.168.1.112\dev_api\Vector.Api).
+  sur le partage UNC du serveur :
+    dev  -> \\192.168.1.112\dev_api\Vector.Api
+    prod -> \\192.168.1.112\prod_api\Vector.Api
 
   Le web.config (ASPNETCORE_ENVIRONMENT + secrets) est gere MANUELLEMENT sur le
   serveur (csproj : IsTransformWebConfigDisabled=true) -- rien a tamponner ici.
 
+  ATTENTION : appsettings.json EST ecrase par la publication (il fait partie de la
+  sortie) et porte les valeurs de dev. Toute valeur specifique a la prod doit vivre
+  dans appsettings.Production.json, qui est shippe et surcharge la base.
+
+  La publication vers PROD demande une confirmation explicite (-Force pour la sauter,
+  p.ex. en CI). La publication pose app_offline.htm : l'API est coupee le temps de la copie.
+
   Prerequis (1re fois) : une session ouverte sur le partage cible
-    net use \\192.168.1.112\dev_api /user:192.168.1.112\DeployApi *
+    net use \\192.168.1.112\dev_api  /user:192.168.1.112\DeployApi *
+    net use \\192.168.1.112\prod_api /user:192.168.1.112\DeployApi *
 
 .EXAMPLE
   .\deploy.ps1            # publie sur le serveur de dev
   .\deploy.ps1 dev
+  .\deploy.ps1 prod       # demande confirmation
+  .\deploy.ps1 prod -Force
 #>
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('dev')]
-    [string]$Target = 'dev'
+    [ValidateSet('dev', 'prod')]
+    [string]$Target = 'dev',
+
+    # Saute la confirmation interactive de la cible PROD (usage non-interactif / CI).
+    [switch]$Force
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,7 +43,21 @@ $proj = Join-Path $PSScriptRoot 'CaSoft.Erp.USVector.Api\CaSoft.Erp.USVector.Api
 
 # Cible -> profil pubxml
 $profileOf = @{
-    dev = 'IIS-DevServer'
+    dev  = 'IIS-DevServer'
+    prod = 'IIS-ProdServer'
+}
+
+# Cibles sensibles : confirmation explicite avant de couper l'app et d'ecraser la sortie.
+$protected = @('prod')
+
+function Confirm-Target($key, $url) {
+    if ($key -notin $protected -or $Force) { return }
+
+    Write-Host ""
+    Write-Host "  /!\  Publication en $($key.ToUpper()) : $url" -ForegroundColor Yellow
+    Write-Host "       L'API sera coupee (app_offline.htm) le temps de la copie." -ForegroundColor Yellow
+    $answer = Read-Host "       Taper $key pour confirmer"
+    if ($answer -ne $key) { throw "Publication $key annulee (confirmation non saisie)." }
 }
 
 function Publish-Target($key) {
@@ -41,6 +70,16 @@ function Publish-Target($key) {
     [xml]$x = Get-Content -LiteralPath $pubxml
     $url = ([string]$x.SelectSingleNode('//*[local-name()="publishUrl"]').InnerText).Trim()
     if (-not $url) { throw "publishUrl introuvable dans $pubxml." }
+
+    # Pre-vol : sans session ouverte sur le partage, MSBuild echoue tard et le message est obscur
+    # (et sur une cible protegee on aurait deja pose app_offline.htm). On tranche avant.
+    if (-not (Test-Path -LiteralPath $url)) {
+        # Racine du partage = \\serveur\partage (Split-Path -Qualifier ne gere pas l'UNC).
+        $share = if ($url -match '^(\\\\[^\\]+\\[^\\]+)') { $Matches[1] } else { $url }
+        throw "Cible $url inaccessible. Ouvrir la session : net use $share /user:192.168.1.112\DeployApi *"
+    }
+
+    Confirm-Target $key $url
 
     dotnet publish $proj -c Release "/p:PublishProfile=$profileName"
     if ($LASTEXITCODE) { throw "Echec de la publication $key (profil $profileName)." }
