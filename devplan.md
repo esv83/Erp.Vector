@@ -270,11 +270,14 @@ régulation — c'est l'écriture elle-même qui gelait.
    configure explicitement (`Order OC-29`, un `UPDATE` — **aucun écran à produire**).
 5. Pas de traçabilité prévue : ni de la proposition écrasée, ni de la configuration.
 
-⚠️ **Détour à connaître** : un premier essai (`062`, `OOC_LOCKED` sur l'assignation) a été **joué le
-2026-08-24 sur `109` et `118`** avant d'être corrigé. `063` retire cette colonne et pose la propriété
-au bon endroit. **`063` reste à jouer**, et le code d'Order **n'est pas déployé** : l'API en service
-dérive encore le verrou de l'origine et rend toujours 20 missions sur 25 verrouillées. Vector, lui,
-est prêt des deux côtés grâce au repli.
+**Schéma joué le 2026-08-25** sur `109` et `118`, vérifié : `OCT_FIELD_OVERRIDABLE` posée, 7 types
+sur 7 surchargeables, `OOC_LOCKED` et sa contrainte retirées. *(Détour : un premier essai `062`
+plaçait le verrou sur l'assignation ; `063` le défait — ne pas rejouer `062`.)*
+
+⚠️ **Le code d'Order n'est pas déployé** : l'API en service dérive encore le verrou de l'origine et
+rend toujours 20 missions sur 25 verrouillées. Vector, lui, est prêt des deux côtés grâce au repli.
+**Mesure parlante** : les **4 099 assignations** de production viennent toutes de la régulation —
+sous l'ancien modèle, autant de commandes verrouillées que personne n'avait voulu verrouiller.
 
 **Côté Vector**, `ContextOrderStateQueryService` lit désormais le vrai `origin` et **retombe** sur la
 déduction si l'instance d'Orders.Api ne le sert pas encore : l'ordre de déploiement des deux modules
