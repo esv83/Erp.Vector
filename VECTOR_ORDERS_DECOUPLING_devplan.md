@@ -1,130 +1,128 @@
-# Découplage Vector ↔ Orders — passage en HTTP
+# 🔌 Découplage Vector ↔ Orders — accès HTTP
 
-> Décision (2026-06-14) : **direction A — HTTP**. Vector cesse de référencer Orders en projet ;
-> il consomme `Orders.Api` en REST, comme il consomme déjà `Address.Api` (`HttpAddressApiClient`).
-> Objectif : isoler le build mobile (un WIP Orders ne doit plus casser Vector) et homogénéiser
-> l'accès aux modules ERP.
+> **Objet** : Vector ne compile plus Orders depuis les sources ; il consomme `Orders.Api` en REST,
+> comme il consomme déjà `Address.Api`. Décision du 2026-06-14, **direction 4a** (DTO miroir côté
+> Vector, sans toucher Orders sauf un endpoint additif).
+>
+> **Mise à jour 2026-08-24** — livré résumé en prose, reste détaillé techniquement, pistes
+> abandonnées listées au §4.
 
-## 1. Problème
+---
 
-`CaSoft.Erp.USVector.Infrastructure.csproj` référence en **projet** :
-`..\..\Erp.Orders\Orders.Application` et `Orders.Infrastructure`. Vector **compile Orders depuis
-les sources** → toute erreur Orders casse le build mobile (constaté : `IBreakInterruptReasonQueryService`
-absent). Incohérence : **Address est déjà en HTTP**, Orders en in-process.
+## 1. Ce qui est livré
 
-## 2. Surface consommée par Vector (audit)
+**Le build mobile est indépendant d'Orders.** Un chantier en cours côté Orders ne casse plus la
+compilation de Vector, et les deux modules se déploient séparément. L'isolation a été prouvée : une
+reconstruction complète ne compile plus que Vector et ses connecteurs.
 
-Adaptateurs `CaSoft.Erp.USVector.Infrastructure/Repositories/Erp/` + `Mapping/ErpReferenceMappings` :
+**Tout l'ERP se consomme de la même façon.** Missions, commandes, patients, équipages, véhicules et
+personnel sont lus par appels HTTP, au même titre que les adresses — plus aucune référence de projet
+ni de chaîne de connexion vers la base d'Orders.
 
-| Service Orders consommé | Méthode appelée | DTO retour | Adaptateur Vector |
-|---|---|---|---|
-| `IMissionDetailQueryService` | `GetFullAsync` | `ClMissionFullDtoOut`, `ClStageDetailDtoOut` | `JobRepository` |
-| `IOrderQueryService` | `GetByIdAsync` | `ClEditOrderDtoOut` | `JobRepository` |
-| `IBeneficiaryQueryService` | `GetByIdAsync` | `ClBeneficiaryDetailDtoOut` | `JobRepository` |
-| `ICrewQueryService` | `ListAsync` | `ClCrewDtoOut`, `ClCrewMemberDtoOut` | `CrewRepository` |
-| `IMissionQueryService` | (liste missions) | — | `CrewRepository` |
-| `IPersonnelQueryService` | `GetPersonnelIdByKeyCloakIdAsync` | `ClPersonnelDtoOut` | `MobileIdentityResolver` |
-| `IVehicleQueryService` | (get) | `ClVehicleDtoOut` | `CrewRepository`/mappings |
+**Le seul manque côté Orders a été comblé** : la résolution d'un compte Keycloak vers un ambulancier,
+ajoutée en tant qu'endpoint additif, sans rien casser d'existant.
 
-## 3. Couverture des endpoints `Orders.Api`
+**Un chemin d'écriture a suivi la même voie** : l'avancement terrain est poussé vers Orders en HTTP,
+avec une file d'attente qui rejoue les envois en échec.
 
-| Besoin Vector | Endpoint existant | État |
-|---|---|---|
-| Détail mission complet | `GET /missions/{id}/full` | ✅ |
-| Commande par id | `GET /orders/{id}` | ✅ |
-| Bénéficiaire par id | `GET /beneficiaries/{id}` | ✅ |
-| Liste / détail équipages | `GET /crews`, `GET /crews/{id}`, `GET /crews/{id}/members` | ✅ |
-| Véhicule par id | `GET /vehicles/{id}` | ✅ |
-| Personnel par id | `GET /personnel/{id}` | ✅ |
-| **Identité Keycloak → personnel** | — | ❌ **GAP** (à créer) |
+*Livré en six tranches (T1→T6) + l'endpoint additif, isolation de build vérifiée. Détail des tranches
+dans `git log`.*
 
-➡️ Quasi tout est déjà exposé. Seul manque la résolution `sub` Keycloak → `PER_ID`.
+---
 
-## 3bis. Décision : direction **4a** retenue (2026-06-15)
+## 2. Ce qui reste
 
-4b (Orders.Contracts partagé) reporté : la fermeture transitive des DTO est large
-(`ClMissionCancellationDtoOut`, `ClEditOrderBodyDtoOut`…) **et** Orders a 251 fichiers non
-commités → refactor entremêlé. On fait **4a** : DTO miroir côté Vector + clients HTTP, **sans
-toucher Orders** (sauf 1 endpoint additif, cf. DEC-4).
+### 2.1 ⏳ DEC-6 — Authentification de service à service
 
-### Contrat HTTP vérifié (Orders.Api)
-- JSON **camelCase** (`JsonSerializerDefaults.Web`), enums sérialisés en **entiers** → DTO miroir en `int`.
-- `GET /missions/{id}/full` → mission détail | `GET /orders/{id}` → commande | `GET /beneficiaries/{id}` → bénéficiaire.
-- `GET /missions?from=&to=&unassignedOnly=&includeCancelled=&take=` → liste missions.
-- `GET /crews?personnelId=&date=&take=` → liste équipages (`ClCrewListItemDtoOut`, on ne lit que `Id`).
-- ❌ **Gap** : `sub` Keycloak → `PER_ID` non exposé → DEC-4 (endpoint additif `GET /personnel/by-keycloak/{sub}`, le service `IPersonnelQueryService.GetPersonnelIdByKeyCloakIdAsync` existe déjà).
+`Orders.Api` est aujourd'hui appelée **sans jeton** : les deux `HttpClient` de
+`Program.cs` (`IErpReadApiClient`, `IErpWriteApiClient`) ne posent aucun en-tête `Authorization`.
+Cela tient tant qu'Orders.Api n'est pas protégée. Le jour où elle l'est, il faut un **client
+credentials Keycloak** (compte de service dédié à Vector), avec cache et renouvellement du jeton, sur
+le modèle de ce que le module Identity a mis en place (`Keycloak:AllowedAzp` côté serveur appelé).
+**À anticiper** : le symptôme sera une série de 401 sur la joblist, en production, sans autre indice.
 
-### Surface mobile à migrer (bornée)
-`JobRepository`, `CrewRepository`, `MobileIdentityResolver` (+ `ErpReferenceMappings` = **mort, à supprimer**),
-`Program.cs` (retirer `AddOrdersInfrastructure`), `USVector.Infrastructure.csproj` (retirer 2 refs projet).
+### 2.2 ⏳ DEC-7 — Résilience des appels sortants
 
-### Stratégie par tranches (chaque tranche compile) — ÉTAT
-1. ✅ **T1** : DTO miroir (`ErpApi/ErpReadDtos`) + client `IErpReadApiClient`/`HttpErpReadApiClient` + DI `AddHttpClient` + `OrdersApi:BaseUrl` (appsettings).
-2. ✅ **T2** : `JobRepository` migré (mission/full + order + beneficiary) vers le client HTTP.
-3. ✅ **T3** : `CrewRepository` (liste missions) + `MobileIdentityResolver` (crew list + mission detail) migrés.
-4. ✅ **T4 / DEC-4** : endpoint `GET /personnel/by-keycloak/{sub}` ajouté à **Orders.Api** (`PersonnelEndpoints`, injecte `IPersonnelQueryService` ; 200 `Guid` ou 404). Build Orders.Api vert.
-5. ✅ **T5** : `ErpReferenceMappings` supprimé (mort), `AddOrdersInfrastructure` retiré, **2 refs projet Orders retirées**.
-6. ✅ **T6** : **isolation prouvée** — rebuild ne compile que `USVector.*` + connecteurs ; `USVector.Infrastructure` ne référence plus Orders.
+Les deux clients sont enregistrés avec la seule `BaseAddress` : **pas de timeout explicite**
+(donc 100 s par défaut, ce qui fait pendre une requête mobile), **pas de retry ni de disjoncteur** sur
+le chemin de **lecture**. Le chemin d'écriture est couvert (file `MOB_OPERATIONAL_OUTBOX` + worker
+avec retry), pas la lecture.
 
-### Reste / points de déploiement
-- **T4** (endpoint personnel/keycloak) : seul reste, côté Orders.Api. Touche Orders mais **additif**.
-- **Runtime** : `OrdersApi:BaseUrl` (appsettings, défaut `http://localhost:5200/`) doit pointer vers
-  l'`Orders.Api` réel **avant déploiement** — sinon `GET FormStructure`/`JobEdit` échouent (mission lue en HTTP).
-- `ConnectionStrings:OrdersDb` devient **inutilisé** côté mobile (plus d'OrdersDbContext).
+À faire : timeout court et explicite sur les deux clients, puis `AddStandardResilienceHandler`
+(Microsoft.Extensions.Http.Resilience) ou Polly — en gardant le comportement déjà en place côté
+lecture, qui tolère un 404 (`ListCrewIdsAsync` → liste vide plutôt qu'erreur).
 
-## 4. Décision structurante : d'où viennent les DTO côté Vector ?
+### 2.3 ⚠️ DET-4 — Nommage des DTO du contrat mobile
 
-Les DTO (`ClMissionFullDtoOut`, …) vivent dans `Orders.Application`. Si Vector ne référence plus
-Orders, il lui faut ces formes autrement. Deux options :
+*(Renuméroté : ce point portait le numéro DET-2, déjà utilisé par l'affichage pickup/dropoff piloté
+serveur, livré et communiqué au dev web.)*
 
-- **4a. DTO recopiés côté Vector** (dans `USVector.Contracts` ou `Infrastructure/ErpApi/Dtos`).
-  Simple, zéro réf Orders, mais **duplication + risque de drift** quand Orders change le JSON.
-- **4b. Assembly de contrats partagé** `Orders.Contracts` (DTO de lecture only, **sans logique**),
-  référencé par `Orders.Api` ET Vector. Pas de duplication, et **pas de couplage au code métier**
-  Orders (l'assembly contrats ne contient pas le handler cassé). À créer par extraction.
+Les DTO hérités du portage sont nommés en legacy (`ClJobLocationDto`, `ClJobDetailModel`…) au lieu du
+suffixe directionnel de la convention (`…DtoOut` Application → UI, `…DtoIn` UI → Application).
+Renommage progressif, **sans aucun impact JSON** (le nom du type n'apparaît pas sur le fil, seules
+les propriétés comptent) : simple refactor de types et de références. **Priorité basse, par lots.**
 
-> Recommandation : **4b** si on veut éviter la dérive de contrat sur la durée ; **4a** si on veut
-> un découplage strict et rapide sans toucher Orders. À trancher avant DEC-1.
+### 2.4 ⚠️ DET-3 — Une adresse ne devrait jamais être « non structurée »
 
-## 5. Tickets
+Le repli de `ToJobLocation` (label mono-ligne) ne devrait jamais se déclencher : quand il le fait, il
+signale une donnée non normalisée ou une **référence orpheline** côté ERP (site ou adresse supprimé
+après la commande). Vector journalise désormais un WARNING (`mission`, `pickup`/`dropoff`, `label`)
+au lieu de masquer le cas.
 
-| Ticket | Objet | Dépend de |
-|---|---|---|
-| **DEC-1** | DTO de lecture côté Vector (option 4a) ou `Orders.Contracts` (4b) | §4 |
-| **DEC-2** | Clients HTTP typés `IErpMissionClient`/`Order`/`Beneficiary`/`Crew`/`Vehicle`/`Personnel`, sur le modèle `HttpAddressApiClient` | DEC-1 |
-| **DEC-3** | Réécrire les adaptateurs `Repositories/Erp/*` + `ErpReferenceMappings` pour consommer les clients HTTP au lieu des query services in-process | DEC-2 |
-| **DEC-4** | Combler le gap : endpoint Orders.Api `GET /personnel/by-keycloak/{sub}` (ou query) + service | — |
-| **DEC-5** | Retirer les `ProjectReference` Orders.Application/Infrastructure de `USVector.Infrastructure` ; supprimer `AddOrdersInfrastructure` ; `OrdersApi:BaseUrl` en config (comme `AddressApi`) ; enregistrer les `HttpClient` | DEC-3, DEC-4 |
-| **DEC-6** | Auth service-to-service si Orders.Api est protégé (token client credentials Keycloak) | DEC-5 |
-| **DEC-7** | Résilience : timeouts, `HttpClient` nommés ; (Polly optionnel) | DEC-5 |
-| **DEC-8** | Validation : build mobile isolé (casser volontairement Orders → Vector compile toujours) ; tests fumée GET FormStructure/Crew | DEC-5 |
+Le correctif n'est pas dans Vector : **revue de la saisie et de la validation côté Orders /
+Address.Api** pour garantir qu'une adresse enregistrée porte au minimum `AddressLine1` + commune
+(CP/Ville), et contrôle des références orphelines. *Une adresse totalement vide est un problème
+distinct, à traiter à part.* Surveiller les WARNING « Lieu non structuré » en production pour mesurer
+l'ampleur avant d'engager quoi que ce soit.
 
-## 6. Risques / points à trancher
+### 2.5 ⚪ Différé — Assembly de contrats partagé (option 4b)
 
-1. **Parité DTO** — vérifier que `GET /missions/{id}/full` renvoie bien la forme `ClMissionFullDtoOut`
-   (et idem order/beneficiary). Sinon adapter le mapping JSON.
-2. **Perf** — `JobRepository.GetJob` fera 3 appels HTTP (mission/full + order + beneficiary) au lieu
-   de 3 requêtes in-process. Acceptable ; sinon prévoir un endpoint agrégé « job detail » côté Orders.
-3. **PathBase IIS** — `Orders.Api` est hébergé sous un sous-chemin (cf. fix Swagger). `OrdersApi:BaseUrl`
-   doit inclure le sous-chemin correct.
-4. **Auth** — Keycloak est gated off en dev (`Keycloak:Enabled=false`). Si activé, prévoir DEC-6.
-5. **Transaction / cohérence** — lecture seule, pas d'enjeu transactionnel cross-module.
+`Orders.Contracts` (DTO de lecture seule, sans logique, référencé par `Orders.Api` **et** Vector)
+supprimerait la duplication des DTO miroir et le **risque de dérive** quand Orders change son JSON.
+Reporté à l'époque parce que la fermeture transitive des DTO était large et qu'Orders avait un gros
+WIP non commité. **Le risque de drift est assumé** : il se manifestera par un champ silencieusement
+null côté mobile, pas par une erreur.
 
-## 7. Bénéfice attendu
+---
 
-- Build mobile **indépendant** d'Orders (débloque MOB-13.10 et la suite).
-- Cohérence avec Address (tout l'ERP consommé en HTTP).
-- Déploiement Vector/Orders découplé.
+## 3. Contrat consommé (rappel opérationnel)
 
-## 8. Ordre proposé
+JSON **camelCase** (`JsonSerializerDefaults.Web`), **enums sérialisés en entiers** → les DTO miroir
+côté Vector sont en `int`.
 
-**4 (trancher 4a/4b) → DEC-4 (gap personnel) → DEC-1 → DEC-2 → DEC-3 → DEC-5 → DEC-7 → DEC-8**,
-DEC-6 si auth activée. DEC-4 peut démarrer en parallèle (côté Orders.Api).
+| Besoin | Endpoint Orders.Api |
+|---|---|
+| Détail mission complet | `GET /missions/{id}/full` |
+| Commande / bénéficiaire | `GET /orders/{id}` · `GET /beneficiaries/{id}` |
+| Missions du jour | `GET /missions?from=&to=&unassignedOnly=&includeCancelled=&take=` |
+| Équipages | `GET /crews?personnelId=&date=&take=` · `GET /crews/{id}` · `PUT /crews/{id}/driver` |
+| Véhicule / personnel | `GET /vehicles/{id}` · `GET /personnel/{id}` |
+| **Keycloak → ambulancier** | `GET /personnel/by-keycloak/{sub}` *(endpoint additif livré pour Vector)* |
+| Projection de l'avancement | `PUT /missions/{id}/operational` |
 
-## 9. Dette technique
+⚠️ **`OrdersApi:BaseUrl` doit se terminer par un `/` et inclure le PathBase IIS** — sans le slash
+final, le dernier segment est perdu à la résolution d'URI relative et tout part en 500. Cause d'une
+panne réelle en juillet 2026.
 
-| # | Dette | Contexte / correctif propre |
-|---|---|---|
-| **DET-1** ✅ | **RÉSOLU (2026-07-14) — Champ `Service` dédié.** Le service médical (`ServiceLabel`, ex. « Cardiologie ») avait été concaténé dans `BatEtage` faute de champ dédié. | Livré : `Service` ajouté à `ClJobLocation` **et** `ClJobLocationDto` ; `ToJobLocation` → `Service = ServiceLabel`, `BatEtage = AddressLine3` seul ; `ClJobDetailAdapter` mappe le champ. Contrat UI basculé — `note_ui_alex.md` + `docs/ui-web/jobdetail-champ-service.md` (ligne `Service` après `Nom`). ⚠ déployer serveur + app ensemble. |
-| **DET-2** | **Nommage des DTO du contrat mobile non aligné sur `DtoIn`/`DtoOut`** — DTO hérités du portage USVector nommés en legacy (`ClJobLocationDto`, `ClJobDetailModel`…) au lieu du suffixe directionnel de la convention (`DtoOut` = Application → UI, `DtoIn` = UI → Application). | Renommer progressivement en `…DtoOut` / `…DtoIn`. **Aucun impact JSON** (le nom de type n'apparaît pas sur le fil — seules les propriétés comptent) → simple refactor de types + références. Priorité basse, par lot. |
-| **DET-3** | **Une adresse ne devrait jamais être « non structurée »** (une seule ligne / label figé). Le repli de `ToJobLocation` ne devrait pas se déclencher : il signale une donnée non normalisée ou une référence orpheline côté ERP. Vector loggue désormais un WARNING (`mission`, `pickup/dropoff`, `label`) quand ça arrive, au lieu de le masquer. | **Revue de code côté saisie/validation (Orders / Address.Api)** : garantir qu'une adresse enregistrée porte **a minima `AddressLine1` + Commune (CP/Ville)** — jamais un simple label mono-ligne. Contrôler aussi les **références orphelines** (site/adresse supprimé après commande). *Adresse totalement vide = problème distinct*, à traiter à part. Surveiller les WARNING « Lieu non structuré » en prod pour mesurer l'ampleur. |
+Attente côté Orders, encore non honorée : le filtre `assignedCrewId` sur `GET /missions` (Vector
+l'envoie, Orders l'ignore → toute la journée est rapatriée puis filtrée en mémoire). Contrat détaillé
+dans [`endPoint.md`](endPoint.md).
+
+---
+
+## 4. Retiré du plan — obsolète ou abandonné
+
+| Ce qui a disparu | Motif |
+|---|---|
+| **Audit de la surface consommée** (tableau des query services in-process) et **table de couverture des endpoints** | Servaient à préparer la migration ; elle est faite. Le contrat réellement consommé est au §3. |
+| **Tranches T1→T6 et tickets DEC-1, DEC-2, DEC-3, DEC-5, DEC-8** | Livrés. |
+| **Arbitrage 4a / 4b** et sa recommandation | Tranché : **4a**. 4b subsiste seulement comme option différée (§2.5). |
+| **`ErpReferenceMappings`** | Supprimé (code mort après la bascule). |
+| **`AddOrdersInfrastructure` + les 2 références projet Orders + `ConnectionStrings:OrdersDb`** | Retirés ; la clé de connexion est devenue inutilisée côté mobile. |
+| **Risque « parité des DTO »** | Levé : formes vérifiées à la migration, puis en service réel. |
+| **Risque « perf : 3 appels HTTP au lieu de 3 requêtes in-process »** | Accepté et mesuré en service ; pas d'endpoint agrégé « job detail » à demander à Orders. |
+| **DET-1 — champ `Service` concaténé dans `BatEtage`** | Résolu le 2026-07-14 : champ `Service` dédié, contrat UI basculé. |
+
+---
+
+**Fin du document**
