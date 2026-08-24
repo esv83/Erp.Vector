@@ -225,6 +225,9 @@ builder.Services.AddScoped<ICrewRepository, CaSoft.Erp.USVector.Infrastructure.R
 builder.Services.AddScoped<IJobRepository, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.JobRepository>();
 // OC-3a : verrou + provenance du context de la mission, lus sur Orders.Api (lecture seule).
 builder.Services.AddScoped<IContextOrderStateQueryService, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.ContextOrderStateQueryService>();
+// OC-4 : relais de la sélection terrain vers Orders.Api (traduction d'id par code). Pas encore
+// branché sur POST api/Contract — le contrat mobile bascule avec OC-3b.
+builder.Services.AddScoped<IContextOrderSelectionService, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.ContextOrderSelectionService>();
 // MOB-4a : résolution identité Keycloak (sub → PER_ID → crews actifs).
 // Décoré par un cache (chemin chaud : garde-fou crew de chaque requête). TTLs configurables :
 // - PersonnelMinutes : mapping sub→PER_ID quasi-immuable → long (défaut 8h).

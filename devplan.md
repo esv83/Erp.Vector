@@ -232,7 +232,7 @@ endpoints livrés, scripts `038` et `040` joués.
 | **OC-2** | Client HTTP en **écriture** du context (`PATCH /missions/{id}/contextOrder`) | ✅ (204 non vérifié en réel) |
 | **OC-3a** | Ajouts **additifs** sur `api/Contract` : propriété `Locked` par item + route `GET api/Contract/{jobId}/state` → `{ locked, contextOrderId, origin }` | ✅ (`origin` réel depuis `Order OC-28`) |
 | **OC-3b** | **Bascule de la source** de `GET api/Contract/{jobId}` : Order remplace `MOB_CONTRACT_TYPE` | ⬜ (bloqué : `Order OC-28`, cadenas côté web, ids en dur) |
-| **OC-4** | `POST api/Contract/{jobId}` relaie le `PATCH` Order (nouveaux 409/400) | ⬜ |
+| **OC-4** | `POST api/Contract/{jobId}` relaie le `PATCH` Order (nouveaux 409/400) | 🟡 relais livré **inerte** (traduction d'id par code) · branchement avec OC-3b |
 | **OC-5** | Attributs : `form-structure` + `values` remplacent `JobAttributeOverlayRepository` | ⬜ |
 | **OC-6** | Règles métier portées par Order à respecter côté Vector (DDN/NIR, PMT/BT, portée du verrou) | ⬜ |
 | **OC-7** | `FieldDataReader` : le bloc `attributes` du paquet vient d'Order | ⬜ |
@@ -338,10 +338,36 @@ assume la perte.
    `/api/ContextOrder` **ne se font pas** tant que le front n'a pas basculé.
    ⚠️ **Deux préalables**, mesurés et non théoriques : le cadenas visible côté web (OC-3a livré *et*
    consommé — 20 missions sur 25 arrivent verrouillées) et la levée des **ids en dur** côté front.
-4. **OC-4 — `POST api/Contract/{jobId}`** garde son corps (`int`) mais n'écrit plus `MOB_JOB_CONTRACT` : il
+4. 🟡 **OC-4 — `POST api/Contract/{jobId}`** garde son corps (`int`) mais n'écrit plus `MOB_JOB_CONTRACT` : il
    relaie le `PATCH` Order. Supprimer la règle « défaut = premier context actif » — « non renseigné »
    devient un état valide. ⚠️ **Nouveaux codes de retour** (409 verrou, 400 non applicable) là où
    l'appel réussissait toujours : à annoncer au dev web avant livraison.
+   - **Relais livré, inerte** (`IContextOrderSelectionService` → `ContextOrderSelectionService`,
+     6 tests) : port applicatif, adaptateur, traduction des refus en issues métier. **Aucun
+     appelant** — le contrat mobile est inchangé, comme l'ont été OC-1 et OC-2 avant leur
+     branchement.
+   - ⛔ **Le branchement attend OC-3b, pour une raison de données et non de planning.** Les deux
+     catalogues **ne partagent pas leurs identifiants** (relevé en base le 2026-08-24) :
+
+     | id | Vector `MOB_CONTRACT_TYPE` | Order `ORD_ORDER_CONTEXT` |
+     |---|---|---|
+     | 1 | `STANDARD` — Transport standard | `CPAM` |
+     | 2 | — | **`ART80`** — Article 80 |
+     | 4 | **`ART80`** — Article 83 | `CENTRE15` — Centre 15 |
+
+     Relayer l'entier reçu écrirait donc **« Centre 15 » là où l'ambulancier a coché « Article 80 »**,
+     sur une mission réelle, sans que rien ne le signale — jusqu'à la facturation.
+   - **La traduction se fait par code, pas par id**, et l'identifiant Order est **repris de la
+     réponse d'Orders.Api** (`availableContextOrders`, déjà filtré agence/mode) plutôt que déduit :
+     aucune table de correspondance à maintenir, et rien à resynchroniser si le catalogue Order
+     bouge. Le composant disparaît avec OC-3b, où l'id reçu sera déjà le bon.
+   - ⛔ **Décision métier ouverte : `STANDARD` n'a aucun équivalent côté Order.** En l'état il est
+     **refusé** (400) plutôt que remplacé par un type approchant — un mauvais type part en
+     facturation sans que personne ne le voie passer. À trancher avant branchement : `STANDARD`
+     devient-il `CPAM`, ou disparaît-il du sélecteur ? *(Rappel : `MOB_JOB_CONTRACT` = 0 ligne,
+     aucun type n'a jamais été sélectionné en production — l'enjeu est le futur, pas l'historique.)*
+   - ⚠️ Au passage : le libellé Vector d'`ART80` dit **« Article 83 »**, celui d'Order « Article 80 ».
+     L'un des deux est faux ; il disparaîtra avec OC-3b, mais autant savoir lequel s'affiche.
 5. **OC-5 — Attributs** : `GET /missions/{id}/contextOrder/form-structure` et
    `PATCH /missions/{id}/contextOrder/values` remplacent `JobAttributeOverlayRepository.BuildContractType`
    et `.Save`. Le DTO de champ est le miroir de `ClMobileAppFieldModel`, plus **deux champs additifs à
