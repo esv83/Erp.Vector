@@ -159,8 +159,15 @@ une couche déclarative que la facturation relit et corrige.
 ## 3.1 ⏳ OC — Bascule du « contrat » vers le **ContextOrder** (Order = source de vérité)
 
 **Le plus gros reste à faire, et il périme une partie du livré.** Le référentiel de type de mission a
-migré côté Order (OC-9) ; Vector doit devenir consommateur, son catalogue autonome et son magasin
-d'attributs deviennent des doublons.
+migré côté Order (sa tâche `Order OC-9`) ; Vector doit devenir consommateur, son catalogue autonome
+et son magasin d'attributs deviennent des doublons.
+
+> ⚠️ **Deux numérotations `OC-` coexistent, et elles ne se recouvrent pas.** Celle de ce fichier
+> décrit le chantier **Vector** (liste ci-dessous, reprise par les commits `OC-x (vector)`) ; celle
+> de [`../Erp.Order/feature_order_context_devplan.md`](../Erp.Order/feature_order_context_devplan.md)
+> §7 décrit le chantier **Order** (`OC-1` = script SQL `038`, `OC-9` = API mission-scoped,
+> `OC-11` = « migration Vector », c'est-à-dire *tout* ce fichier-ci). **Convention** : un `OC-x` nu
+> désigne ici la tâche Vector ; la tâche Order s'écrit toujours `Order OC-x`.
 
 **État constaté (2026-08-24)** : aucune occurrence de `contextOrder` dans le code Vector — la bascule
 n'est pas commencée. Côté Order tout est en place : tables `ORD_ORDER_CONTEXT`, `_ATTRIBUTE`,
@@ -209,55 +216,77 @@ endpoints livrés, scripts `038` et `040` joués.
 > - **Le verrou est la règle, pas l'exception** : 9 missions sur 20 au premier relevé, puis
 >   **20 sur 25** sur la fenêtre 20→24/08. C'est un **vrai changement de comportement terrain** :
 >   aujourd'hui l'ambulancier choisit toujours, demain il sera le plus souvent en lecture seule. Le
->   cadenas doit être visible côté web **avant** OC-3, sinon l'ambulancier tentera le changement et
+>   cadenas doit être visible côté web **avant OC-3b**, sinon l'ambulancier tentera le changement et
 >   prendra un 409 — et le 409 est bien réel, il vient d'être constaté en production.
 > - Les missions non verrouillées arrivent avec `contextOrderId = null` : « non renseigné » est bien
 >   l'état de départ réel, ce qui confirme la suppression de la règle « défaut = premier context ».
-> - Reste à vérifier avant OC-3 : **ids en dur côté front** (l'id `4` vaut `ART80` côté Vector et
+> - Reste à vérifier avant **OC-3b** : **ids en dur côté front** (l'id `4` vaut `ART80` côté Vector et
 >   `CENTRE15` côté Order).
 
-1. ✅ **Client HTTP en lecture** — `ErpMissionContextOrderDto` / `ErpContextOrderChoiceDto`
+| Réf | Tâche | État |
+|---|---|---|
+| **OC-1** | Client HTTP en **lecture** du context (`GET /missions/{id}/contextOrder`) | ✅ |
+| **OC-2** | Client HTTP en **écriture** du context (`PATCH /missions/{id}/contextOrder`) | ✅ (204 non vérifié en réel) |
+| **OC-3a** | Ajouts **additifs** sur `api/Contract` : propriété `Locked` par item + route `GET api/Contract/{jobId}/state` | ⬜ |
+| **OC-3b** | **Bascule de la source** de `GET api/Contract/{jobId}` : Order remplace `MOB_CONTRACT_TYPE` | ⬜ (bloqué : cadenas côté web, ids en dur) |
+| **OC-4** | `POST api/Contract/{jobId}` relaie le `PATCH` Order (nouveaux 409/400) | ⬜ |
+| **OC-5** | Attributs : `form-structure` + `values` remplacent `JobAttributeOverlayRepository` | ⬜ |
+| **OC-6** | Règles métier portées par Order à respecter côté Vector (DDN/NIR, PMT/BT, portée du verrou) | ⬜ |
+| **OC-7** | `FieldDataReader` : le bloc `attributes` du paquet vient d'Order | ⬜ |
+| **OC-8** | Dépréciation des tables `MOB_*` du contrat et de l'overlay | ⬜ (décision à prendre) |
+| **OC-9** | Nettoyage des stubs `NotImplementedException` que le `PATCH` remplace | ⬜ |
+
+**OC-3 est scindé volontairement** : `OC-3a` est strictement additif (D14) et **livrable seul** — il
+donne au front de quoi afficher le cadenas, ce que `OC-3b` exige comme préalable. Les livrer d'un
+bloc obligerait à basculer la source avant que le terrain sache lire le verrou.
+
+1. ✅ **OC-1 — Client HTTP en lecture** — `ErpMissionContextOrderDto` / `ErpContextOrderChoiceDto`
    (`ErpApi/ErpReadDtos.cs`) + `IErpReadApiClient.GetMissionContextOrderAsync` →
    `GET /missions/{missionId}/contextOrder` (404 → `null`). La liste `availableContextOrders` est
    **déjà filtrée** (agence + mode de la commande) : ne pas re-filtrer côté Vector.
-   ✅ **Client HTTP en écriture** — `IErpWriteApiClient.SetMissionContextOrderAsync` →
+   ✅ **OC-2 — Client HTTP en écriture** — `IErpWriteApiClient.SetMissionContextOrderAsync` →
    `PATCH /missions/{missionId}/contextOrder` `{ contextOrderId, setBy }` → 204. L'origine `Field`
    est imposée par l'endpoint. Les refus métier reviennent en `EnContextOrderWriteOutcome`
    (`LockedByRegulator` 409, `NotApplicable` 400, `MissionNotFound` 404) — **jamais en exception** :
    seule une panne réelle (5xx, réseau) lève. **Les trois refus sont constatés en production**
    (tableau ci-dessus) ; seul le 204 reste sur les seuls tests. OC-4 les traduira en codes HTTP
    mobiles.
-2. **`GET api/Contract/{jobId}` garde sa forme** (tableau `{ Id, Display, IsSelected }`) — **D14** :
-   seule la **source** change (les `availableContextOrders` d'Order remplacent `MOB_CONTRACT_TYPE`).
-   Le `locked` arrive par deux ajouts **additifs** : une propriété `Locked` sur chaque item et une
-   route nouvelle `GET api/Contract/{jobId}/state` → `{ locked, contextOrderId }`. Le passage du
-   tableau à un objet et le renommage `/api/Contract` → `/api/ContextOrder` **ne se font pas** tant
-   que le front n'a pas basculé.
-3. **`POST api/Contract/{jobId}`** garde son corps (`int`) mais n'écrit plus `MOB_JOB_CONTRACT` : il
+2. **OC-3a — les deux ajouts additifs qui rendent le verrou lisible.** Une propriété `Locked` sur
+   chaque item de `GET api/Contract/{jobId}` et une route nouvelle
+   `GET api/Contract/{jobId}/state` → `{ locked, contextOrderId }`. Rien ne disparaît, rien ne change
+   de type : **livrable sans coordination** avec le dev web, qui pourra afficher le cadenas à son
+   rythme. Source du `locked` : `IErpReadApiClient.GetMissionContextOrderAsync` (OC-1).
+3. **OC-3b — `GET api/Contract/{jobId}` garde sa forme** (tableau `{ Id, Display, IsSelected }`) —
+   **D14** : seule la **source** change (les `availableContextOrders` d'Order remplacent
+   `MOB_CONTRACT_TYPE`). Le passage du tableau à un objet et le renommage `/api/Contract` →
+   `/api/ContextOrder` **ne se font pas** tant que le front n'a pas basculé.
+   ⚠️ **Deux préalables**, mesurés et non théoriques : le cadenas visible côté web (OC-3a livré *et*
+   consommé — 20 missions sur 25 arrivent verrouillées) et la levée des **ids en dur** côté front.
+4. **OC-4 — `POST api/Contract/{jobId}`** garde son corps (`int`) mais n'écrit plus `MOB_JOB_CONTRACT` : il
    relaie le `PATCH` Order. Supprimer la règle « défaut = premier context actif » — « non renseigné »
    devient un état valide. ⚠️ **Nouveaux codes de retour** (409 verrou, 400 non applicable) là où
    l'appel réussissait toujours : à annoncer au dev web avant livraison.
-4. **Attributs** : `GET /missions/{id}/contextOrder/form-structure` et
+5. **OC-5 — Attributs** : `GET /missions/{id}/contextOrder/form-structure` et
    `PATCH /missions/{id}/contextOrder/values` remplacent `JobAttributeOverlayRepository.BuildContractType`
    et `.Save`. Le DTO de champ est le miroir de `ClMobileAppFieldModel`, plus **deux champs additifs à
    exposer** : `isReadOnly` (verrou **par champ**, à ne pas confondre avec `locked` qui gèle le type)
    et `readOnlyReason`. Écriture **tout ou rien** : un champ invalide fait échouer le lot (400).
-5. **Règles métier portées par Order, à respecter côté API/UI Vector** :
+6. **OC-6 — Règles métier portées par Order, à respecter côté API/UI Vector** :
    - `DDN` / `NIR` pré-remplis depuis la fiche bénéficiaire et **verrouillés dès qu'ils sont connus** ;
      une saisie sur fiche vide alimente la fiche. DDN en ISO (date future refusée) ; NIR à clé de
      contrôle vérifiée et **non corrigeable une fois posé** — le faire relire à la saisie.
    - `PMT` / `BT` (prescription, bon de transport) vivent **au niveau commande** : l'aller et le
      retour partagent la case, scellée dès qu'elle est cochée (409 si on tente de la décocher).
    - `locked` gèle **le choix du type**, pas la saisie des attributs.
-6. **`FieldDataReader`** : le bloc `attributes` du paquet doit venir d'Order. Le paquet maigrit mais
+7. **OC-7 — `FieldDataReader`** : le bloc `attributes` du paquet doit venir d'Order. Le paquet maigrit mais
    **ne disparaît pas** (horaires, signature, documents, anomalies, mutuelle restent servis par Vector).
-7. **Dépréciation** : `MOB_CONTRACT_TYPE` / `_ATTRIBUTE` / `_ATTRIBUTE_CONTRACT` / `_ATTRIBUTE_OPTION`,
+8. **OC-8 — Dépréciation** : `MOB_CONTRACT_TYPE` / `_ATTRIBUTE` / `_ATTRIBUTE_CONTRACT` / `_ATTRIBUTE_OPTION`,
    `MOB_JOB_CONTRACT`, `MOB_JOB_ATTRIBUTE_VALUE`, `JobAttributeOverlayRepository` et ses 11 tests.
    **Donnée en base au 2026-08-24** : `MOB_JOB_ATTRIBUTE_VALUE` = **2 132 lignes**,
    `MOB_JOB_CONTRACT` = **0 ligne** (aucun type jamais sélectionné ; seed = `STANDARD` + `ART80`).
    → **décider** : abandon pur (hypothèse retenue, ce sont des données de test) ou reprise vers
    `ORD_ORDER_CONTEXT_VALUE`.
-8. **Nettoyage** : retirer `JobRepository.UpdateCommande` et `JobRepository.Invoicing`
+9. **OC-9 — Nettoyage** : retirer `JobRepository.UpdateCommande` et `JobRepository.Invoicing`
    (`NotImplementedException`), ainsi que `InvoicingRepositoryStub` et `AttributsRepositoryStub`
    (`NotImplementedStubs.cs`) et leurs enregistrements DI — le `PATCH contextOrder` les remplace.
 
