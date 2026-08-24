@@ -223,6 +223,8 @@ builder.Services.AddScoped<IFieldDataReader, CaSoft.Erp.USVector.Infrastructure.
 builder.Services.AddScoped<ICrewRepository, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.CrewRepository>();
 // MOB-6 : détail mission (mission + commande + bénéficiaire ERP → ClJob).
 builder.Services.AddScoped<IJobRepository, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.JobRepository>();
+// OC-3a : verrou + provenance du context de la mission, lus sur Orders.Api (lecture seule).
+builder.Services.AddScoped<IContextOrderStateQueryService, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.ContextOrderStateQueryService>();
 // MOB-4a : résolution identité Keycloak (sub → PER_ID → crews actifs).
 // Décoré par un cache (chemin chaud : garde-fou crew de chaque requête). TTLs configurables :
 // - PersonnelMinutes : mapping sub→PER_ID quasi-immuable → long (défaut 8h).

@@ -230,7 +230,7 @@ endpoints livrés, scripts `038` et `040` joués.
 |---|---|---|
 | **OC-1** | Client HTTP en **lecture** du context (`GET /missions/{id}/contextOrder`) | ✅ |
 | **OC-2** | Client HTTP en **écriture** du context (`PATCH /missions/{id}/contextOrder`) | ✅ (204 non vérifié en réel) |
-| **OC-3a** | Ajouts **additifs** sur `api/Contract` : propriété `Locked` par item + route `GET api/Contract/{jobId}/state` → `{ locked, contextOrderId, origin }` | ⬜ (dépend d'`Order OC-24`) |
+| **OC-3a** | Ajouts **additifs** sur `api/Contract` : propriété `Locked` par item + route `GET api/Contract/{jobId}/state` → `{ locked, contextOrderId, origin }` | ✅ (`origin` dérivé en attendant `Order OC-24`) |
 | **OC-3b** | **Bascule de la source** de `GET api/Contract/{jobId}` : Order remplace `MOB_CONTRACT_TYPE` | ⬜ (bloqué : `Order OC-24`, cadenas côté web, ids en dur) |
 | **OC-4** | `POST api/Contract/{jobId}` relaie le `PATCH` Order (nouveaux 409/400) | ⬜ |
 | **OC-5** | Attributs : `form-structure` + `values` remplacent `JobAttributeOverlayRepository` | ⬜ |
@@ -285,11 +285,25 @@ assume la perte.
    seule une panne réelle (5xx, réseau) lève. **Les trois refus sont constatés en production**
    (tableau ci-dessus) ; seul le 204 reste sur les seuls tests. OC-4 les traduira en codes HTTP
    mobiles.
-2. **OC-3a — les deux ajouts additifs qui rendent le verrou lisible.** Une propriété `Locked` sur
-   chaque item de `GET api/Contract/{jobId}` et une route nouvelle
-   `GET api/Contract/{jobId}/state` → **`{ locked, contextOrderId, origin }`**. Rien ne disparaît,
-   rien ne change de type : **livrable sans coordination** avec le dev web, qui pourra afficher le
-   cadenas à son rythme. Source : `IErpReadApiClient.GetMissionContextOrderAsync` (OC-1).
+2. ✅ **OC-3a — les deux ajouts additifs qui rendent le verrou lisible** *(livré 2026-08-24)*. Une
+   propriété `Locked` sur chaque item de `GET api/Contract/{jobId}` et une route nouvelle
+   `GET api/Contract/{jobId}/state` → **`{ missionId, locked, contextOrderId, contextOrderCode,
+   contextOrderDisplay, origin }`**. Rien ne disparaît, rien ne change de type : **livrable sans
+   coordination** avec le dev web, qui affichera le cadenas à son rythme.
+   Port `IContextOrderStateQueryService` (Application) → `ContextOrderStateQueryService`
+   (Infrastructure) au-dessus de `IErpReadApiClient.GetMissionContextOrderAsync` (OC-1). 7 tests.
+   - **`origin` est dérivé, pas lu** : `locked ⇒ Regulator`, sinon `contextOrderId` posé ⇒ `Field`,
+     sinon rien. Exact au regard du code d'Order d'aujourd'hui, où `locked` **est** la provenance —
+     et remplaçable par la lecture du vrai champ le jour d'`Order OC-24`, **sans toucher au contrat
+     mobile** : c'est la raison d'être de l'indirection. Le couple « `Regulator` + non verrouillé »
+     est déjà exprimable côté mobile, il n'attend plus qu'Order sache l'émettre.
+   - **La liste ne tombe pas si l'ERP tombe** : le verrou est lu en `try/catch`, une panne
+     Orders.Api dégrade vers `locked = false` (comportement d'avant OC-3a) au lieu de casser une
+     route qui vivait très bien sans l'ERP. D14.
+   - ⚠️ **`contextOrderId` de `/state` est un id du catalogue Order**, pas un id des items de la
+     liste, qui viennent encore de `MOB_CONTRACT_TYPE`. Les deux espaces ne coïncident pas (`4` =
+     `ART80` côté Vector, `CENTRE15` côté Order) : le front doit afficher `contextOrderDisplay`,
+     **jamais** apparier les ids. Le piège disparaît avec OC-3b.
 
    ⚠️ **`locked` seul ne suffit pas — il faut `origin` à côté.** Le terrain doit distinguer quatre
    situations, et un booléen n'en porte que deux :
