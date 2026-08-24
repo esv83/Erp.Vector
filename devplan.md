@@ -271,6 +271,12 @@ régulation — c'est l'écriture elle-même qui gelait.
 personne ne perd un verrou sur lequel il comptait — rien ne consommait `locked`. Une reprise à `1`
 aurait au contraire figé durablement des missions que personne n'avait voulu figer.
 
+**Schéma joué le 2026-08-24** (`192.168.1.109` : 4 097 assignations, 0 verrouillée ; `192.168.1.118`
+: 2). ⚠️ **Le code d'Order n'est pas déployé** : l'API en service dérive encore le verrou de
+l'origine et rend toujours 20 missions sur 25 verrouillées (re-mesuré après le script). Rien ne
+change pour le terrain tant que le build OC-28 n'est pas en service — et Vector, lui, est déjà prêt
+des deux côtés grâce au repli.
+
 **Côté Vector**, `ContextOrderStateQueryService` lit désormais le vrai `origin` et **retombe** sur la
 déduction si l'instance d'Orders.Api ne le sert pas encore : l'ordre de déploiement des deux modules
 est donc indifférent.
