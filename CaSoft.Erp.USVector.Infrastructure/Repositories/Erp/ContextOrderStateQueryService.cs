@@ -32,28 +32,30 @@ public sealed class ContextOrderStateQueryService : IContextOrderStateQueryServi
             ContextOrderId = context.ContextOrderId,
             ContextOrderCode = context.ContextOrderCode,
             ContextOrderDisplay = context.ContextOrderDisplay,
-            Origin = DeriveOrigin(context)
+            Origin = ResolveOrigin(context)
         };
     }
 
     /// <summary>
-    /// Reconstitue la provenance, qu'Orders.Api <b>n'expose pas encore</b> (dette <c>Order OC-24</c>).
+    /// Provenance servie par Orders.Api depuis <c>Order OC-28</c>, avec repli sur la déduction
+    /// lorsqu'une instance antérieure ne sert pas encore le champ.
     /// <para>
-    /// La déduction est exacte au regard du code d'Order d'aujourd'hui, où <c>locked</c> n'est pas
-    /// une donnée mais un dérivé de la provenance (<c>Origin = Regulator</c> ⇒ <c>locked</c>) : un
-    /// context verrouillé vient donc forcément de la régulation, et un context posé et non
-    /// verrouillé vient forcément du terrain.
+    /// Ce repli rend <b>l'ordre de déploiement indifférent</b> : Vector livré avant Order continue
+    /// de fonctionner, et bascule tout seul sur la vraie provenance dès qu'Order la sert. La
+    /// déduction reste exacte tant qu'Order dérive <c>locked</c> de la provenance : un context
+    /// verrouillé vient alors forcément de la régulation, et un context posé non verrouillé
+    /// forcément du terrain.
     /// </para>
     /// <para>
-    /// ⚠️ Cette équivalence <b>tombera</b> le jour où Order distinguera verrou et provenance — c'est
-    /// précisément l'objet d'<c>Order OC-24</c>, qui doit rendre possible « posé par la régulation,
-    /// modifiable par le terrain ». Ce jour-là, cette méthode est à remplacer par la lecture du
-    /// champ <c>origin</c> servi par l'API, sans rien changer au contrat mobile ci-dessus : c'est
-    /// la raison d'être de cette indirection.
+    /// ⚠️ Le repli est <b>volontairement muet sur le cas nominal d'OC-28</b> : « posé par la
+    /// régulation mais modifiable » y ressort en <c>Field</c>, faute de pouvoir le distinguer. Ce
+    /// n'est pas une approximation à conserver — c'est la raison pour laquelle le vrai champ prime
+    /// dès qu'il existe. À retirer quand toutes les instances d'Orders.Api auront OC-28.
     /// </para>
     /// </summary>
-    private static string? DeriveOrigin(ErpMissionContextOrderDto context)
+    private static string? ResolveOrigin(ErpMissionContextOrderDto context)
     {
+        if (!string.IsNullOrWhiteSpace(context.Origin)) return context.Origin;
         if (context.Locked) return OriginRegulator;
         return context.ContextOrderId.HasValue ? OriginField : null;
     }

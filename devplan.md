@@ -217,7 +217,7 @@ endpoints livrés, scripts `038` et `040` joués.
 >   **20 sur 25** sur la fenêtre 20→24/08. Le 409 correspondant est bien réel, il vient d'être
 >   constaté en production. ⚠️ **Lecture corrigée le 2026-08-24** : ce chiffre ne mesure **pas** une
 >   politique de régulation. Le verrou n'est pas décidé, il est dérivé de l'auteur de l'écriture
->   (`Origin = Regulator` ⇒ `locked`) — voir la dépendance amont `Order OC-24` ci-dessous. Autrement
+>   (`Origin = Regulator` ⇒ `locked`) — voir la dépendance amont `Order OC-28` ci-dessous. Autrement
 >   dit, en l'état, **toute** mission renseignée par la régulation passerait le terrain en lecture
 >   seule, ce que personne n'a demandé. Le préalable à OC-3b n'est donc pas seulement « rendre le
 >   cadenas visible côté web », c'est **d'abord rendre le verrou intentionnel côté Order**.
@@ -230,8 +230,8 @@ endpoints livrés, scripts `038` et `040` joués.
 |---|---|---|
 | **OC-1** | Client HTTP en **lecture** du context (`GET /missions/{id}/contextOrder`) | ✅ |
 | **OC-2** | Client HTTP en **écriture** du context (`PATCH /missions/{id}/contextOrder`) | ✅ (204 non vérifié en réel) |
-| **OC-3a** | Ajouts **additifs** sur `api/Contract` : propriété `Locked` par item + route `GET api/Contract/{jobId}/state` → `{ locked, contextOrderId, origin }` | ✅ (`origin` dérivé en attendant `Order OC-24`) |
-| **OC-3b** | **Bascule de la source** de `GET api/Contract/{jobId}` : Order remplace `MOB_CONTRACT_TYPE` | ⬜ (bloqué : `Order OC-24`, cadenas côté web, ids en dur) |
+| **OC-3a** | Ajouts **additifs** sur `api/Contract` : propriété `Locked` par item + route `GET api/Contract/{jobId}/state` → `{ locked, contextOrderId, origin }` | ✅ (`origin` réel depuis `Order OC-28`) |
+| **OC-3b** | **Bascule de la source** de `GET api/Contract/{jobId}` : Order remplace `MOB_CONTRACT_TYPE` | ⬜ (bloqué : `Order OC-28`, cadenas côté web, ids en dur) |
 | **OC-4** | `POST api/Contract/{jobId}` relaie le `PATCH` Order (nouveaux 409/400) | ⬜ |
 | **OC-5** | Attributs : `form-structure` + `values` remplacent `JobAttributeOverlayRepository` | ⬜ |
 | **OC-6** | Règles métier portées par Order à respecter côté Vector (DDN/NIR, PMT/BT, portée du verrou) | ⬜ |
@@ -243,30 +243,37 @@ endpoints livrés, scripts `038` et `040` joués.
 donne au front de quoi afficher le cadenas, ce que `OC-3b` exige comme préalable. Les livrer d'un
 bloc obligerait à basculer la source avant que le terrain sache lire le verrou.
 
-### ⛔ Dépendance amont : le verrou n'est pas une décision, c'est un effet de bord
+### ✅ Dépendance amont levée : le verrou est devenu une décision (`Order OC-28`, 2026-08-24)
 
-**Le cas « la régulation pose la valeur, l'ambulancier peut quand même la changer » est aujourd'hui
-inexprimable.** Côté Order, une seule colonne `ORD_ORDER_CONTEXT_ASSIGNMENT.OOC_TYPE_ORIGIN` porte
-**deux informations distinctes** — *qui a écrit* et *est-ce gelé* — et `locked` en est simplement
-dérivé (`Origin = Regulator`). Trois endroits calculent la même chose :
+**Le cas « la régulation pose la valeur, l'ambulancier peut quand même la changer » était
+inexprimable.** Côté Order, une seule colonne `ORD_ORDER_CONTEXT_ASSIGNMENT.OOC_TYPE_ORIGIN` portait
+**deux informations distinctes** — *qui a écrit* et *est-ce gelé* — et `locked` n'en était qu'un
+dérivé (`Origin = Regulator`), recalculé en trois endroits :
 `ClGetMissionContextOrderQueryHandler` (le `locked` servi à Vector), `OrderQueryService.cs:84`
 (`ContextOrderLocked` de l'écran régulateur) et `ClSetMissionContextOrderHandler` (le refus 409).
 
-Conséquence directe : **toute** valeur posée par la régulation verrouille, sans que personne l'ait
-voulu. Les **20 missions sur 25** relevées le 2026-08-24 ne traduisent donc pas une politique de
-régulation — c'est l'écriture elle-même qui gèle. Le régulateur n'a aucun moyen de dire « je propose
-sans imposer ».
+Conséquence : **toute** valeur posée par la régulation verrouillait, sans que personne l'ait voulu.
+Les **20 missions sur 25** relevées le 2026-08-24 ne traduisaient donc pas une politique de
+régulation — c'est l'écriture elle-même qui gelait.
 
-**Correctif attendu côté Order — `Order OC-24` (à ouvrir)** : séparer provenance et verrou.
-1. Colonne `OOC_LOCKED` (`bit NOT NULL DEFAULT 0`) — prochain script SQL libre : `062`.
-2. `locked` des DTO (`ClMissionContextOrderDtoOut`, `ClEditOrderBodyDtoOut.ContextOrderLocked`) lu
-   sur cette colonne ; **`origin` exposé en plus** (additif) pour les besoins d'OC-3a.
-3. Le 409 de `ClSetMissionContextOrderHandler` se fonde sur `OOC_LOCKED`, plus sur l'origine.
-4. UI régulateur : une case « imposer ce type » (Jules) — décochée, la valeur reste une proposition.
+**Livré côté Order** (`Erp.Order`, branche `feat/oc-28-context-lock`, 801 tests verts) :
+1. Script SQL `062` : colonne `OOC_LOCKED` (`bit NOT NULL DEFAULT 0`).
+2. `locked` lu sur cette colonne dans les deux DTO ; **`origin` exposé en plus** (`"Regulator"` /
+   `"Field"` / `null`), ce qui alimente directement l'`origin` d'OC-3a.
+3. Le 409 se fonde sur le verrou, plus sur l'origine. Le `PATCH` terrain ne verrouille jamais.
+4. `contextOrderLocked` accepté à la création (faux par défaut) et à la mise à jour, où il est
+   **nullable** : non fourni ⇒ verrou conservé, sinon la première correction d'horaire venue rendrait
+   la main au terrain sur une mission imposée.
+5. Reste `Order OC-29` : la case « imposer ce type » côté UI régulateur (Jules). Tant qu'elle
+   n'existe pas, **plus aucune mission n'est verrouillée** — ce qui est le comportement voulu.
 
-**La migration est sans risque** : `DEFAULT 0` rend les missions du jour modifiables, et personne ne
-perd un verrou sur lequel il comptait — rien ne consomme `locked` aujourd'hui, Vector n'étant pas
-encore branché. C'est précisément la fenêtre pour corriger.
+**Aucune reprise de données, volontairement** : `DEFAULT 0` rend les missions du jour modifiables, et
+personne ne perd un verrou sur lequel il comptait — rien ne consommait `locked`. Une reprise à `1`
+aurait au contraire figé durablement des missions que personne n'avait voulu figer.
+
+**Côté Vector**, `ContextOrderStateQueryService` lit désormais le vrai `origin` et **retombe** sur la
+déduction si l'instance d'Orders.Api ne le sert pas encore : l'ordre de déploiement des deux modules
+est donc indifférent.
 
 **À trancher** : quand le terrain écrase une proposition de la régulation, `OOC_TYPE_ID` et
 `OOC_SET_BY` sont **écrasés en place** (une seule ligne par commande, aucun audit sur cette table) —
@@ -294,7 +301,7 @@ assume la perte.
    (Infrastructure) au-dessus de `IErpReadApiClient.GetMissionContextOrderAsync` (OC-1). 7 tests.
    - **`origin` est dérivé, pas lu** : `locked ⇒ Regulator`, sinon `contextOrderId` posé ⇒ `Field`,
      sinon rien. Exact au regard du code d'Order d'aujourd'hui, où `locked` **est** la provenance —
-     et remplaçable par la lecture du vrai champ le jour d'`Order OC-24`, **sans toucher au contrat
+     et remplaçable par la lecture du vrai champ le jour d'`Order OC-28`, **sans toucher au contrat
      mobile** : c'est la raison d'être de l'indirection. Le couple « `Regulator` + non verrouillé »
      est déjà exprimable côté mobile, il n'attend plus qu'Order sache l'émettre.
    - **La liste ne tombe pas si l'ERP tombe** : le verrou est lu en `try/catch`, une panne

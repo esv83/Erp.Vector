@@ -25,7 +25,7 @@ public class ContextOrderStateTests
 {
     private const string BaseUrl = "https://api.urgencesante.net/order/";
 
-    private static string Payload(bool locked, int? contextOrderId) => $$"""
+    private static string Payload(bool locked, int? contextOrderId, string? origin = null) => $$"""
     {
       "missionId": "9f3ca1b2-0000-0000-0000-000000000001",
       "orderId":   "1a2bc3d4-0000-0000-0000-000000000002",
@@ -33,54 +33,64 @@ public class ContextOrderStateTests
       "contextOrderCode": "CENTRE15",
       "contextOrderDisplay": "Centre 15",
       "locked": {{(locked ? "true" : "false")}},
+      "origin": {{(origin is null ? "null" : $"\"{origin}\"")}},
       "availableContextOrders": []
     }
     """;
 
+    /// <summary>
+    /// Le cas demandé, désormais servi tel quel par Orders.Api (<c>Order OC-24</c>) : la régulation
+    /// propose, l'ambulancier garde la main. Verrou et provenance sont deux champs indépendants,
+    /// pas un booléen déguisé.
+    /// </summary>
     [Fact]
-    public async Task Context_verrouille_est_attribue_a_la_regulation()
+    public async Task Pose_par_la_regulation_mais_modifiable()
     {
-        var state = await ReadState(Payload(locked: true, contextOrderId: 4));
+        var state = await ReadState(Payload(locked: false, contextOrderId: 4, origin: "Regulator"));
 
-        state!.Locked.Should().BeTrue();
-        state.Origin.Should().Be("Regulator");
+        state!.Locked.Should().BeFalse("l'ambulancier peut encore changer le type");
+        state.Origin.Should().Be("Regulator", "mais la valeur affichée vient de la régulation");
         state.ContextOrderDisplay.Should().Be("Centre 15");
     }
 
     [Fact]
-    public async Task Context_pose_et_libre_est_attribue_au_terrain()
+    public async Task Context_impose_par_la_regulation_est_verrouille()
     {
-        var state = await ReadState(Payload(locked: false, contextOrderId: 4));
+        var state = await ReadState(Payload(locked: true, contextOrderId: 4, origin: "Regulator"));
+
+        state!.Locked.Should().BeTrue();
+        state.Origin.Should().Be("Regulator");
+    }
+
+    [Fact]
+    public async Task Context_choisi_par_le_terrain_est_attribue_au_terrain()
+    {
+        var state = await ReadState(Payload(locked: false, contextOrderId: 4, origin: "Field"));
 
         state!.Locked.Should().BeFalse();
         state.Origin.Should().Be("Field");
     }
 
     /// <summary>
-    /// Le cas demandé : la régulation propose, l'ambulancier garde la main. Tant qu'Order dérive
-    /// <c>locked</c> de la provenance, ce couple ne peut pas <b>venir</b> de l'API — mais le DTO
-    /// mobile doit pouvoir le porter, et l'UI s'y fier : verrou et provenance sont deux champs
-    /// indépendants, pas un booléen déguisé.
+    /// Repli : une instance d'Orders.Api antérieure à OC-24 ne sert pas <c>origin</c>. On le déduit
+    /// alors du verrou, ce qui rend l'ordre de déploiement indifférent — Vector livré en premier
+    /// continue de fonctionner et bascule tout seul quand Order suit.
     /// </summary>
-    [Fact]
-    public void Pose_par_la_regulation_mais_modifiable_est_exprimable_dans_le_contrat_mobile()
+    [Theory]
+    [InlineData(true, 4, "Regulator")]
+    [InlineData(false, 4, "Field")]
+    [InlineData(false, null, null)]
+    public async Task Sans_origin_servi_la_provenance_est_deduite_du_verrou(bool locked, int? id, string? expected)
     {
-        var state = new ClContextOrderStateDtoOut
-        {
-            Locked = false,
-            Origin = "Regulator",
-            ContextOrderId = 4,
-            ContextOrderDisplay = "Centre 15"
-        };
+        var state = await ReadState(Payload(locked, id));
 
-        state.Locked.Should().BeFalse("l'ambulancier peut encore changer le type");
-        state.Origin.Should().Be("Regulator", "mais la valeur affichée vient de la régulation");
+        state!.Origin.Should().Be(expected);
     }
 
     [Fact]
     public async Task Aucun_context_pose_ne_designe_aucune_provenance()
     {
-        var state = await ReadState(Payload(locked: false, contextOrderId: null));
+        var state = await ReadState(Payload(locked: false, contextOrderId: null, origin: null));
 
         state!.ContextOrderId.Should().BeNull();
         state.Origin.Should().BeNull();

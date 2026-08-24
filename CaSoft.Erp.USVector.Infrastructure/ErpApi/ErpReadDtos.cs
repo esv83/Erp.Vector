@@ -154,10 +154,22 @@ public sealed class ErpMissionContextOrderDto
     public string? ContextOrderDisplay { get; set; }
 
     /// <summary>
-    /// true ⇒ context fixé par le régulateur : lecture seule côté terrain (un PATCH renverrait 409).
-    /// Gèle <b>le choix du context</b>, pas la saisie des attributs.
+    /// true ⇒ context <b>imposé</b> par le régulateur : lecture seule côté terrain (un PATCH
+    /// renverrait 409). Gèle <b>le choix du context</b>, pas la saisie des attributs.
     /// </summary>
     public bool Locked { get; set; }
+
+    /// <summary>
+    /// <c>"Regulator"</c> / <c>"Field"</c> / <c>null</c> — provenance du context, servie par Orders.Api
+    /// depuis <c>Order OC-28</c>. <b>Distincte de <see cref="Locked"/></b> : une valeur posée par la
+    /// régulation reste modifiable tant qu'elle n'est pas imposée.
+    /// <para>
+    /// <c>null</c> a deux causes possibles — aucun context posé, ou une instance d'Orders.Api
+    /// antérieure à OC-28 qui ne sert pas encore le champ. Le repli sur la déduction est fait par
+    /// <c>ContextOrderStateQueryService</c>, ce qui rend l'ordre de déploiement indifférent.
+    /// </para>
+    /// </summary>
+    public string? Origin { get; set; }
 
     /// <summary>
     /// Contexts sélectionnables (actifs, filtrés agence + mode côté Orders.Api). Renvoyé
