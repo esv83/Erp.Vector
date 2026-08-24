@@ -174,17 +174,45 @@ endpoints livrés, scripts `038` et `040` joués.
 > place, **inertes** (aucun appelant, contrat mobile inchangé). 11 tests épinglent routes, verbes,
 > corps et traduction des refus ; **75 tests verts**.
 > Lecture **vérifiée contre l'API réelle** (`https://api.urgencesante.net/order/`, 200 sans jeton) :
-> la réponse correspond champ pour champ au DTO miroir. ⚠️ **L'écriture n'est pas vérifiée en réel** :
-> le seul essai possible écrirait sur une mission de production — à faire sur une instance de dev,
-> ou sur une mission verrouillée (réponse 409 attendue, sans écriture) après accord explicite.
+> la réponse correspond champ pour champ au DTO miroir.
 >
-> **Mesures OC-0 prises au passage** (20 missions récentes, prod) :
-> - **0 sélecteur vide** → le risque « la liste se vide en production à cause du filtrage
->   agence/mode » n'apparaît pas sur cet échantillon.
-> - **9 missions sur 20 arrivent `locked`** (context fixé par la régulation). C'est un **vrai
->   changement de comportement terrain** : aujourd'hui l'ambulancier choisit toujours, demain près
->   d'une mission sur deux sera en lecture seule. Le cadenas doit être visible côté web **avant**
->   OC-3, sinon l'ambulancier tentera le changement et prendra un 409.
+> **Écriture vérifiée en réel le 2026-08-24, sans jamais écrire.** Le contrôle d'applicabilité du
+> type se fait **avant** l'écriture côté Order : un `contextOrderId` inexistant (999999) ne peut donc
+> pas franchir l'étape d'écriture, ce qui rend les essais de refus sûrs sur des missions de
+> production. Chaque appel est encadré d'un `GET` avant/après — état identique dans les quatre cas.
+>
+> | Cas | Appel | Réponse réelle | État après |
+> |---|---|---|---|
+> | `MissionNotFound` | mission inexistante | **404** « Mission … introuvable. » | — |
+> | `LockedByRegulator` | mission verrouillée, id 999999 | **409** « Type de mission verrouillé par le régulateur » | inchangé |
+> | `NotApplicable` | mission libre, id 999999 | **400** « … non applicable à cette commande (agence/mode) ou inactif. » | inchangé |
+> | `LockedByRegulator` | mission verrouillée, **id valide** (`2` ART80) — *scénario terrain réel* | **409** | inchangé |
+>
+> Le 4ᵉ cas n'a été lancé qu'après le 2ᵉ : le 409 sur un id invalide prouve que le handler sort au
+> contrôle de verrou, **avant** de regarder l'id — le même appel avec un id valide emprunte donc le
+> même chemin, sans écriture possible.
+>
+> ⚠️ **Seule l'issue `Applied` (204) reste non vérifiée** : elle écrirait pour de bon. Le coût exact
+> d'un essai est connu — une ligne dans `ORD_ORDER_CONTEXT_ASSIGNMENT`, **au niveau commande** (donc
+> aller *et* retour), `origin = Field` (qui ne verrouille pas), et **aucun endpoint ne sait
+> l'annuler** : le retour arrière serait un `DELETE` SQL ciblé en production. À faire sur une
+> instance de dev, ou sur une mission libre du jour avec suppression derrière, sur accord explicite.
+> Le chemin de code concerné est trivial (`IsSuccessStatusCode → Applied`) et couvert par les tests.
+>
+> **Note à remonter à Order** (cosmétique, pas bloquant) : le `detail` des `ProblemDetails` sort
+> préfixé `"Application Error :"` — la formulation du framework fuit dans le contrat HTTP. À nettoyer
+> avant qu'un message d'Order ne s'affiche tel quel côté terrain.
+>
+> **Mesures OC-0 prises au passage** :
+> - **0 sélecteur vide** (20 missions récentes, prod) → le risque « la liste se vide en production à
+>   cause du filtrage agence/mode » n'apparaît pas ; les 7 types du catalogue sortent à chaque fois.
+> - **Le verrou est la règle, pas l'exception** : 9 missions sur 20 au premier relevé, puis
+>   **20 sur 25** sur la fenêtre 20→24/08. C'est un **vrai changement de comportement terrain** :
+>   aujourd'hui l'ambulancier choisit toujours, demain il sera le plus souvent en lecture seule. Le
+>   cadenas doit être visible côté web **avant** OC-3, sinon l'ambulancier tentera le changement et
+>   prendra un 409 — et le 409 est bien réel, il vient d'être constaté en production.
+> - Les missions non verrouillées arrivent avec `contextOrderId = null` : « non renseigné » est bien
+>   l'état de départ réel, ce qui confirme la suppression de la règle « défaut = premier context ».
 > - Reste à vérifier avant OC-3 : **ids en dur côté front** (l'id `4` vaut `ART80` côté Vector et
 >   `CENTRE15` côté Order).
 
@@ -196,7 +224,9 @@ endpoints livrés, scripts `038` et `040` joués.
    `PATCH /missions/{missionId}/contextOrder` `{ contextOrderId, setBy }` → 204. L'origine `Field`
    est imposée par l'endpoint. Les refus métier reviennent en `EnContextOrderWriteOutcome`
    (`LockedByRegulator` 409, `NotApplicable` 400, `MissionNotFound` 404) — **jamais en exception** :
-   seule une panne réelle (5xx, réseau) lève. OC-4 les traduira en codes HTTP mobiles.
+   seule une panne réelle (5xx, réseau) lève. **Les trois refus sont constatés en production**
+   (tableau ci-dessus) ; seul le 204 reste sur les seuls tests. OC-4 les traduira en codes HTTP
+   mobiles.
 2. **`GET api/Contract/{jobId}` garde sa forme** (tableau `{ Id, Display, IsSelected }`) — **D14** :
    seule la **source** change (les `availableContextOrders` d'Order remplacent `MOB_CONTRACT_TYPE`).
    Le `locked` arrive par deux ajouts **additifs** : une propriété `Locked` sur chaque item et une
