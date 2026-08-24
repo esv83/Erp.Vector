@@ -150,6 +150,7 @@ une couche déclarative que la facturation relit et corrige.
 | D11 | **`Closed` reste la main du régulateur** : le mobile n'écrit jamais la clôture administrative. |
 | D12 | **Photos et documents en base** en V1 ; sortie vers un stockage fichier planifiée V2. |
 | D13 | **Le claim `per_id` dans le jeton est écarté** : un turnover le rendrait non invalidable. C'est le cache HTTP qui s'invalide, pas le jeton. |
+| **D14** | **On code neutre ou additif — jamais de rupture du contrat consommé par l'appli web en production.** L'app web ambulancier tourne contre `Vector.Api` et **n'est pas déployée en même temps que l'API** : un champ retiré, renommé, ou un type de réponse changé (tableau → objet) casse le terrain immédiatement, sans filet. Corollaires : on ajoute à côté plutôt qu'on ne remplace ; les alias de compatibilité (C1-C5) ne se retirent **que** sur confirmation que le front a basculé ; un renommage de type .NET est neutre (le nom n'est pas sur le fil), un renommage de propriété ne l'est pas. Quand une évolution ne **peut** pas être additive, elle se coordonne avec le dev web avant livraison (note `note_web_alexandre_*.md`). |
 
 ---
 
@@ -176,13 +177,16 @@ endpoints livrés, scripts `038` et `040` joués.
    - `PATCH /missions/{missionId}/contextOrder` `{ contextOrderId, setBy }` → 204. L'origine `Field`
      est imposée par l'endpoint. Erreurs à propager : **409** (verrou régulateur), **400** (type non
      applicable ou inactif), **404**.
-2. **`GET api/Contract/{jobId}`** passe d'un tableau plat à un objet
-   `{ locked, contextOrderId, contextOrders[] }`. **Changement de contrat web → à coordonner avec
-   Alexandre avant livraison** ; repli possible : garder le tableau et ajouter
-   `GET api/Contract/{jobId}/state` pour le `locked`. Renommage `/api/Contract` → `/api/ContextOrder`
-   à trancher dans la même passe.
-3. **`POST api/Contract/{jobId}`** n'écrit plus `MOB_JOB_CONTRACT` : il relaie le `PATCH` Order.
-   Supprimer la règle « défaut = premier context actif » — « non renseigné » devient un état valide.
+2. **`GET api/Contract/{jobId}` garde sa forme** (tableau `{ Id, Display, IsSelected }`) — **D14** :
+   seule la **source** change (les `availableContextOrders` d'Order remplacent `MOB_CONTRACT_TYPE`).
+   Le `locked` arrive par deux ajouts **additifs** : une propriété `Locked` sur chaque item et une
+   route nouvelle `GET api/Contract/{jobId}/state` → `{ locked, contextOrderId }`. Le passage du
+   tableau à un objet et le renommage `/api/Contract` → `/api/ContextOrder` **ne se font pas** tant
+   que le front n'a pas basculé.
+3. **`POST api/Contract/{jobId}`** garde son corps (`int`) mais n'écrit plus `MOB_JOB_CONTRACT` : il
+   relaie le `PATCH` Order. Supprimer la règle « défaut = premier context actif » — « non renseigné »
+   devient un état valide. ⚠️ **Nouveaux codes de retour** (409 verrou, 400 non applicable) là où
+   l'appel réussissait toujours : à annoncer au dev web avant livraison.
 4. **Attributs** : `GET /missions/{id}/contextOrder/form-structure` et
    `PATCH /missions/{id}/contextOrder/values` remplacent `JobAttributeOverlayRepository.BuildContractType`
    et `.Save`. Le DTO de champ est le miroir de `ClMobileAppFieldModel`, plus **deux champs additifs à
