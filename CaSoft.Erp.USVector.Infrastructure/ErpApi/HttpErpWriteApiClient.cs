@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -56,5 +57,35 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
         _logger.LogError("Orders.Api PUT crews/{CrewId}/driver a échoué : {Status} {Body}",
             crewId, (int)response.StatusCode, content);
         throw new HttpRequestException($"Orders.Api PUT crews/{crewId}/driver → {(int)response.StatusCode}.");
+    }
+
+    public async Task<EnContextOrderWriteOutcome> SetMissionContextOrderAsync(
+        Guid missionId, int contextOrderId, string? setBy = null, CancellationToken ct = default)
+    {
+        var body = new { contextOrderId, setBy };
+        var response = await _http.PatchAsJsonAsync($"missions/{missionId}/contextOrder", body, JsonOptions, ct);
+        if (response.IsSuccessStatusCode) return EnContextOrderWriteOutcome.Applied;
+
+        // 409/400/404 = réponses métier (ProblemDetails), pas des pannes : on les remonte à
+        // l'appelant, qui les traduit en 409/400/404 mobile. Journalisées en Warning, pas en Error.
+        var outcome = response.StatusCode switch
+        {
+            HttpStatusCode.Conflict => EnContextOrderWriteOutcome.LockedByRegulator,
+            HttpStatusCode.BadRequest => EnContextOrderWriteOutcome.NotApplicable,
+            HttpStatusCode.NotFound => EnContextOrderWriteOutcome.MissionNotFound,
+            _ => (EnContextOrderWriteOutcome?)null
+        };
+
+        var content = await response.Content.ReadAsStringAsync(ct);
+        if (outcome.HasValue)
+        {
+            _logger.LogWarning("Orders.Api PATCH missions/{MissionId}/contextOrder refusé ({Outcome}) : {Status} {Body}",
+                missionId, outcome.Value, (int)response.StatusCode, content);
+            return outcome.Value;
+        }
+
+        _logger.LogError("Orders.Api PATCH missions/{MissionId}/contextOrder a échoué : {Status} {Body}",
+            missionId, (int)response.StatusCode, content);
+        throw new HttpRequestException($"Orders.Api PATCH missions/{missionId}/contextOrder → {(int)response.StatusCode}.");
     }
 }

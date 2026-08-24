@@ -170,10 +170,13 @@ endpoints livrés, scripts `038` et `040` joués.
 (côté intégrateur, §7 pour les attributs) et
 [`note_web_alexandre_vector_type_mission.md`](note_web_alexandre_vector_type_mission.md) (contrat UI web).
 
-> **Avancement** — **OC-1 livré (2026-08-24)** : lecture HTTP du context en place, **inerte** (aucun
-> appelant, contrat mobile inchangé). 5 tests épinglent la route et la forme JSON, **69 tests verts**.
-> Contrat **vérifié contre l'API réelle** (`https://api.urgencesante.net/order/`, 200 sans jeton) :
-> la réponse correspond champ pour champ au DTO miroir.
+> **Avancement** — **OC-1 et OC-2 livrés (2026-08-24)** : lecture et écriture HTTP du context en
+> place, **inertes** (aucun appelant, contrat mobile inchangé). 11 tests épinglent routes, verbes,
+> corps et traduction des refus ; **75 tests verts**.
+> Lecture **vérifiée contre l'API réelle** (`https://api.urgencesante.net/order/`, 200 sans jeton) :
+> la réponse correspond champ pour champ au DTO miroir. ⚠️ **L'écriture n'est pas vérifiée en réel** :
+> le seul essai possible écrirait sur une mission de production — à faire sur une instance de dev,
+> ou sur une mission verrouillée (réponse 409 attendue, sans écriture) après accord explicite.
 >
 > **Mesures OC-0 prises au passage** (20 missions récentes, prod) :
 > - **0 sélecteur vide** → le risque « la liste se vide en production à cause du filtrage
@@ -189,9 +192,11 @@ endpoints livrés, scripts `038` et `040` joués.
    (`ErpApi/ErpReadDtos.cs`) + `IErpReadApiClient.GetMissionContextOrderAsync` →
    `GET /missions/{missionId}/contextOrder` (404 → `null`). La liste `availableContextOrders` est
    **déjà filtrée** (agence + mode de la commande) : ne pas re-filtrer côté Vector.
-   ⏳ **Client HTTP en écriture** (OC-2) : `PATCH /missions/{missionId}/contextOrder`
-   `{ contextOrderId, setBy }` → 204. L'origine `Field` est imposée par l'endpoint. Erreurs à
-   propager : **409** (verrou régulateur), **400** (type non applicable ou inactif), **404**.
+   ✅ **Client HTTP en écriture** — `IErpWriteApiClient.SetMissionContextOrderAsync` →
+   `PATCH /missions/{missionId}/contextOrder` `{ contextOrderId, setBy }` → 204. L'origine `Field`
+   est imposée par l'endpoint. Les refus métier reviennent en `EnContextOrderWriteOutcome`
+   (`LockedByRegulator` 409, `NotApplicable` 400, `MissionNotFound` 404) — **jamais en exception** :
+   seule une panne réelle (5xx, réseau) lève. OC-4 les traduira en codes HTTP mobiles.
 2. **`GET api/Contract/{jobId}` garde sa forme** (tableau `{ Id, Display, IsSelected }`) — **D14** :
    seule la **source** change (les `availableContextOrders` d'Order remplacent `MOB_CONTRACT_TYPE`).
    Le `locked` arrive par deux ajouts **additifs** : une propriété `Locked` sur chaque item et une
