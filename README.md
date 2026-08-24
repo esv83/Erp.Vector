@@ -5,7 +5,8 @@ la base legacy `BD_REGULATION_prod`. Remplace l'ancienne `WebApi` de la solution
 `E:\VB_Projects\MobileApp` en préservant le contrat (routes + DTOs) → l'app mobile est
 re-pointée sans modification.
 
-> Plan de développement détaillé : `mobile_devplan.md` (itérations MOB-0 → MOB-16).
+> Plan de développement détaillé : `TERRAIN_devplan.md` (socle mobile, attributs de mission,
+> transfert terrain→compta). Vue d'ensemble tous chantiers : `devplan.md`.
 
 ## Architecture (Clean Architecture, .NET 8)
 

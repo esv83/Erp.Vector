@@ -2,7 +2,9 @@
 
 > **Statut global** : 🟡 En cours — MVP boucle ambulancier **livré** (hors UI login MOB-4b) · Transfert terrain→compta livré côté Orders+Vector, Certification à faire · Result pattern Vague 1 livrée.
 > **Prod** : `\\192.168.1.112\prod_api\Vector.Api` — déployée le **2026-08-02 13:06** depuis `main` (`0e76a70`), trafic servi et JWT validés dans la foulée.
-> **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **Dernière mise à jour** : 2026-08-02.
+> **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **Dernière mise à jour** : 2026-08-24.
+> **2026-08-24** : `mobile_devplan.md`, `MOB-13_devplan.md` et `TRANSFER_devplan.md` sont fusionnés dans
+> [`TERRAIN_devplan.md`](TERRAIN_devplan.md) (détail des trois lots + liste des pistes abandonnées).
 >
 > _Devplan **unifié** du module Vector — synthèse des 8 docs de conception (voir §5). Organisé **par statut**
 > (le tableau de bord §1 donne la vue d'ensemble), puis par module (§2). Convention : Clean Architecture,
@@ -47,27 +49,27 @@
 ### 🟡 En cours
 | Réf | Élément | Détail |
 |---|---|---|
-| MOB-4b | UI de mapping Keycloak ↔ Personnel | aujourd'hui **insertion SQL manuelle** dans `PER_KEYCLOAK_MAP` ; manque l'écran + endpoints CRUD Orders |
+| MOB-4b | UI de mapping Keycloak ↔ Personnel | aujourd'hui **insertion SQL manuelle** dans `PER_KEYCLOAK_MAP`. Les **endpoints Orders sont livrés** (`GET/PUT/DELETE /personnel/{id}/keycloak`, `GET /keycloak/users`) ; il manque l'écran, dont **l'hôte est à re-trancher** : le module **Identity** possède désormais la correspondance (reprise jouée 23/08/2026) et l'écran Siège envisagé n'existe plus qu'en `Archives/`. Cf. [`TERRAIN_devplan.md`](TERRAIN_devplan.md) §3.2 |
 | Result V2 | Retrait du legacy (échafaudage presenter) | straggler `ClSetDriverUseCase` (31/32) puis suppression des types legacy |
-| MOB-13 → OC | Bascule vers le référentiel **ContextOrder** (côté Order) | Vector devient consommateur ; `MOB_CONTRACT_*` à **déprécier** |
+| MOB-13 → OC | Bascule vers le référentiel **ContextOrder** (côté Order) | **Pas commencée** (aucune occurrence `contextOrder` dans le code Vector au 2026-08-24) ; le back Order est prêt. Vector devient consommateur ; `MOB_CONTRACT_*` + `MOB_JOB_ATTRIBUTE_VALUE` **dépréciées**. Plan détaillé : [`TERRAIN_devplan.md`](TERRAIN_devplan.md) §3.1 |
 
 ### ⛔ Bloqué / en attente (dépendance externe ou décision)
 | Réf | Élément | Ce qui bloque |
 |---|---|---|
-| MOB-13.2 | **Vrai catalogue métier** (types de contrat + attributs facturation) | attend le **contenu métier** (seed actuel = provisoire STANDARD/ART80) |
 | MUTUELLE P2 (compta) | Client HTTP tirant la carte à l'export | à faire **dans le module Certification** (hors mobile) |
-| SQL `MOB_003/004/005` | Migrations mutuelle / anomalies / documents | **à exécuter avec un compte db_owner** (`ErpAccount` n'a pas `CREATE TABLE`) |
-| Projection statut fin→ERP | `terminate` → `ORD_MISSION.MIS_STATUS` | Orders n'expose **pas de transition** ; à cadrer côté module régulation |
+
+> ~~MOB-13.2 (vrai catalogue métier)~~ **abandonné** : le catalogue passe côté Order (ContextOrder) — le seed provisoire ne sera pas complété.
+> ~~SQL `MOB_003/004/005`~~ **résolu** : tables vérifiées présentes en BD le 2026-08-24 (§3).
+> ~~Projection statut fin→ERP~~ **résolue** par TRF-2/3/5 (dérivation `MIS_STATUS` côté domaine Orders, poussée par Vector) ; seule la clôture `Closed` reste la main du régulateur.
 
 ### ⏳ À faire (planifié)
 | Réf | Élément | Module |
 |---|---|---|
-| MOB-9 | Déploiement IIS `/mobile` + smoke `.http` + retrait `WebApi` | Socle |
-| MOB-10 | Kilométrage (table dédiée) | Socle |
-| MOB-12 | Fin de service | Socle |
-| MOB-14 | Logs mécaniques | Socle |
+| MOB-9 (résiduel) | Suite smoke `.http` de parité de contrat — déploiement fait, `WebApi` legacy disparue | Socle |
+| MOB-10 | Kilométrage : arbitrer km véhicule (existant) vs relevé **par mission** attendu par la facturation | Socle |
+| MOB-12 | Fin de service — **à re-cadrer** : `MOB_SESSION` n'est plus la source d'auth, viser la vacation Orders | Socle |
+| MOB-14 | Logs mécaniques (controllers exposés sur stubs) | Socle |
 | MOB-16 | Recâblage connecteurs Sirus / GpsGate | Socle |
-| MOB-13.12 | Purge des valeurs orphelines (au transfert) | MOB-13 |
 | MUTUELLE P3 | OCR carte mutuelle (Claude vision + validation humaine) | Mutuelle |
 | — | Tests xUnit Orders du transfert (dérivation statut, garde-fous) | Transfert |
 | TRF-12..15 | Certification : découverte → tirage `field-data` → agrégation → `transfer-status` | Certification (autre module) |
@@ -94,7 +96,7 @@ Mode **offline** (cache + sync différée) · **géoloc avancée** · **push Sig
 > Chaque module : à quoi ça sert + architecture essentielle + source faisant autorité. **Le statut détaillé est au §1.**
 
 ### 2.1 Socle technique & reconnexion ERP (MOB-0..16)
-> Source : [`mobile_devplan.md`](mobile_devplan.md)
+> Source : [`TERRAIN_devplan.md`](TERRAIN_devplan.md) §1.1-1.3, §3.4
 
 Reconnecter l'API mobile à l'ERP après perte de la base legacy, **sans changer le contrat mobile** (25 routes + DTOs) : on ne remplace que l'implémentation des repositories. API ASP.NET Core 8 `CaSoft.Erp.USVector.Api` (remplace `WebApi`). « Mission vue » remplace l'ACK (`MST_READ_AT` + `IsSeen` + événement `MissionSeen`).
 - **Tables** : `MOB_SESSION`, `MOB_MISSION_STATE` (timeline ack/read/go/onsite/terminate), `MOB_SIGNATURE`.
@@ -124,10 +126,10 @@ Chaîne : `JWT local → sub→PER_ID (PER_KEYCLOAK_MAP) → crews actifs → cr
 Migration des use cases legacy (`Execute(presenter)`) vers `Handle() → ClResult(Of T)` + `IError` (NotFound→404), **non cassante** (Strangler Fig + pont). Vague 1 faite (31/32) ; Vague 2 = retrait de l'échafaudage (`ClUseCaseHandler`, `ClWebApiPresenter`, `ClUseCaseBase`…).
 
 ### 2.6 Édition attributs de mission / contrat (MOB-13)
-> Source : [`MOB-13_devplan.md`](MOB-13_devplan.md)
+> Source : [`TERRAIN_devplan.md`](TERRAIN_devplan.md) §1.4, §3.1
 
 Édition des attributs (commentaires, tél/mail patient, **type de contrat + attributs facturation**) en **overlay BD Mobile, aucune écriture ERP**. Applicabilité **N..N** (`CAT_IS_GLOBAL` ou liaison contrat). Tables catalogue `MOB_CONTRACT_TYPE/ATTRIBUTE(_CONTRACT/_OPTION)` + overlay `MOB_JOB_CONTRACT`/`MOB_JOB_ATTRIBUTE_VALUE`. Endpoints `GET FormStructure`, `PATCH JobEdit`, `GET/POST Contract`.
-> ⚠️ **Évolution** : le référentiel migre **côté Order** (`ContextOrder`/OC-9, verrou régulateur + filtrage agence/mode) → Vector devient consommateur, `MOB_CONTRACT_*` **dépréciées**. Cf. `Erp.Order/feature_order_context_devplan.md` + `note_vector_orderContext_mission.md`.
+> ⚠️ **Évolution** : le référentiel migre **côté Order** (`ContextOrder`/OC-9, verrou régulateur + filtrage agence/mode) → Vector devient consommateur, `MOB_CONTRACT_*` **dépréciées**. Cf. `Erp.Order/feature_order_context_devplan.md` + `Erp.Order/note_vector_orderContext_mission.md`.
 
 ### 2.7 Carte mutuelle
 > Source : [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md)
@@ -135,7 +137,7 @@ Migration des use cases legacy (`Execute(presenter)`) vers `Handle() → ClResul
 Capture photo → stockage blob BD Mobile (`MOB_MUTUELLE_CARD`) → restitution à la facturation (**pivot code AMC**) → OCR IA (Claude vision, validation humaine, P3). Endpoints `POST/GET /api/beneficiaries/{id}/mutuelle-card`, `GET /api/mutuelle-card/{id}/image`, `PATCH …` (saisie manuelle P2). Restitution = décision **2b** (Certification tire en HTTP).
 
 ### 2.8 Transfert terrain → comptabilité (TRF-1..15)
-> Source : [`TRANSFER_devplan.md`](TRANSFER_devplan.md)
+> Source : [`TERRAIN_devplan.md`](TERRAIN_devplan.md) §1.5, §3.3
 
 Cycle **Orders → Vector → Certification** : projection de l'avancement vers Orders (`PUT /missions/{id}/operational` → `ORD_MISSION_OPERATIONAL`, `MIS_STATUS` dérivé), statut de transfert `MIS_TRANSFER_STATUS` (`Transferable→Transferred→Billed`), **gel terrain** au transfert (`[FreezeOnTransfer]` → 409), paquet consolidé versionné **`GET /missions/{id}/field-data`** (timeline/signature/attributs/mutuelle/km/documents/anomalies). Compta **tire les octets** (pas de blob partagé). Temps réel = **polling** au MVP (push SignalR en V2).
 
@@ -148,9 +150,10 @@ Cycle **Orders → Vector → Certification** : projection de l'avancement vers 
 | Orders | `034_AddMissionOperationalAndTransfer.sql` | `ORD_MISSION_OPERATIONAL` + `MIS_TRANSFER_STATUS` | 🟢 appliqué 2026-06-22 ⚠️ *(numéroté `027` dans TRANSFER §2.1)* |
 | Mobile (`BD_ERP_MOBILE_APP`, **db_owner**) | `MOB_001_Initial.sql` | SESSION / MISSION_STATE / SIGNATURE | 🟢 appliqué |
 | Mobile | `MOB_002_JobAttributes.sql` | catalogue contrat + overlay | 🟢 appliqué |
-| Mobile | `MOB_003_MutuelleCard.sql` | carte mutuelle | ⛔ à exécuter |
-| Mobile | `MOB_004_Anomaly.sql` | anomalies | ⛔ à exécuter |
-| Mobile | `MOB_005_Document.sql` | documents | ⛔ à exécuter |
+| Mobile | `MOB_003_MutuelleCard.sql` | carte mutuelle | 🟢 appliqué *(vérifié 2026-08-24)* |
+| Mobile | `MOB_004_Anomaly.sql` | anomalies | 🟢 appliqué *(vérifié 2026-08-24)* |
+| Mobile | `MOB_005_Document.sql` | documents | 🟢 appliqué *(vérifié 2026-08-24)* |
+| Mobile | `MOB_006_OperationalOutbox.sql` | file de projection régulation | 🟢 appliqué *(vérifié 2026-08-24)* |
 
 ## 4. Configuration
 - `ConnectionStrings:MobileDb` · `ConnectionStrings:OrdersDb` **(inutilisé depuis le découplage 4a)**.
@@ -176,12 +179,10 @@ Prérequis : `net use \\192.168.1.112\prod_api /user:192.168.1.112\DeployApi *`.
 | Doc | Genre | Module |
 |---|---|---|
 | [`AppMobile_specifications.md`](AppMobile_specifications.md) | Spec fonctionnelle | Besoin/vocabulaire |
-| [`mobile_devplan.md`](mobile_devplan.md) | Devplan | Socle (§2.1) |
+| [`TERRAIN_devplan.md`](TERRAIN_devplan.md) | Devplan consolidé | Socle (§2.1) · Attributs (§2.6) · Transfert (§2.8) — fusion de `mobile_devplan` + `MOB-13_devplan` + `TRANSFER_devplan` le 2026-08-24 |
 | [`VECTOR_ORDERS_DECOUPLING_devplan.md`](VECTOR_ORDERS_DECOUPLING_devplan.md) | Devplan | Découplage (§2.3) |
 | [`docs/auth/optimisation-chaine-authentification.md`](docs/auth/optimisation-chaine-authentification.md) | Note conception | Auth (§2.4) |
 | [`refactor_result_pattern.md`](refactor_result_pattern.md) | Devplan refactoring | Application (§2.5) |
-| [`MOB-13_devplan.md`](MOB-13_devplan.md) | Devplan | Attributs (§2.6) |
 | [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) | Devplan | Mutuelle (§2.7) |
-| [`TRANSFER_devplan.md`](TRANSFER_devplan.md) | Devplan transverse | Transfert (§2.8) |
 
 **Non consolidés ici** (autres genres) : contrats front (`note_web_alexandre_*.md`, `docs/ui-web/*`), contrat HTTP Orders (`endPoint.md`), déploiement (`docs/deploiement/*`), `BUG_DISPLAY.MD`, `README.md`.
