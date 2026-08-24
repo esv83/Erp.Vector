@@ -214,10 +214,13 @@ endpoints livrés, scripts `038` et `040` joués.
 > - **0 sélecteur vide** (20 missions récentes, prod) → le risque « la liste se vide en production à
 >   cause du filtrage agence/mode » n'apparaît pas ; les 7 types du catalogue sortent à chaque fois.
 > - **Le verrou est la règle, pas l'exception** : 9 missions sur 20 au premier relevé, puis
->   **20 sur 25** sur la fenêtre 20→24/08. C'est un **vrai changement de comportement terrain** :
->   aujourd'hui l'ambulancier choisit toujours, demain il sera le plus souvent en lecture seule. Le
->   cadenas doit être visible côté web **avant OC-3b**, sinon l'ambulancier tentera le changement et
->   prendra un 409 — et le 409 est bien réel, il vient d'être constaté en production.
+>   **20 sur 25** sur la fenêtre 20→24/08. Le 409 correspondant est bien réel, il vient d'être
+>   constaté en production. ⚠️ **Lecture corrigée le 2026-08-24** : ce chiffre ne mesure **pas** une
+>   politique de régulation. Le verrou n'est pas décidé, il est dérivé de l'auteur de l'écriture
+>   (`Origin = Regulator` ⇒ `locked`) — voir la dépendance amont `Order OC-24` ci-dessous. Autrement
+>   dit, en l'état, **toute** mission renseignée par la régulation passerait le terrain en lecture
+>   seule, ce que personne n'a demandé. Le préalable à OC-3b n'est donc pas seulement « rendre le
+>   cadenas visible côté web », c'est **d'abord rendre le verrou intentionnel côté Order**.
 > - Les missions non verrouillées arrivent avec `contextOrderId = null` : « non renseigné » est bien
 >   l'état de départ réel, ce qui confirme la suppression de la règle « défaut = premier context ».
 > - Reste à vérifier avant **OC-3b** : **ids en dur côté front** (l'id `4` vaut `ART80` côté Vector et
@@ -227,8 +230,8 @@ endpoints livrés, scripts `038` et `040` joués.
 |---|---|---|
 | **OC-1** | Client HTTP en **lecture** du context (`GET /missions/{id}/contextOrder`) | ✅ |
 | **OC-2** | Client HTTP en **écriture** du context (`PATCH /missions/{id}/contextOrder`) | ✅ (204 non vérifié en réel) |
-| **OC-3a** | Ajouts **additifs** sur `api/Contract` : propriété `Locked` par item + route `GET api/Contract/{jobId}/state` | ⬜ |
-| **OC-3b** | **Bascule de la source** de `GET api/Contract/{jobId}` : Order remplace `MOB_CONTRACT_TYPE` | ⬜ (bloqué : cadenas côté web, ids en dur) |
+| **OC-3a** | Ajouts **additifs** sur `api/Contract` : propriété `Locked` par item + route `GET api/Contract/{jobId}/state` → `{ locked, contextOrderId, origin }` | ⬜ (dépend d'`Order OC-24`) |
+| **OC-3b** | **Bascule de la source** de `GET api/Contract/{jobId}` : Order remplace `MOB_CONTRACT_TYPE` | ⬜ (bloqué : `Order OC-24`, cadenas côté web, ids en dur) |
 | **OC-4** | `POST api/Contract/{jobId}` relaie le `PATCH` Order (nouveaux 409/400) | ⬜ |
 | **OC-5** | Attributs : `form-structure` + `values` remplacent `JobAttributeOverlayRepository` | ⬜ |
 | **OC-6** | Règles métier portées par Order à respecter côté Vector (DDN/NIR, PMT/BT, portée du verrou) | ⬜ |
@@ -239,6 +242,37 @@ endpoints livrés, scripts `038` et `040` joués.
 **OC-3 est scindé volontairement** : `OC-3a` est strictement additif (D14) et **livrable seul** — il
 donne au front de quoi afficher le cadenas, ce que `OC-3b` exige comme préalable. Les livrer d'un
 bloc obligerait à basculer la source avant que le terrain sache lire le verrou.
+
+### ⛔ Dépendance amont : le verrou n'est pas une décision, c'est un effet de bord
+
+**Le cas « la régulation pose la valeur, l'ambulancier peut quand même la changer » est aujourd'hui
+inexprimable.** Côté Order, une seule colonne `ORD_ORDER_CONTEXT_ASSIGNMENT.OOC_TYPE_ORIGIN` porte
+**deux informations distinctes** — *qui a écrit* et *est-ce gelé* — et `locked` en est simplement
+dérivé (`Origin = Regulator`). Trois endroits calculent la même chose :
+`ClGetMissionContextOrderQueryHandler` (le `locked` servi à Vector), `OrderQueryService.cs:84`
+(`ContextOrderLocked` de l'écran régulateur) et `ClSetMissionContextOrderHandler` (le refus 409).
+
+Conséquence directe : **toute** valeur posée par la régulation verrouille, sans que personne l'ait
+voulu. Les **20 missions sur 25** relevées le 2026-08-24 ne traduisent donc pas une politique de
+régulation — c'est l'écriture elle-même qui gèle. Le régulateur n'a aucun moyen de dire « je propose
+sans imposer ».
+
+**Correctif attendu côté Order — `Order OC-24` (à ouvrir)** : séparer provenance et verrou.
+1. Colonne `OOC_LOCKED` (`bit NOT NULL DEFAULT 0`) — prochain script SQL libre : `062`.
+2. `locked` des DTO (`ClMissionContextOrderDtoOut`, `ClEditOrderBodyDtoOut.ContextOrderLocked`) lu
+   sur cette colonne ; **`origin` exposé en plus** (additif) pour les besoins d'OC-3a.
+3. Le 409 de `ClSetMissionContextOrderHandler` se fonde sur `OOC_LOCKED`, plus sur l'origine.
+4. UI régulateur : une case « imposer ce type » (Jules) — décochée, la valeur reste une proposition.
+
+**La migration est sans risque** : `DEFAULT 0` rend les missions du jour modifiables, et personne ne
+perd un verrou sur lequel il comptait — rien ne consomme `locked` aujourd'hui, Vector n'étant pas
+encore branché. C'est précisément la fenêtre pour corriger.
+
+**À trancher** : quand le terrain écrase une proposition de la régulation, `OOC_TYPE_ID` et
+`OOC_SET_BY` sont **écrasés en place** (une seule ligne par commande, aucun audit sur cette table) —
+ce que la régulation avait proposé est perdu. Si la facturation ou l'arbitrage d'un litige doit
+pouvoir le relire, il faut une colonne `OOC_REGULATOR_TYPE_ID` ou une trace d'audit. Sinon, on
+assume la perte.
 
 1. ✅ **OC-1 — Client HTTP en lecture** — `ErpMissionContextOrderDto` / `ErpContextOrderChoiceDto`
    (`ErpApi/ErpReadDtos.cs`) + `IErpReadApiClient.GetMissionContextOrderAsync` →
@@ -253,9 +287,24 @@ bloc obligerait à basculer la source avant que le terrain sache lire le verrou.
    mobiles.
 2. **OC-3a — les deux ajouts additifs qui rendent le verrou lisible.** Une propriété `Locked` sur
    chaque item de `GET api/Contract/{jobId}` et une route nouvelle
-   `GET api/Contract/{jobId}/state` → `{ locked, contextOrderId }`. Rien ne disparaît, rien ne change
-   de type : **livrable sans coordination** avec le dev web, qui pourra afficher le cadenas à son
-   rythme. Source du `locked` : `IErpReadApiClient.GetMissionContextOrderAsync` (OC-1).
+   `GET api/Contract/{jobId}/state` → **`{ locked, contextOrderId, origin }`**. Rien ne disparaît,
+   rien ne change de type : **livrable sans coordination** avec le dev web, qui pourra afficher le
+   cadenas à son rythme. Source : `IErpReadApiClient.GetMissionContextOrderAsync` (OC-1).
+
+   ⚠️ **`locked` seul ne suffit pas — il faut `origin` à côté.** Le terrain doit distinguer quatre
+   situations, et un booléen n'en porte que deux :
+
+   | `origin` | `locked` | Ce que voit l'ambulancier |
+   |---|---|---|
+   | *(aucun)* | `false` | rien de proposé, il choisit librement |
+   | `Regulator` | `false` | **valeur poussée par la régulation, qu'il peut changer** — pré-sélectionnée, modifiable |
+   | `Regulator` | `true` | imposée par la régulation, lecture seule (409 s'il tente) |
+   | `Field` | `false` | son propre choix, déjà enregistré |
+
+   La deuxième ligne est le cas demandé : sans `origin`, l'ambulancier verrait une valeur
+   pré-cochée sans savoir qu'elle vient de la régulation — il la prendrait pour un défaut technique
+   et la changerait sans y penser. Avec `origin`, l'UI peut écrire « proposé par la régulation »
+   tout en laissant la main.
 3. **OC-3b — `GET api/Contract/{jobId}` garde sa forme** (tableau `{ Id, Display, IsSelected }`) —
    **D14** : seule la **source** change (les `availableContextOrders` d'Order remplacent
    `MOB_CONTRACT_TYPE`). Le passage du tableau à un objet et le renommage `/api/Contract` →
