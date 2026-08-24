@@ -243,7 +243,7 @@ endpoints livrés, scripts `038` et `040` joués.
 donne au front de quoi afficher le cadenas, ce que `OC-3b` exige comme préalable. Les livrer d'un
 bloc obligerait à basculer la source avant que le terrain sache lire le verrou.
 
-### ✅ Dépendance amont levée : le verrou est devenu une décision (`Order OC-28`, 2026-08-24)
+### ✅ Dépendance amont levée : la surchargeabilité passe au catalogue (`Order OC-28`, 2026-08-24)
 
 **Le cas « la régulation pose la valeur, l'ambulancier peut quand même la changer » était
 inexprimable.** Côté Order, une seule colonne `ORD_ORDER_CONTEXT_ASSIGNMENT.OOC_TYPE_ORIGIN` portait
@@ -256,26 +256,25 @@ Conséquence : **toute** valeur posée par la régulation verrouillait, sans que
 Les **20 missions sur 25** relevées le 2026-08-24 ne traduisaient donc pas une politique de
 régulation — c'est l'écriture elle-même qui gelait.
 
-**Livré côté Order** (`Erp.Order`, branche `feat/oc-28-context-lock`, 801 tests verts) :
-1. Script SQL `062` : colonne `OOC_LOCKED` (`bit NOT NULL DEFAULT 0`).
-2. `locked` lu sur cette colonne dans les deux DTO ; **`origin` exposé en plus** (`"Regulator"` /
-   `"Field"` / `null`), ce qui alimente directement l'`origin` d'OC-3a.
-3. Le 409 se fonde sur le verrou, plus sur l'origine. Le `PATCH` terrain ne verrouille jamais.
-4. `contextOrderLocked` accepté à la création (faux par défaut) et à la mise à jour, où il est
-   **nullable** : non fourni ⇒ verrou conservé, sinon la première correction d'horaire venue rendrait
-   la main au terrain sur une mission imposée.
-5. Reste `Order OC-29` : la case « imposer ce type » côté UI régulateur (Jules). Tant qu'elle
-   n'existe pas, **plus aucune mission n'est verrouillée** — ce qui est le comportement voulu.
+**Livré côté Order** (`Erp.Order`, branche `feat/oc-28-context-lock`, 813 tests verts) :
+1. Script SQL `063` : `ORD_ORDER_CONTEXT.OCT_FIELD_OVERRIDABLE` (`bit NOT NULL DEFAULT 1`).
+   **La surchargeabilité est une propriété du type**, configurée une fois au catalogue — pas une
+   décision prise commande par commande. Le régulateur ne verrouille ni ne déverrouille : il saisit
+   un type, et c'est le type qui dit si le terrain peut le corriger.
+2. `origin` **exposé** (`"Regulator"` / `"Field"` / `null`), ce qui alimente directement l'`origin`
+   d'OC-3a. `OOC_TYPE_ORIGIN` ne dit plus que la provenance.
+3. La règle — `origin = Regulator ET NOT fieldOverridable` — vit dans `ModContextOrderLock`, **appelée
+   par les trois lecteurs** au lieu d'être recopiée. C'est la leçon du bug d'origine.
+4. `DEFAULT 1` : tous les types deviennent surchargeables, donc **plus aucune mission verrouillée** —
+   ce qui restitue le comportement que l'ambulancier a toujours connu. Un type qui doit s'imposer se
+   configure explicitement (`Order OC-29`, un `UPDATE` — **aucun écran à produire**).
+5. Pas de traçabilité prévue : ni de la proposition écrasée, ni de la configuration.
 
-**Aucune reprise de données, volontairement** : `DEFAULT 0` rend les missions du jour modifiables, et
-personne ne perd un verrou sur lequel il comptait — rien ne consommait `locked`. Une reprise à `1`
-aurait au contraire figé durablement des missions que personne n'avait voulu figer.
-
-**Schéma joué le 2026-08-24** (`192.168.1.109` : 4 097 assignations, 0 verrouillée ; `192.168.1.118`
-: 2). ⚠️ **Le code d'Order n'est pas déployé** : l'API en service dérive encore le verrou de
-l'origine et rend toujours 20 missions sur 25 verrouillées (re-mesuré après le script). Rien ne
-change pour le terrain tant que le build OC-28 n'est pas en service — et Vector, lui, est déjà prêt
-des deux côtés grâce au repli.
+⚠️ **Détour à connaître** : un premier essai (`062`, `OOC_LOCKED` sur l'assignation) a été **joué le
+2026-08-24 sur `109` et `118`** avant d'être corrigé. `063` retire cette colonne et pose la propriété
+au bon endroit. **`063` reste à jouer**, et le code d'Order **n'est pas déployé** : l'API en service
+dérive encore le verrou de l'origine et rend toujours 20 missions sur 25 verrouillées. Vector, lui,
+est prêt des deux côtés grâce au repli.
 
 **Côté Vector**, `ContextOrderStateQueryService` lit désormais le vrai `origin` et **retombe** sur la
 déduction si l'instance d'Orders.Api ne le sert pas encore : l'ordre de déploiement des deux modules
