@@ -27,6 +27,22 @@ namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Erp;
 /// </summary>
 public sealed class ContextOrderSelectionService : IContextOrderSelectionService
 {
+    /// <summary>
+    /// Codes Vector sans homonyme côté Order, et leur équivalent décidé.
+    /// <para>
+    /// <c>STANDARD</c> — « Transport standard » — n'existe pas au catalogue Order : un transport
+    /// standard y est un transport <c>CPAM</c>. Arbitrage métier du 2026-08-24. Sans cette entrée,
+    /// le type par défaut du sélecteur mobile serait le seul à ne pas pouvoir être enregistré.
+    /// </para>
+    /// <para>
+    /// Table volontairement minuscule et locale : elle ne survit pas à OC-3b, où le sélecteur
+    /// n'offrira plus que des types du catalogue Order. En faire une table de base la rendrait
+    /// permanente.
+    /// </para>
+    /// </summary>
+    private static readonly Dictionary<string, string> CodeAliases =
+        new(StringComparer.OrdinalIgnoreCase) { ["STANDARD"] = "CPAM" };
+
     private readonly MobileDbContext _ctx;
     private readonly IErpReadApiClient _read;
     private readonly IErpWriteApiClient _write;
@@ -49,16 +65,17 @@ public sealed class ContextOrderSelectionService : IContextOrderSelectionService
         // Type inconnu du catalogue Vector : la requête ne correspond à rien de sélectionnable.
         if (string.IsNullOrWhiteSpace(code)) return EnContextOrderSelectionOutcome.NotApplicable;
 
+        var targetCode = CodeAliases.TryGetValue(code, out var alias) ? alias : code;
+
         var context = await _read.GetMissionContextOrderAsync(missionId, ct);
         if (context is null) return EnContextOrderSelectionOutcome.MissionNotFound;
 
         var match = context.AvailableContextOrders
-            .FirstOrDefault(c => string.Equals(c.Code, code, StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(c => string.Equals(c.Code, targetCode, StringComparison.OrdinalIgnoreCase));
 
-        // Pas d'équivalent côté Order : soit le type n'est pas proposé pour cette commande, soit le
-        // code n'existe pas du tout dans le catalogue Order (cas de STANDARD, sans correspondance
-        // — arbitrage métier ouvert, cf. devplan §3.1 OC-4). Dans les deux cas, refus explicite
-        // plutôt qu'un type approchant écrit à la place de celui qu'on a coché.
+        // Refus explicite plutôt qu'un type approchant écrit à la place de celui qu'on a coché : un
+        // mauvais type part en facturation sans que personne ne le voie passer. Ce chemin reste
+        // atteignable même avec les alias — le type peut être hors agence/mode de la commande.
         if (match is null) return EnContextOrderSelectionOutcome.NotApplicable;
 
         var outcome = await _write.SetMissionContextOrderAsync(missionId, match.Id, setBy, ct);

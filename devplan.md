@@ -361,13 +361,19 @@ assume la perte.
      réponse d'Orders.Api** (`availableContextOrders`, déjà filtré agence/mode) plutôt que déduit :
      aucune table de correspondance à maintenir, et rien à resynchroniser si le catalogue Order
      bouge. Le composant disparaît avec OC-3b, où l'id reçu sera déjà le bon.
-   - ⛔ **Décision métier ouverte : `STANDARD` n'a aucun équivalent côté Order.** En l'état il est
-     **refusé** (400) plutôt que remplacé par un type approchant — un mauvais type part en
-     facturation sans que personne ne le voie passer. À trancher avant branchement : `STANDARD`
-     devient-il `CPAM`, ou disparaît-il du sélecteur ? *(Rappel : `MOB_JOB_CONTRACT` = 0 ligne,
-     aucun type n'a jamais été sélectionné en production — l'enjeu est le futur, pas l'historique.)*
-   - ⚠️ Au passage : le libellé Vector d'`ART80` dit **« Article 83 »**, celui d'Order « Article 80 ».
-     L'un des deux est faux ; il disparaîtra avec OC-3b, mais autant savoir lequel s'affiche.
+   - ✅ **`STANDARD` → `CPAM`** (arbitrage du 2026-08-24) : un transport standard est un transport
+     CPAM côté Order. Porté par une table d'alias de **codes**, locale au service et volontairement
+     minuscule — elle ne survit pas à OC-3b ; en faire une table de base la rendrait permanente.
+     La traduction est désormais **totale** : les deux types du catalogue Vector s'enregistrent.
+     Un type hors agence/mode reste refusé (400) — l'alias ne dispense pas de l'applicabilité.
+   - ✅ **Libellé `ART80` corrigé** : « Article 83 » → « Article 80 » (script `MOB_007`). C'est
+     Vector qui avait tort — l'article 80 est celui du code de la sécurité sociale. Libellé
+     d'affichage seul : `CTT_CODE` reste `ART80`, et c'est lui qui sert à la correspondance.
+   - ⛔ **Ce qui reste avant de brancher le `POST`** — le risque n'est plus la donnée, c'est le
+     contrat : l'appel réussissait **toujours**, il pourra rendre 409 et 400. Or l'API d'Order en
+     service verrouille encore 20 missions sur 25 (`Order OC-28` non déployé) et le front n'affiche
+     pas le cadenas : brancher aujourd'hui ferait échouer quatre sélections sur cinq. Le branchement
+     suit donc le déploiement d'`Order OC-28` **et** l'annonce au dev web.
 5. **OC-5 — Attributs** : `GET /missions/{id}/contextOrder/form-structure` et
    `PATCH /missions/{id}/contextOrder/values` remplacent `JobAttributeOverlayRepository.BuildContractType`
    et `.Save`. Le DTO de champ est le miroir de `ClMobileAppFieldModel`, plus **deux champs additifs à

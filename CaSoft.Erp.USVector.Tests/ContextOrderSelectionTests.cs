@@ -63,13 +63,31 @@ public class ContextOrderSelectionTests
     }
 
     /// <summary>
-    /// STANDARD n'a aucun équivalent dans le catalogue Order. On refuse plutôt que d'écrire un type
-    /// approchant : un mauvais type part en facturation sans que personne ne le voie passer.
+    /// STANDARD n'existe pas au catalogue Order : un transport standard y est un transport CPAM
+    /// (arbitrage du 2026-08-24). Sans cet alias, le type par défaut du sélecteur mobile serait le
+    /// seul à ne pas pouvoir être enregistré.
     /// </summary>
     [Fact]
-    public async Task Type_sans_equivalent_cote_Order_est_refuse()
+    public async Task STANDARD_est_enregistre_comme_CPAM()
     {
         var handler = new RoutingHandler(ContextPayload);
+        var outcome = await Build(handler).SelectAsync(Mission, contractTypeId: 1, null, default);
+
+        outcome.Should().Be(EnContextOrderSelectionOutcome.Applied);
+        using var sent = JsonDocument.Parse(handler.PatchBody!);
+        sent.RootElement.GetProperty("contextOrderId").GetInt32().Should().Be(1, "CPAM porte l'id 1 côté Order");
+    }
+
+    /// <summary>
+    /// L'alias ne dispense pas du contrôle d'applicabilité : si CPAM n'est pas proposé pour cette
+    /// commande (agence/mode), le choix est refusé — pas rabattu sur un type voisin.
+    /// </summary>
+    [Fact]
+    public async Task Type_non_proposé_pour_la_commande_est_refuse()
+    {
+        var sansCpam = ContextPayload.Replace("""{ "id": 1, "code": "CPAM",     "display": "CPAM",       "index": 10 },""", "");
+        var handler = new RoutingHandler(sansCpam);
+
         var outcome = await Build(handler).SelectAsync(Mission, contractTypeId: 1, null, default);
 
         outcome.Should().Be(EnContextOrderSelectionOutcome.NotApplicable);
@@ -117,7 +135,7 @@ public class ContextOrderSelectionTests
         // Catalogue Vector réel (relevé en base le 2026-08-24) : STANDARD=1, ART80=4.
         ctx.ContractTypes.AddRange(
             new MOB_CONTRACT_TYPE { CTT_ID = 1, CTT_CODE = "STANDARD", CTT_DISPLAY = "Transport standard", CTT_ACTIVE = true },
-            new MOB_CONTRACT_TYPE { CTT_ID = 4, CTT_CODE = "ART80", CTT_DISPLAY = "Article 83", CTT_ACTIVE = true });
+            new MOB_CONTRACT_TYPE { CTT_ID = 4, CTT_CODE = "ART80", CTT_DISPLAY = "Article 80", CTT_ACTIVE = true });
         ctx.SaveChanges();
 
         return new ContextOrderSelectionService(
