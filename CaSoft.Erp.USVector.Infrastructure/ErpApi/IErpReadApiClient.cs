@@ -48,4 +48,11 @@ public interface IErpReadApiClient
     /// Valeurs : 0=NonTransférable, 1=Transférable, 2=Transféré, 3=Facturé.
     /// </summary>
     Task<int?> GetMissionTransferStatusAsync(Guid missionId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Context de la mission (ex-« contrat » MOB-13) et sélecteur associé — OC-1. Le référentiel
+    /// vit côté Order : cette lecture remplacera le catalogue autonome <c>MOB_CONTRACT_*</c>.
+    /// Null si la mission est introuvable (404).
+    /// </summary>
+    Task<ErpMissionContextOrderDto?> GetMissionContextOrderAsync(Guid missionId, CancellationToken ct = default);
 }

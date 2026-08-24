@@ -135,3 +135,42 @@ public sealed class ErpMissionStatusDto
     public Guid Id { get; set; }
     public int TransferStatus { get; set; }
 }
+
+/// <summary>
+/// GET /missions/{missionId}/contextOrder — OC-1. Le <b>context de la mission</b> (ex-« contrat »
+/// MOB-13) est piloté par l'Order : le régulateur peut le fixer (⇒ <see cref="Locked"/>), sinon
+/// l'ambulancier choisit dans <see cref="AvailableContextOrders"/>, <b>déjà filtré</b> par l'agence
+/// et le mode de la commande — Vector ne refait pas ce filtrage.
+/// Contrat décrit dans <c>Erp.Order/note_vector_orderContext_mission.md</c>.
+/// </summary>
+public sealed class ErpMissionContextOrderDto
+{
+    public Guid MissionId { get; set; }
+    public Guid OrderId { get; set; }
+
+    /// <summary>Context effectif de la mission. <c>null</c> = non renseigné (état valide : pas de défaut auto).</summary>
+    public int? ContextOrderId { get; set; }
+    public string? ContextOrderCode { get; set; }
+    public string? ContextOrderDisplay { get; set; }
+
+    /// <summary>
+    /// true ⇒ context fixé par le régulateur : lecture seule côté terrain (un PATCH renverrait 409).
+    /// Gèle <b>le choix du context</b>, pas la saisie des attributs.
+    /// </summary>
+    public bool Locked { get; set; }
+
+    /// <summary>
+    /// Contexts sélectionnables (actifs, filtrés agence + mode côté Orders.Api). Renvoyé
+    /// <b>même quand <see cref="Locked"/> est vrai</b> — c'est <c>Locked</c> qui gouverne l'éditabilité.
+    /// </summary>
+    public List<ErpContextOrderChoiceDto> AvailableContextOrders { get; set; } = new();
+}
+
+/// <summary>Un context proposé au sélecteur — à trier par <see cref="Index"/>.</summary>
+public sealed class ErpContextOrderChoiceDto
+{
+    public int Id { get; set; }
+    public string? Code { get; set; }
+    public string? Display { get; set; }
+    public int Index { get; set; }
+}

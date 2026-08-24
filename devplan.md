@@ -170,13 +170,28 @@ endpoints livrés, scripts `038` et `040` joués.
 (côté intégrateur, §7 pour les attributs) et
 [`note_web_alexandre_vector_type_mission.md`](note_web_alexandre_vector_type_mission.md) (contrat UI web).
 
-1. **Client HTTP** (`ErpApi/`, DTO miroir + `IErpReadApiClient` / `IErpWriteApiClient`) :
-   - `GET /missions/{missionId}/contextOrder` → `{ contextOrderId, contextOrderCode,
-     contextOrderDisplay, locked, availableContextOrders[] }`. La liste est **déjà filtrée** (agence +
-     mode de la commande) : ne pas re-filtrer côté Vector.
-   - `PATCH /missions/{missionId}/contextOrder` `{ contextOrderId, setBy }` → 204. L'origine `Field`
-     est imposée par l'endpoint. Erreurs à propager : **409** (verrou régulateur), **400** (type non
-     applicable ou inactif), **404**.
+> **Avancement** — **OC-1 livré (2026-08-24)** : lecture HTTP du context en place, **inerte** (aucun
+> appelant, contrat mobile inchangé). 5 tests épinglent la route et la forme JSON, **69 tests verts**.
+> Contrat **vérifié contre l'API réelle** (`https://api.urgencesante.net/order/`, 200 sans jeton) :
+> la réponse correspond champ pour champ au DTO miroir.
+>
+> **Mesures OC-0 prises au passage** (20 missions récentes, prod) :
+> - **0 sélecteur vide** → le risque « la liste se vide en production à cause du filtrage
+>   agence/mode » n'apparaît pas sur cet échantillon.
+> - **9 missions sur 20 arrivent `locked`** (context fixé par la régulation). C'est un **vrai
+>   changement de comportement terrain** : aujourd'hui l'ambulancier choisit toujours, demain près
+>   d'une mission sur deux sera en lecture seule. Le cadenas doit être visible côté web **avant**
+>   OC-3, sinon l'ambulancier tentera le changement et prendra un 409.
+> - Reste à vérifier avant OC-3 : **ids en dur côté front** (l'id `4` vaut `ART80` côté Vector et
+>   `CENTRE15` côté Order).
+
+1. ✅ **Client HTTP en lecture** — `ErpMissionContextOrderDto` / `ErpContextOrderChoiceDto`
+   (`ErpApi/ErpReadDtos.cs`) + `IErpReadApiClient.GetMissionContextOrderAsync` →
+   `GET /missions/{missionId}/contextOrder` (404 → `null`). La liste `availableContextOrders` est
+   **déjà filtrée** (agence + mode de la commande) : ne pas re-filtrer côté Vector.
+   ⏳ **Client HTTP en écriture** (OC-2) : `PATCH /missions/{missionId}/contextOrder`
+   `{ contextOrderId, setBy }` → 204. L'origine `Field` est imposée par l'endpoint. Erreurs à
+   propager : **409** (verrou régulateur), **400** (type non applicable ou inactif), **404**.
 2. **`GET api/Contract/{jobId}` garde sa forme** (tableau `{ Id, Display, IsSelected }`) — **D14** :
    seule la **source** change (les `availableContextOrders` d'Order remplacent `MOB_CONTRACT_TYPE`).
    Le `locked` arrive par deux ajouts **additifs** : une propriété `Locked` sur chaque item et une

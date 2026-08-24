@@ -91,6 +91,10 @@ public sealed class HttpErpReadApiClient : IErpReadApiClient
         return dto?.TransferStatus;
     }
 
+    public async Task<ErpMissionContextOrderDto?> GetMissionContextOrderAsync(Guid missionId, CancellationToken ct = default)
+        // Casse de la route conservée telle qu'Orders.Api l'expose (`contextOrder`).
+        => await GetOrNullAsync<ErpMissionContextOrderDto>($"missions/{missionId}/contextOrder", ct);
+
     private async Task<T?> GetOrNullAsync<T>(string url, CancellationToken ct) where T : class
     {
         var response = await _http.GetAsync(url, ct);

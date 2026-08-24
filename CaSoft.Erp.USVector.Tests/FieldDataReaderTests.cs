@@ -40,6 +40,9 @@ public class FieldDataReaderTests
             => Task.FromResult<Guid?>(null);
         public Task<int?> GetMissionTransferStatusAsync(Guid id, CancellationToken ct = default)
             => Task.FromResult<int?>(0);
+
+        public Task<ErpMissionContextOrderDto?> GetMissionContextOrderAsync(Guid id, CancellationToken ct = default)
+            => throw new NotSupportedException();
     }
 
     private sealed class FakeJobTime : IJobTimeRepository
