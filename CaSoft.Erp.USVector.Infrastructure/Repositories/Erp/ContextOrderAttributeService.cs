@@ -48,7 +48,7 @@ public sealed class ContextOrderAttributeService : IContextOrderAttributeService
                 // Le modèle mobile porte les options en Object et ne les sert que pour une liste ;
                 // on garde cette convention pour ne pas faire apparaître un « options: {} » là où le
                 // front n'en attendait jamais.
-                Options = IsList(f.Type) ? f.Options : null,
+                Options = IsList(f.Type) ? ToMobileOptions(f.Options) : null,
                 Value = f.Value,
                 IsReadOnly = f.IsReadOnly,
                 ReadOnlyReason = f.ReadOnlyReason
@@ -81,4 +81,25 @@ public sealed class ContextOrderAttributeService : IContextOrderAttributeService
 
     private static bool IsList(string? type)
         => string.Equals(type, "list", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Order sert les options en tableau ordonné <c>[{ key, label }]</c> ; le contrat mobile les
+    /// attend en objet <c>{ "0": "Non", "1": "Oui" }</c> — c'est la forme que le front parse depuis
+    /// toujours, et la bascule ne doit pas la changer (D14).
+    /// <para>
+    /// L'ordre de réception est conservé : <c>System.Text.Json</c> sérialise un dictionnaire dans
+    /// l'ordre d'insertion, et cet ordre est celui qu'Order a voulu. Une clé en double est écartée
+    /// plutôt que de faire échouer le formulaire entier pour un doublon de catalogue.
+    /// </para>
+    /// </summary>
+    private static Dictionary<int, string>? ToMobileOptions(List<ErpContextOrderOptionDto>? options)
+    {
+        if (options is null || options.Count == 0) return null;
+
+        var mapped = new Dictionary<int, string>(options.Count);
+        foreach (var option in options)
+            mapped[option.Key] = option.Label ?? string.Empty;
+
+        return mapped;
+    }
 }

@@ -45,7 +45,9 @@ public class ContextOrderAttributeTests
       {
         "name": "PMT", "label": "Prescription", "index": 30, "type": "list",
         "required": false, "instantUpdate": true, "placeHolder": null,
-        "isMulti": false, "options": { "0": "Non", "1": "Oui" }, "value": "1",
+        "isMulti": false,
+        "options": [ { "key": 0, "label": "Non" }, { "key": 1, "label": "Oui" } ],
+        "value": "1",
         "isReadOnly": true, "readOnlyReason": "Document déjà récupéré à l'aller"
       }
     ]
@@ -103,6 +105,31 @@ public class ContextOrderAttributeTests
 
         fields!.Single(f => f.Name == "PMT").Options.Should().NotBeNull();
         fields!.Single(f => f.Name == "NIR").Options.Should().BeNull();
+    }
+
+    /// <summary>
+    /// ⚠️ Les deux catalogues n'ont pas la même forme d'options : Order sert un <b>tableau</b>
+    /// ordonné <c>[{key,label}]</c>, le contrat mobile attend un <b>objet</b>
+    /// <c>{"0":"Non","1":"Oui"}</c> — la forme que le front parse depuis toujours.
+    /// <para>
+    /// Sans cette conversion, le miroir typé en dictionnaire faisait échouer la désérialisation : le
+    /// <b>formulaire entier</b> tombait dès qu'une mission portait un seul attribut de type liste,
+    /// pas seulement ce champ. Aucun contexte du catalogue de production n'en portait au moment de
+    /// la bascule, ce qui rendait le défaut invisible — jusqu'au premier qu'on configurerait.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Les_options_sont_rendues_au_format_objet_attendu_par_le_front()
+    {
+        var fields = await Build(new StubHandler(FormPayload)).GetFormStructureAsync(Mission, default);
+
+        var options = fields!.Single(f => f.Name == "PMT").Options as Dictionary<int, string>;
+
+        options.Should().NotBeNull("un tableau [{key,label}] doit ressortir en objet clé → libellé");
+        options!.Should().HaveCount(2);
+        options[0].Should().Be("Non");
+        options[1].Should().Be("Oui");
+        options.Keys.Should().Equal(new[] { 0, 1 }, "l'ordre voulu par Order est conservé");
     }
 
     [Fact]

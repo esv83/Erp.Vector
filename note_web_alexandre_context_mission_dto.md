@@ -130,6 +130,17 @@ Réponse réelle (valeur masquée ici) :
 | `IsReadOnly` | ⭐ **NOUVEAU** — affiche la valeur, **désactive la saisie**. Verrou **par champ** |
 | `ReadOnlyReason` | ⭐ **NOUVEAU** — motif affichable (info-bulle ou texte d'aide). `null` quand le champ est ouvert |
 
+✅ **`Type` et `Options` ne changent pas de forme.** Le vocabulaire des contrôles est le même
+(`text`, `textarea`, `checkbox`, `list`, `phone`, `email`, `number`, `date`), et `Options` reste un
+objet `{ "0": "Non", "1": "Oui" }` sur les champs `list`. Ton rendu par type n'a rien à migrer.
+
+⚠️ En revanche **le catalogue d'attributs n'est plus le même** : il vient désormais de la régulation.
+Relevé sur 25 missions en production, il ne contient aujourd'hui que `BT` (checkbox), `DDN` (date),
+`NIR`, `NOM_ASSISTANCE`, `NUM_CENTAURE`, `NUM_DOSSIER` (text). Les champs multi-valués (téléphones,
+e-mails), les zones de texte long et les listes de l'ancien catalogue Vector **n'y figurent pas**.
+Si des contrôles ont disparu de ton écran, c'est d'abord parce que ces champs n'existent plus — pas
+parce qu'ils sont mal rendus.
+
 🔑 **`IsReadOnly` ≠ `Locked`.** `Locked` gèle **le choix du type**, `IsReadOnly` gèle **un champ**.
 Une mission au type imposé garde son questionnaire éditable, et une mission au type libre peut porter
 une date de naissance verrouillée.

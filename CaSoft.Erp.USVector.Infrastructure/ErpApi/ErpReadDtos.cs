@@ -212,8 +212,14 @@ public sealed class ErpContextOrderFieldDto
     /// <summary>Champ multi-valué (saisie répétable : téléphones, e-mails).</summary>
     public bool IsMulti { get; set; }
 
-    /// <summary>Pour <c>Type = "list"</c> : valeurs proposées (clé entière → libellé).</summary>
-    public Dictionary<int, string>? Options { get; set; }
+    /// <summary>
+    /// Pour <c>Type = "list"</c> : valeurs proposées, servies par Order comme un <b>tableau
+    /// ordonné</b> <c>[{ key, label }]</c>. Le contrat mobile, lui, les attend en <b>objet</b>
+    /// <c>{ "0": "Non", "1": "Oui" }</c> : la conversion est faite à l'adaptation, pour que le front
+    /// ne change pas de parsing (D14). Ne pas typer ce miroir en dictionnaire — la désérialisation
+    /// d'un tableau y échouerait, et ferait tomber le formulaire entier, pas seulement ce champ.
+    /// </summary>
+    public List<ErpContextOrderOptionDto>? Options { get; set; }
 
     public string? Value { get; set; }
 
@@ -226,4 +232,11 @@ public sealed class ErpContextOrderFieldDto
 
     /// <summary>Motif affichable du verrou. <c>null</c> quand le champ est ouvert.</summary>
     public string? ReadOnlyReason { get; set; }
+}
+
+/// <summary>Une valeur proposée d'un attribut de type liste, telle qu'Order la sert.</summary>
+public sealed class ErpContextOrderOptionDto
+{
+    public int Key { get; set; }
+    public string? Label { get; set; }
 }
