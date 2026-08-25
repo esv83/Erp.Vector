@@ -47,6 +47,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Guides", "Guides", "{572C85
 		mobile_devplan.md = mobile_devplan.md
 		MUTUELLE_CARD_devplan.md = MUTUELLE_CARD_devplan.md
 		plan_correctif_vector_fallback_snapshot.md = plan_correctif_vector_fallback_snapshot.md
+		PROJECTION_TERRAIN_devplan.md = PROJECTION_TERRAIN_devplan.md
 		README.md = README.md
 		TRANSFER_devplan.md = TRANSFER_devplan.md
 		VECTOR_ORDERS_DECOUPLING_devplan.md = VECTOR_ORDERS_DECOUPLING_devplan.md
