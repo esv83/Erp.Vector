@@ -9,6 +9,7 @@ using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Api.Workers;
 using EmergencyPlatformConnector;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
@@ -136,6 +137,26 @@ if (keycloakEnabled)
                 }
             };
         });
+    // ⚠️ FERMÉ PAR DÉFAUT. Jusqu'ici aucun contrôleur ne portait d'attribut d'autorisation et il
+    // n'existait aucune politique globale : seuls les cinq endpoints passant par CrewAccess étaient
+    // protégés, par leur code. Tout le reste répondait 200 à qui connaissait un identifiant de
+    // mission — y compris la structure du formulaire, VALEURS COMPRISES (date de naissance, NIR).
+    //
+    // La politique de repli renverse la charge : une route est protégée sauf mention contraire. Cela
+    // ferme la classe entière du problème, et pas seulement les cas connus — un contrôleur ajouté
+    // demain naît protégé.
+    //
+    // Elle n'est posée que si Keycloak est actif : sans schéma d'authentification, elle rejetterait
+    // tout, y compris en développement local où la validation est volontairement désactivée.
+    builder.Services.AddAuthorization(options =>
+    {
+        options.FallbackPolicy = new AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser()
+            .Build();
+    });
+}
+else
+{
     builder.Services.AddAuthorization();
 }
 

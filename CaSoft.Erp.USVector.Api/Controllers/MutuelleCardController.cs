@@ -1,6 +1,7 @@
 using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CaSoft.Erp.USVector.Api.Controllers
@@ -69,6 +70,10 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         }
 
         /// <summary>Octets de l'image d'une carte (Content-Type d'origine).</summary>
+        // ⛔ Octets de la carte mutuelle, annoncés par le paquet terrain (ImageUrl) et tirés par la
+        // facturation sans jeton — D8. ⚠️ Donnée de santé : c'est l'ouverture la plus sensible des
+        // quatre, et la première à refermer avec DEC-6 (§3.C2).
+        [AllowAnonymous]
         [HttpGet("mutuelle-card/{cardId:guid}/image")]
         public IActionResult GetImage(Guid cardId)
         {

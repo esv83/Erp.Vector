@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using CaSoft.Erp.USVector.Api.Infrastructure;
 
@@ -21,6 +22,10 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         }
 
         // GET api/auth/whoami
+        // Doit rester anonyme : son travail est précisément de DIRE pourquoi un appel n'est pas
+        // authentifié (jeton absent, rejeté, principal vide). Sous la politique de repli, il
+        // renverrait un 401 muet et perdrait toute valeur de diagnostic.
+        [AllowAnonymous]
         [HttpGet("whoami")]
         public IActionResult WhoAmI()
         {

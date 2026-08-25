@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Application;
@@ -12,6 +13,10 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         // Le DbContext legacy (BD_REGULATION_PROD) injecté ici n'était pas utilisé :
         // toutes les actions passent par ISignatureRepository ([FromServices]).
 
+        // ⛔ Les octets de la signature, annoncés par le paquet terrain (ImageUrl) et tirés par la
+        // facturation sans jeton — D8. Le POST juste dessous, lui, reste protégé : c'est le geste de
+        // l'ambulancier. Se referme avec DEC-6 (§3.C2).
+        [AllowAnonymous]
         [HttpGet("{gJobId}")]
         public ActionResult<ClSignatureGetModel> GetSignature(Guid gJobId, [FromServices] ISignatureRepository getSignatureRepository)
         {

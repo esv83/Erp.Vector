@@ -2,6 +2,7 @@ using System.Linq;
 using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CaSoft.Erp.USVector.Api.Controllers
@@ -58,6 +59,9 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             => Ok(_repository.ListByMission(gJobId).Select(d => d.ToDtoOut()));
 
         /// <summary>Octets d'un document (Content-Type d'origine).</summary>
+        // ⛔ Octets d'un document, annoncés par le paquet terrain (FileUrl) et tirés par la facturation
+        // sans jeton — D8. La liste et le dépôt restent protégés. Se referme avec DEC-6 (§3.C2).
+        [AllowAnonymous]
         [HttpGet("documents/{documentId:guid}/content")]
         public IActionResult GetContent(Guid documentId)
         {

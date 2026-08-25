@@ -127,9 +127,9 @@ public class ContextOrderAttributeTests
 
         options.Should().NotBeNull("un tableau [{key,label}] doit ressortir en objet clé → libellé");
         options!.Should().HaveCount(2);
-        options[0].Should().Be("Non");
-        options[1].Should().Be("Oui");
-        options.Keys.Should().Equal(new[] { 0, 1 }, "l'ordre voulu par Order est conservé");
+        options![0].Should().Be("Non");
+        options![1].Should().Be("Oui");
+        options!.Keys.Should().Equal(new[] { 0, 1 }, "l'ordre voulu par Order est conservé");
     }
 
     [Fact]

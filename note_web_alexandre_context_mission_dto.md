@@ -135,11 +135,21 @@ Réponse réelle (valeur masquée ici) :
 objet `{ "0": "Non", "1": "Oui" }` sur les champs `list`. Ton rendu par type n'a rien à migrer.
 
 ⚠️ En revanche **le catalogue d'attributs n'est plus le même** : il vient désormais de la régulation.
-Relevé sur 25 missions en production, il ne contient aujourd'hui que `BT` (checkbox), `DDN` (date),
-`NIR`, `NOM_ASSISTANCE`, `NUM_CENTAURE`, `NUM_DOSSIER` (text). Les champs multi-valués (téléphones,
-e-mails), les zones de texte long et les listes de l'ancien catalogue Vector **n'y figurent pas**.
-Si des contrôles ont disparu de ton écran, c'est d'abord parce que ces champs n'existent plus — pas
-parce qu'ils sont mal rendus.
+Un temps il s'était appauvri — les champs globaux de l'ancien catalogue Vector n'y étaient rattachés
+à rien. **C'est réparé depuis le 2026-08-25** : `COMMENTS`, `PHONES` et `MAILS` sont de nouveau
+servis sur **toutes** les missions.
+
+Ce que ça implique pour ton rendu, vérifié sur 12 formulaires en production :
+
+```jsonc
+{ "Name": "COMMENTS", "Label": "Commentaires", "Index": 100, "Type": "textarea", "IsMulti": false, … }
+{ "Name": "PHONES",   "Label": "Téléphones",   "Index": 110, "Type": "phone",    "IsMulti": true,  … }
+{ "Name": "MAILS",    "Label": "E-mails",      "Index": 120, "Type": "email",    "IsMulti": true,  … }
+```
+
+👉 **`phone` et `email` reviennent en `IsMulti: true`** — saisie répétable. Si ton écran ne rend plus
+le multi-valué depuis la bascule, ces deux champs s'afficheront mal. C'est le seul type de contrôle
+qui avait complètement disparu du paysage entre-temps.
 
 🔑 **`IsReadOnly` ≠ `Locked`.** `Locked` gèle **le choix du type**, `IsReadOnly` gèle **un champ**.
 Une mission au type imposé garde son questionnaire éditable, et une mission au type libre peut porter

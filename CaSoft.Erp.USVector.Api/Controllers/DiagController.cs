@@ -1,4 +1,5 @@
 using CaSoft.Erp.USVector.Infrastructure.Diagnostics;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,6 +17,11 @@ namespace CaSoft.Erp.USVector.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/diag")]
+// Déjà fermé par configuration : hors Development, chaque action rend 404 tant que
+// Diagnostics:Enabled est absent — c'est le comportement voulu en production. L'outil est
+// une page de navigateur pour développeur : l'astreindre à porter un jeton le rendrait
+// inutilisable là où il sert, sans rien fermer de plus.
+[AllowAnonymous]
 public class DiagController : ControllerBase
 {
     private readonly IWebHostEnvironment _env;

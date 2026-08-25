@@ -21,6 +21,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CaSoft.Erp.USVector.Infrastructure\CaSoft.Erp.USVector.Infrastructure.csproj" />
+    <!-- AUTH : permet de reflechir sur les controleurs pour figer la surface anonyme.
+         Effet de bord bienvenu : dotnet test compile desormais l'Api, ce qui n'était pas le
+         cas et obligeait a la rebuilder a la main apres chaque modification (devplan G1). -->
+    <ProjectReference Include="..\CaSoft.Erp.USVector.Api\CaSoft.Erp.USVector.Api.csproj" />
   </ItemGroup>
 
 </Project>

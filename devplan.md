@@ -13,7 +13,7 @@
 > **contexte basculé et en service depuis le 2026-08-25** (§3.A).
 > **Prod** : `\\192.168.1.112\prod_api\Vector.Api` (IIS `/vector`) — trafic servi, jetons Keycloak
 > réellement validés depuis le 2026-08-02.
-> **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **122 tests verts** (vérifié 2026-08-25).
+> **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **126 tests verts** (vérifié 2026-08-25).
 > **Dernière mise à jour** : 2026-08-25.
 
 | | Sens |
@@ -98,6 +98,8 @@ une couche déclarative que la facturation relit et corrige.
   champs restent servis le temps que l'UI web bascule.
 - **Une authentification à un seul point de passage**, avec cache : le chemin chaud ne refait plus
   d'appels réseau pour retrouver l'ambulancier et son équipage.
+- **Une API fermée par défaut** : une route est protégée sauf mention contraire, et les quelques
+  sorties sont nommées, justifiées et figées par un test (§3.C2).
 - **Un outil de diagnostic** qui rejoue la chaîne d'identité maillon par maillon, réservé au dev,
   pour trancher une panne d'accès sans lire les logs à l'aveugle.
 - **Un code applicatif homogène** : les cas d'usage renvoient un résultat typé plutôt que d'écrire
@@ -119,7 +121,7 @@ une couche déclarative que la facturation relit et corrige.
 | Transfert (Orders + Vector) | 24 tests ; schéma appliqué 2026-06-22 |
 | Consommation réelle du paquet terrain | mesurée le 2026-08-06 par la facturation : 284 missions acquises |
 | Contexte de mission (type, attributs, paquet terrain) | 58 tests ; **les trois refus constatés en production** le 2026-08-24 |
-| Suite complète | **122 tests verts** (2026-08-25) |
+| Suite complète | **126 tests verts** (2026-08-25) |
 
 ## 1.8 ⚠️ Livré mais pas encore exploité
 
@@ -448,13 +450,38 @@ d'écriture directe en base), afficher les garde-fous (compte déjà lié, perso
 ⚠️ Tant que les trois emplacements du rattachement coexistent, ils divergeront — et l'écart se verra
 le jour où un ambulancier ne recevra plus ses missions.
 
-### C2 — ⏳ Authentification de service à service (`DEC-6`)
+### C2 — ⏳ Authentification de service à service (`DEC-6`) — *les deux sens*
 
-`Orders.Api` est appelée **sans jeton** : aucun en-tête `Authorization` sur les deux clients HTTP.
-Cela tient tant qu'Orders.Api n'est pas protégée. Le jour où elle l'est, il faut un **client
-credentials Keycloak** (compte de service dédié à Vector) avec cache et renouvellement, sur le modèle
-du module Identity. **Rien ne bloque, et c'est à anticiper** : le symptôme sera une série de 401 sur
-la joblist, en production, sans autre indice.
+**Sortant.** `Orders.Api` est appelée **sans jeton** : aucun en-tête `Authorization` sur les deux
+clients HTTP. Cela tient tant qu'Orders.Api n'est pas protégée. Le jour où elle l'est, il faut un
+**client credentials Keycloak** (compte de service dédié à Vector) avec cache et renouvellement, sur
+le modèle du module Identity. **Rien ne bloque, et c'est à anticiper** : le symptôme sera une série de
+401 sur la joblist, en production, sans autre indice.
+
+**Entrant — nouveau, et c'est désormais la moitié qui presse.** L'API a été **fermée par défaut le
+2026-08-25** : jusque-là aucun contrôleur ne portait d'attribut d'autorisation et il n'existait aucune
+politique globale, si bien que **seuls les cinq endpoints passant par `CrewAccess` étaient protégés**.
+Tout le reste répondait 200 à qui connaissait un identifiant de mission — y compris la structure du
+formulaire, **valeurs comprises** : une date de naissance de patient a été relevée servie sans
+authentification.
+
+Il reste **quatre ouvertures**, et elles n'ont qu'une justification : la facturation les tire en
+serveur-à-serveur, sans jeton, faute de `DEC-6`.
+
+| Route ouverte | Ce qu'elle expose |
+|---|---|
+| `GET api/missions/{id}/field-data` | le **dossier terrain complet** de la mission |
+| `GET api/Signature/{id}` | l'image de la signature du patient |
+| `GET api/documents/{id}/content` | les octets d'un document |
+| `GET api/mutuelle-card/{id}/image` | ⚠️ **carte mutuelle — donnée de santé** |
+
+Elles se referment **ensemble**, le jour où Vector saura présenter un jeton de service. `DEC-6` cesse
+donc d'être une anticipation : c'est ce qui tient ces quatre portes ouvertes, la dernière étant la
+plus sensible.
+
+⚠️ **Garde-fou en place** : `AnonymousSurfaceTests` fige la liste exacte de ce qui répond sans jeton.
+Toute route anonyme ajoutée fait échouer la suite — une exception doit être une décision, pas un
+oubli. Le test rappelle aussi que ces quatre entrées doivent disparaître avec `DEC-6`.
 
 ### C3 — ⏳ Trancher le 404 du second membre d'équipage
 

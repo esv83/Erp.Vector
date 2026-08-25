@@ -1,4 +1,5 @@
 using CaSoft.Erp.USVector.Application.Port;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CaSoft.Erp.USVector.Api.Controllers
@@ -17,6 +18,10 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         public FieldDataController(IFieldDataReader reader) => _reader = reader;
 
         /// <summary>Paquet consolidé de la mission. 404 si la mission est introuvable côté ERP.</summary>
+        // ⛔ Tiré par la facturation en serveur-à-serveur, SANS jeton : DEC-6 (auth de service) n'est
+        // pas fait. Ouvert explicitement pour que cette exception soit visible et dénombrable,
+        // au lieu d'être l'état par défaut de toute l'API. Se referme avec DEC-6 (§3.C2).
+        [AllowAnonymous]
         [HttpGet("missions/{gJobId:guid}/field-data")]
         public async Task<IActionResult> Get(Guid gJobId, CancellationToken ct)
         {
