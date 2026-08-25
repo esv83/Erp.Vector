@@ -796,6 +796,7 @@ Prérequis : `net use \\192.168.1.112\prod_api /user:192.168.1.112\DeployApi *`.
 | [`AppMobile_specifications.md`](AppMobile_specifications.md) | Spec fonctionnelle | Le besoin et le vocabulaire (plan de travail, statuts terrain, isolation par équipage, séparation officiel↔terrain) |
 | [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) | Devplan | Carte mutuelle : capture, restitution, OCR (§3.F1-F2) |
 | [`VECTOR_ORDERS_DECOUPLING_devplan.md`](VECTOR_ORDERS_DECOUPLING_devplan.md) | Devplan | Découplage HTTP : contrat consommé, auth de service, résilience (§3.C2, §3.D) |
+| [`DEVPLAN_2.md`](DEVPLAN_2.md) | Plan d'exécution | **Le détail de `DEC-6` et `DEC-7`** : étapes codables, ordre de livraison, décisions à trancher (§3.C2, §3.D) |
 | [`refactor_result_pattern.md`](refactor_result_pattern.md) | Devplan refactoring | Result pattern, vague 2 (§3.G1) |
 | [`plan_correctif_vector_fallback_snapshot.md`](plan_correctif_vector_fallback_snapshot.md) | Plan correctif | Repli sur le snapshot `ORD_ORDER` — **à coder dans `Erp.Order`** (§3.B2) |
 | [`feadesc_utilisateurs_connectes_vector.md`](feadesc_utilisateurs_connectes_vector.md) | Spec | Présence des utilisateurs connectés (§3.F4) |

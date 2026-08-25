@@ -32,6 +32,11 @@ dans `git log`.*
 
 ## 2. Ce qui reste
 
+> 📌 **`DEC-6` et `DEC-7` ont leur plan d'exécution dédié** :
+> [`DEVPLAN_2.md`](DEVPLAN_2.md) — étapes codables, ordre de livraison et décisions à trancher.
+> Les trois autres restes ci-dessous (`DET-4`, `DET-3`, option 4b) n'y sont pas et restent suivis
+> au devplan principal.
+
 ### 2.1 ⏳ DEC-6 — Authentification de service à service
 
 `Orders.Api` est aujourd'hui appelée **sans jeton** : les deux `HttpClient` de
