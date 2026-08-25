@@ -29,6 +29,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "UI", "UI", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 	ProjectSection(SolutionItems) = preProject
 		note_ui_alex.md = note_ui_alex.md
+		note_web_alexandre_context_mission_dto.md = note_web_alexandre_context_mission_dto.md
 		note_web_alexandre_location_display.md = note_web_alexandre_location_display.md
 		note_web_alexandre_vector_type_mission.md = note_web_alexandre_vector_type_mission.md
 		docs\ui-web\UI_selection-equipage-multi-crew.md = docs\ui-web\UI_selection-equipage-multi-crew.md

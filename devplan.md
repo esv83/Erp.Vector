@@ -757,6 +757,7 @@ Prérequis : `net use \\192.168.1.112\prod_api /user:192.168.1.112\DeployApi *`.
 | [`endPoint.md`](endPoint.md) | Contrat HTTP | Ce que Vector attend d'Orders.Api |
 | [`docs/auth/optimisation-chaine-authentification.md`](docs/auth/optimisation-chaine-authentification.md) · [`docs/auth/diag-404-second-membre-equipage.md`](docs/auth/diag-404-second-membre-equipage.md) | Notes | Chaîne d'identité et caches · procédure de diagnostic (§3.C3) |
 | [`../Erp.Order/note_vector_orderContext_mission.md`](../Erp.Order/note_vector_orderContext_mission.md) | Note d'intégration | ContextOrder : endpoints, attributs, règles DDN/NIR/PMT/BT |
+| [`note_web_alexandre_context_mission_dto.md`](note_web_alexandre_context_mission_dto.md) | Contrat front | **Les DTO de la bascule du contexte, tels qu'ils répondent en production** — la note qui débloque le sélecteur (§3.A1) |
 | `note_ui_alex.md`, `note_web_alexandre_*.md`, `docs/ui-web/*` | Contrats front | Ce qui est promis au dev web |
 | `docs/deploiement/*`, `BUG_DISPLAY.MD`, `README.md` | Exploitation | ⚠️ périmés par endroits — cf. §3.G6 |
 
