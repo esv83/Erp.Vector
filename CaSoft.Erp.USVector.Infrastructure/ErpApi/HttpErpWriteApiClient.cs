@@ -88,4 +88,36 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
             missionId, (int)response.StatusCode, content);
         throw new HttpRequestException($"Orders.Api PATCH missions/{missionId}/contextOrder → {(int)response.StatusCode}.");
     }
+
+    public async Task<EnContextOrderValuesWriteOutcome> SetContextOrderValuesAsync(
+        Guid missionId,
+        IReadOnlyCollection<(string Name, string? Value)> values,
+        string? setBy = null,
+        CancellationToken ct = default)
+    {
+        var body = new { values = values.Select(v => new { name = v.Name, value = v.Value }).ToList(), setBy };
+        var response = await _http.PatchAsJsonAsync($"missions/{missionId}/contextOrder/values", body, JsonOptions, ct);
+        if (response.IsSuccessStatusCode) return EnContextOrderValuesWriteOutcome.Applied;
+
+        // 409/400/404 = réponses métier (ProblemDetails), pas des pannes.
+        var outcome = response.StatusCode switch
+        {
+            HttpStatusCode.Conflict => EnContextOrderValuesWriteOutcome.FieldLocked,
+            HttpStatusCode.BadRequest => EnContextOrderValuesWriteOutcome.Invalid,
+            HttpStatusCode.NotFound => EnContextOrderValuesWriteOutcome.MissionNotFound,
+            _ => (EnContextOrderValuesWriteOutcome?)null
+        };
+
+        var content = await response.Content.ReadAsStringAsync(ct);
+        if (outcome.HasValue)
+        {
+            _logger.LogWarning("Orders.Api PATCH missions/{MissionId}/contextOrder/values refusé ({Outcome}) : {Status} {Body}",
+                missionId, outcome.Value, (int)response.StatusCode, content);
+            return outcome.Value;
+        }
+
+        _logger.LogError("Orders.Api PATCH missions/{MissionId}/contextOrder/values a échoué : {Status} {Body}",
+            missionId, (int)response.StatusCode, content);
+        throw new HttpRequestException($"Orders.Api PATCH missions/{missionId}/contextOrder/values → {(int)response.StatusCode}.");
+    }
 }

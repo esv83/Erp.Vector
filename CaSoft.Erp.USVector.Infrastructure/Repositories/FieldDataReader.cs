@@ -14,7 +14,7 @@ public sealed class FieldDataReader : IFieldDataReader
     private readonly IErpReadApiClient _erp;
     private readonly IJobTimeRepository _jobTime;
     private readonly ISignatureRepository _signature;
-    private readonly IJobAttributeOverlay _overlay;
+    private readonly IFieldAttributesReader _attributes;
     private readonly IMutuelleCardRepository _mutuelle;
     private readonly IDocumentRepository _documents;
     private readonly IAnomalyRepository _anomalies;
@@ -23,7 +23,7 @@ public sealed class FieldDataReader : IFieldDataReader
         IErpReadApiClient erp,
         IJobTimeRepository jobTime,
         ISignatureRepository signature,
-        IJobAttributeOverlay overlay,
+        IFieldAttributesReader attributes,
         IMutuelleCardRepository mutuelle,
         IDocumentRepository documents,
         IAnomalyRepository anomalies)
@@ -31,7 +31,7 @@ public sealed class FieldDataReader : IFieldDataReader
         _erp = erp;
         _jobTime = jobTime;
         _signature = signature;
-        _overlay = overlay;
+        _attributes = attributes;
         _mutuelle = mutuelle;
         _documents = documents;
         _anomalies = anomalies;
@@ -68,18 +68,12 @@ public sealed class FieldDataReader : IFieldDataReader
             ImageUrl = sigExists ? $"api/Signature/{missionId}" : null
         };
 
-        // Attributs de facturation dynamiques (overlay MOB-13, valeurs terrain seules).
-        var contract = _overlay.BuildContractType(missionId, new Dictionary<string, IEnumerable<string>>());
-        var values = contract?.Attributs?.Values
-            .Where(a => !string.IsNullOrEmpty(a.Value))
-            .Select(a => new ClFieldAttributeValueDto { Name = a.Name, Value = a.Value })
-            .ToList() ?? new List<ClFieldAttributeValueDto>();
-        var attributes = new ClFieldAttributesDto
-        {
-            ContractId = contract?.Id ?? 0,
-            ContractDisplay = contract?.Display,
-            Values = values
-        };
+        // Attributs de facturation dynamiques — OC-7 : lus dans le seul magasin Vector, sans appel
+        // réseau. Depuis la bascule du référentiel, la facturation lit ces valeurs directement chez
+        // Order et les fait primer ; ce bloc ne sert plus qu'à combler les trous pour les missions
+        // saisies avant. Les faire transiter par ici en interrogeant Order serait un troisième chemin
+        // vers la même donnée, payé deux appels par mission sur un traitement déjà lent.
+        var attributes = _attributes.Read(missionId);
 
         // Carte mutuelle courante du bénéficiaire.
         ClMutuelleCardDtoOut? mutuelle = null;

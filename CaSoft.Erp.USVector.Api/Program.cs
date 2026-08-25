@@ -208,14 +208,52 @@ builder.Services.AddScoped<IJobTimeRepository, JobTimeRepository>();
 // Synchro régulation garantie : worker qui vide l'Outbox de projection opérationnelle (debounce + retry).
 builder.Services.AddHostedService<OperationalOutboxDispatcher>();
 builder.Services.AddScoped<ISessionRepository, SessionRepository>();
+// OC-3b : drapeau de bascule du référentiel de type de mission vers Order. Défaut = désarmé, donc
+// comportement d'avant la bascule. S'arme par appsettings.{Environnement}.json — et se désarme de
+// même, sans redéploiement, donc sans coupure d'API.
+var contextOrderSection = builder.Configuration
+    .GetSection(CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.ContextOrderOptions.SectionName);
+var contextOrderOptions = new CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.ContextOrderOptions
+{
+    UseOrderCatalog = contextOrderSection.GetValue<bool>("UseOrderCatalog"),
+    UseOrderAttributes = contextOrderSection.GetValue<bool>("UseOrderAttributes")
+};
+
+// Garde-fou AU DÉMARRAGE, même esprit que KC-1 : les attributs d'Order se résolvent depuis le
+// context effectif de la mission. Les armer sans avoir armé le type ferait choisir un type dans le
+// catalogue Vector et afficher les champs de celui d'Order — un écran incohérent que personne ne
+// verrait venir. On refuse de démarrer plutôt que de servir ça.
+if (contextOrderOptions.UseOrderAttributes && !contextOrderOptions.UseOrderCatalog)
+{
+    throw new InvalidOperationException(
+        "ContextOrder:UseOrderAttributes=true exige ContextOrder:UseOrderCatalog=true : les attributs "
+        + "d'Order suivent le context effectif de la mission, qui doit donc déjà venir d'Order. "
+        + "Armer d'abord UseOrderCatalog, observer, puis armer UseOrderAttributes.");
+}
+
+builder.Services.AddSingleton(contextOrderOptions);
+
 // MOB-13 : overlay attributs de mission (catalogue + valeurs en BD Mobile).
-builder.Services.AddScoped<IJobAttributeOverlay, JobAttributeOverlayRepository>();
+// OC-3b : le « quel contrat » peut venir d'Order (résolveur ci-dessous) ; les définitions et les
+// valeurs restent en BD Mobile jusqu'à OC-5.
+builder.Services.AddScoped<
+    CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.IEffectiveContractTypeResolver,
+    CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.OrderEffectiveContractTypeResolver>();
+builder.Services.AddScoped<IJobAttributeOverlay>(sp => new JobAttributeOverlayRepository(
+    sp.GetRequiredService<MobileDbContext>(),
+    sp.GetRequiredService<CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.IEffectiveContractTypeResolver>()));
 // Carte mutuelle (P1) : stockage BD Mobile.
 builder.Services.AddScoped<IMutuelleCardRepository, MutuelleCardRepository>();
 // Anomalies terrain (TRF-8) : stockage BD Mobile.
 builder.Services.AddScoped<IAnomalyRepository, AnomalyRepository>();
 // Documents/photos terrain (TRF-10) : stockage BD Mobile.
 builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
+// OC-7 : bloc « attributs » du paquet terrain. On monte ici, EXPRÈS, un overlay **sans résolveur de
+// type** : le paquet lit le magasin Vector et ne doit jamais interroger Orders.Api pour cela. Sans
+// cette instance dédiée, il hériterait du résolveur d'OC-3b et paierait un appel réseau par mission,
+// sur un traitement mesuré à 14,7 s pour 284 missions — pour une information dont il ne fait rien.
+builder.Services.AddScoped<IFieldAttributesReader>(sp => new FieldAttributesReader(
+    new JobAttributeOverlayRepository(sp.GetRequiredService<MobileDbContext>())));
 // Paquet d'enrichissement consolidé (TRF-6) : tiré par Certification au transfert.
 builder.Services.AddScoped<IFieldDataReader, CaSoft.Erp.USVector.Infrastructure.Repositories.FieldDataReader>();
 
@@ -225,9 +263,13 @@ builder.Services.AddScoped<ICrewRepository, CaSoft.Erp.USVector.Infrastructure.R
 builder.Services.AddScoped<IJobRepository, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.JobRepository>();
 // OC-3a : verrou + provenance du context de la mission, lus sur Orders.Api (lecture seule).
 builder.Services.AddScoped<IContextOrderStateQueryService, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.ContextOrderStateQueryService>();
-// OC-4 : relais de la sélection terrain vers Orders.Api (traduction d'id par code). Pas encore
-// branché sur POST api/Contract — le contrat mobile bascule avec OC-3b.
+// OC-4 : relais de la sélection terrain vers Orders.Api. Branché sur POST api/Contract dès que le
+// drapeau OC-3b est armé ; traduit l'id par code tant qu'il ne l'est pas.
 builder.Services.AddScoped<IContextOrderSelectionService, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.ContextOrderSelectionService>();
+// OC-3b : liste des types servie depuis le catalogue Order (déjà filtré agence/mode).
+builder.Services.AddScoped<IContextOrderCatalogService, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.ContextOrderCatalogService>();
+// OC-5 : formulaire d'attributs et valeurs saisies, servis et enregistrés par Order.
+builder.Services.AddScoped<IContextOrderAttributeService, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.ContextOrderAttributeService>();
 // MOB-4a : résolution identité Keycloak (sub → PER_ID → crews actifs).
 // Décoré par un cache (chemin chaud : garde-fou crew de chaque requête). TTLs configurables :
 // - PersonnelMinutes : mapping sub→PER_ID quasi-immuable → long (défaut 8h).

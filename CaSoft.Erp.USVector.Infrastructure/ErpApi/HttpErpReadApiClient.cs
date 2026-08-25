@@ -95,6 +95,11 @@ public sealed class HttpErpReadApiClient : IErpReadApiClient
         // Casse de la route conservée telle qu'Orders.Api l'expose (`contextOrder`).
         => await GetOrNullAsync<ErpMissionContextOrderDto>($"missions/{missionId}/contextOrder", ct);
 
+    public async Task<IReadOnlyList<ErpContextOrderFieldDto>?> GetContextOrderFormStructureAsync(
+        Guid missionId, CancellationToken ct = default)
+        => await GetOrNullAsync<List<ErpContextOrderFieldDto>>(
+            $"missions/{missionId}/contextOrder/form-structure", ct);
+
     private async Task<T?> GetOrNullAsync<T>(string url, CancellationToken ct) where T : class
     {
         var response = await _http.GetAsync(url, ct);

@@ -43,6 +43,9 @@ public class FieldDataReaderTests
 
         public Task<ErpMissionContextOrderDto?> GetMissionContextOrderAsync(Guid id, CancellationToken ct = default)
             => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<ErpContextOrderFieldDto>?> GetContextOrderFormStructureAsync(Guid missionId, CancellationToken ct = default)
+            => throw new NotSupportedException();
     }
 
     private sealed class FakeJobTime : IJobTimeRepository
@@ -124,7 +127,7 @@ public class FieldDataReaderTests
             new FakeErp(),
             new FakeJobTime(time),
             new FakeSignature { DoesExist = true, SignedAt = signed },
-            new FakeOverlay(),
+            new FieldAttributesReader(new FakeOverlay()),
             new FakeMutuelle { Current = new ClMutuelleCard { Id = Guid.NewGuid(), BeneficiaryId = Ben, CapturedAt = go, AmcCode = "AMC1" } },
             docs,
             anomalies);
@@ -153,7 +156,7 @@ public class FieldDataReaderTests
             new FakeErp { MissionExists = false },
             new FakeJobTime(null),
             new FakeSignature(),
-            new FakeOverlay(),
+            new FieldAttributesReader(new FakeOverlay()),
             new FakeMutuelle(),
             new DocumentRepository(ctx),
             new AnomalyRepository(ctx));

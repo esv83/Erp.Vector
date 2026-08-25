@@ -55,4 +55,13 @@ public interface IErpReadApiClient
     /// Null si la mission est introuvable (404).
     /// </summary>
     Task<ErpMissionContextOrderDto?> GetMissionContextOrderAsync(Guid missionId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Structure du formulaire d'attributs de la mission — OC-5. Indexée par <b>mission</b>, jamais
+    /// par type : c'est Order qui résout mission → commande → context effectif → jeu de champs. Vector
+    /// n'a donc rien à corréler, et le contrat mobile de <c>FormStructure</c> ne change pas d'un iota.
+    /// Null si la mission est introuvable (404).
+    /// </summary>
+    Task<IReadOnlyList<ErpContextOrderFieldDto>?> GetContextOrderFormStructureAsync(
+        Guid missionId, CancellationToken ct = default);
 }

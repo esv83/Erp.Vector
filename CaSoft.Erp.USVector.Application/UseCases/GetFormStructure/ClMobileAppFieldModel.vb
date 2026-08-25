@@ -13,4 +13,15 @@
     Public Property Options As Object
     Public Property Value As String
 
+    ''' <summary>
+    ''' OC-5 — Verrou <b>par champ</b> : afficher la valeur, désactiver la saisie. À ne pas confondre
+    ''' avec le verrou du <i>type</i> de mission — une mission au type libre peut très bien porter une
+    ''' date de naissance déjà connue, donc figée. Ajout <b>additif</b> (D14) : reste à <c>False</c>
+    ''' tant que les attributs viennent du catalogue Vector, qui ne connaît pas cette notion.
+    ''' </summary>
+    Public Property IsReadOnly As Boolean
+
+    ''' <summary>Motif affichable du verrou. Nothing quand le champ est ouvert.</summary>
+    Public Property ReadOnlyReason As String
+
 End Class

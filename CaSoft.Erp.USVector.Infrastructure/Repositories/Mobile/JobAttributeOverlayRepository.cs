@@ -3,6 +3,7 @@ using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Persistence.Entities;
+using CaSoft.Erp.USVector.Infrastructure.Repositories.Erp;
 
 namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 
@@ -17,25 +18,49 @@ namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 ///
 /// <para><b>Écriture</b> : upsert dans <c>MOB_JOB_ATTRIBUTE_VALUE</c>. Multi-valué : on ne stocke
 /// que les items hors baseline ERP (on ne peut pas modifier ceux de l'ERP, doublons écartés).</para>
+///
+/// <para><b>OC-3b</b> : le <i>quel contrat</i> peut désormais venir d'ailleurs. Quand la bascule est
+/// armée, le type de la mission est celui d'Order — <c>MOB_JOB_CONTRACT</c> n'est plus alimenté — et
+/// c'est <see cref="IEffectiveContractTypeResolver"/> qui le dit. Le reste ne bouge pas : les
+/// définitions d'attributs et les valeurs saisies restent en BD Mobile jusqu'à OC-5. Les valeurs
+/// étant stockées <b>par nom d'attribut</b> et non sous l'id d'un type, un changement de source ne
+/// peut pas les rattacher au mauvais contrat.</para>
 /// </summary>
 public class JobAttributeOverlayRepository : IJobAttributeOverlay
 {
     private static readonly StringComparer Cmp = StringComparer.OrdinalIgnoreCase;
 
     private readonly MobileDbContext _ctx;
+    private readonly IEffectiveContractTypeResolver? _effectiveContractType;
 
-    public JobAttributeOverlayRepository(MobileDbContext ctx) => _ctx = ctx;
+    /// <param name="effectiveContractType">
+    /// OC-3b — Facultatif. Quand la bascule est armée, c'est lui qui dit le type de la mission :
+    /// il vit chez Order, plus dans <c>MOB_JOB_CONTRACT</c> que plus rien n'écrit. Absent ou
+    /// abstenu, le chemin historique reprend la main à l'identique.
+    /// </param>
+    public JobAttributeOverlayRepository(
+        MobileDbContext ctx, IEffectiveContractTypeResolver? effectiveContractType = null)
+    {
+        _ctx = ctx;
+        _effectiveContractType = effectiveContractType;
+    }
 
     public ClContractType BuildContractType(
         Guid missionId, IDictionary<string, IEnumerable<string>> erpBaselines)
     {
         erpBaselines ??= new Dictionary<string, IEnumerable<string>>();
 
-        int? contractId = _ctx.JobContracts
-            .Where(c => c.JCT_MISSION_ID == missionId)
-            .Select(c => (int?)c.JCT_CONTRACT_ID)
-            .FirstOrDefault()
-            ?? _ctx.ContractTypes
+        // OC-3b — Une réponse du résolveur fait autorité, y compris quand elle vaut « aucun type » :
+        // à ne pas confondre avec son abstention, qui laisse jouer la résolution historique.
+        var effective = _effectiveContractType?.Resolve(missionId);
+
+        int? contractId = effective.HasValue
+            ? effective.Value.ContractTypeId
+            : _ctx.JobContracts
+                .Where(c => c.JCT_MISSION_ID == missionId)
+                .Select(c => (int?)c.JCT_CONTRACT_ID)
+                .FirstOrDefault()
+              ?? _ctx.ContractTypes
                 .Where(t => t.CTT_ACTIVE)
                 .OrderBy(t => t.CTT_ID)
                 .Select(t => (int?)t.CTT_ID)

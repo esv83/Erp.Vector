@@ -186,3 +186,44 @@ public sealed class ErpContextOrderChoiceDto
     public string? Display { get; set; }
     public int Index { get; set; }
 }
+
+/// <summary>
+/// OC-5 — Un champ du formulaire d'attributs servi par Order. <b>Miroir de
+/// <c>ClMobileAppFieldModel</c></b> : l'UI mobile ne change que d'URL, pas son parsing.
+/// <para>
+/// Deux champs s'ajoutent au modèle historique. <see cref="IsReadOnly"/> est un verrou <b>par
+/// champ</b>, à ne pas confondre avec le <c>locked</c> du context, qui gèle le <b>type</b> : une
+/// mission au type libre peut très bien porter une date de naissance déjà connue, donc figée.
+/// </para>
+/// </summary>
+public sealed class ErpContextOrderFieldDto
+{
+    public string? Name { get; set; }
+    public string? Label { get; set; }
+    public int Index { get; set; }
+
+    /// <summary>Type de contrôle web : text | textarea | checkbox | list | phone | email | number | date.</summary>
+    public string? Type { get; set; }
+
+    public bool Required { get; set; }
+    public bool InstantUpdate { get; set; }
+    public string? PlaceHolder { get; set; }
+
+    /// <summary>Champ multi-valué (saisie répétable : téléphones, e-mails).</summary>
+    public bool IsMulti { get; set; }
+
+    /// <summary>Pour <c>Type = "list"</c> : valeurs proposées (clé entière → libellé).</summary>
+    public Dictionary<int, string>? Options { get; set; }
+
+    public string? Value { get; set; }
+
+    /// <summary>
+    /// Verrou <b>par champ</b> : afficher la valeur, désactiver la saisie. Une écriture qui
+    /// <i>modifierait</i> un champ verrouillé est refusée (409) ; reposer la valeur reçue telle
+    /// quelle est sans effet — d'où la possibilité de renvoyer le formulaire entier sans trier.
+    /// </summary>
+    public bool IsReadOnly { get; set; }
+
+    /// <summary>Motif affichable du verrou. <c>null</c> quand le champ est ouvert.</summary>
+    public string? ReadOnlyReason { get; set; }
+}
