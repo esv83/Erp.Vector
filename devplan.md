@@ -130,10 +130,9 @@ une couche déclarative que la facturation relit et corrige.
 - **Le repère de fraîcheur du paquet** (`updatedAt`) est servi mais aucun consommateur ne s'en sert :
   ils re-tirent à chaque construction. À garder, sans y investir davantage.
 - ⚠️ **Le référentiel de contexte est basculé et armé en production** (2026-08-25) : le type de
-  mission et ses attributs viennent d'Order. Deux conséquences à ne pas perdre de vue — le dev web
-  n'a **pas** été prévenu des nouveaux refus (`409`/`400` sur la sélection du type et sur la saisie),
-  et les drapeaux sont armés **sur le serveur uniquement**, alors que le fichier versionné les dit
-  désarmés : le prochain déploiement les remettrait à `false` (§3.A1).
+  mission et ses attributs viennent d'Order. Une conséquence n'a pas été traitée — le dev web n'a
+  **pas** été prévenu des nouveaux refus (`409` sur la sélection du type, `409`/`400` sur la saisie),
+  là où ces appels réussissaient toujours (§3.A1).
 
 ---
 
@@ -238,15 +237,23 @@ relire, il faut une colonne dédiée ou une trace d'audit. Sinon on assume la pe
 
 ### A1 — 🟢 Bascule de la sélection du contexte (`OC-3b` + `OC-4`) — **déployée et armée**
 
-> ⚠️ **État réel au 2026-08-25, vérifié contre la production.** Les deux drapeaux sont **armés sur le
-> serveur** (`appsettings.Production.json`, édité à la main à 18:38), alors que le fichier **versionné**
-> porte encore `false`. Ce fichier étant **shippé par `dotnet publish`**, le prochain `deploy.ps1 prod`
-> **désarmerait la production sans que personne ne le demande** — exactement le mode de dérive décrit
-> au §5.2. À réconcilier avant le prochain déploiement.
+> ✅ **Armée en production depuis le 2026-08-25**, les deux crans. Constaté en service :
+> `GET api/Contract` sert le catalogue Order (7 types, aucun défaut pré-sélectionné) et
+> `GET api/FormStructure` sert le formulaire d'Order, verrou par champ compris (`IsReadOnly`,
+> `ReadOnlyReason` renseignés).
 >
-> Constaté en service : `GET api/Contract` sert bien le catalogue Order (7 types, aucun défaut
-> pré-sélectionné) et `GET api/FormStructure` sert bien le formulaire d'Order, verrou par champ
-> compris (`IsReadOnly`, `ReadOnlyReason` renseignés).
+> Les deux valeurs sont **versionnées** dans `appsettings.Production.json`, pas posées à la main sur
+> le serveur : ce fichier est shippé par la publication, donc une valeur serveur serait effacée au
+> déploiement suivant, sans bruit (§5.2).
+>
+> ⚠️ **Retour arrière** : ne pas rebasculer le fichier versionné à `false` en cas d'incident — cela
+> demande un déploiement, donc une coupure d'API. Passer par une **variable d'environnement du
+> `web.config`** (`ContextOrder__UseOrderCatalog=false`), seule couche qui survit à une publication et
+> qui l'emporte sur le fichier.
+>
+> ⛔ **Reste dû au dev web** : l'annonce des **nouveaux refus** — `409` sur la sélection du type,
+> `409`/`400` sur la saisie des attributs — là où l'appel réussissait toujours. C'est le seul point de
+> la bascule qui n'a pas été traité.
 
 **Livré le 2026-08-25, sous drapeau ; armé en production le jour même.** Les trois
 préalables ci-dessous ne conditionnent plus le *codage* mais l'*armement* : ils sont devenus une
