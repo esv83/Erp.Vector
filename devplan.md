@@ -598,6 +598,9 @@ sans données terrain. → table de suivi (modèle `__BillingGatewaySchema`) + *
 À réconcilier au passage : la migration du transfert est référencée `027` dans l'historique et `034`
 dans le dépôt.
 
+Le besoin s'est révélé plus large que le schéma : voir **G8**, qui le généralise à « quel code
+tourne, sur quelle base ».
+
 ### G5 — ⚠️ Deux dettes de forme, sans urgence
 
 - **Nommage des DTO (`DET-4`)** : suffixe directionnel de la convention (`…DtoIn` / `…DtoOut`) au lieu
@@ -626,6 +629,44 @@ purge (3 ans), chiffrement au repos, contrôle d'accès fin sur l'image de carte
 seul lot pour les trois familles de données.
 
 ---
+
+### G8 — ⏳ Savoir ce qui est réellement en service — *généralise G4*
+
+**Aucun module ne sait dire quel code il exécute ni à quelle base il parle.** Pour l'établir, il faut
+aujourd'hui ouvrir le partage de déploiement, lire des horodatages de DLL, empiler trois couches de
+configuration à la main et deviner laquelle gagne. Chaque diagnostic commence donc par une enquête,
+et cette enquête n'est jamais dans le ticket.
+
+**La journée du 2026-08-25 a produit trois occurrences du même manque, en quelques heures :**
+
+| Ce qui a divergé | Comment on s'en est aperçu |
+|---|---|
+| Le binaire Vector de production avait été **publié depuis un arbre de travail non commité** : git ignorait ce que servait l'API | par hasard, en cherchant l'origine d'un champ inattendu dans une réponse |
+| Les drapeaux de bascule étaient **armés sur le serveur, désarmés dans le fichier versionné** — et ce fichier est shippé par la publication, donc le déploiement suivant les éteignait | en lisant le fichier déployé, pas l'application |
+| **Deux bases candidates pour Orders** : la vraie est `BD_ERP_SANITAIRE_DEV` sur `109`, l'autre `BD_ERP_SANITAIRE` sur `115`, schémas différents | par une erreur SQL, après avoir joué un correctif au mauvais endroit |
+
+Le troisième cas est le plus instructif : **la correction n'a rien signalé.** Elle a modifié
+consciencieusement des lignes que personne ne lit. Une opération qui « réussit » sans effet est pire
+qu'une qui échoue — elle ferme le sujet.
+
+**Ce qu'il faut, et rien de plus** : que chaque API expose, sur une route réservée comme l'est déjà le
+diagnostic, ce qu'elle est en train de faire —
+
+- le **commit** qu'elle exécute (SHA court + date), injecté au build ;
+- l'**environnement** retenu (`ASPNETCORE_ENVIRONMENT`) ;
+- la **base réellement résolue** après empilement des trois couches : serveur + nom, **jamais**
+  d'identifiants ;
+- l'état des **drapeaux** de bascule en vigueur.
+
+Avec la table de suivi de schéma de **G4**, cela fait deux choses à mettre en place et **une seule
+lecture** pour répondre à « qu'est-ce qui tourne, où, et sur quoi ». Aujourd'hui la réponse coûte une
+demi-heure et reste incertaine.
+
+⚠️ **À gated comme `/api/diag`** : nom de serveur et nom de base ne sont pas des secrets, mais ne se
+publient pas non plus sans authentification.
+
+**Fin** : pour chaque module en service, une requête suffit à dire quel commit tourne et sur quelle
+base — et un déploiement dont le code n'est pas commité devient visible au lieu d'être découvert.
 
 ## H. ⚪ Différé (V2 / hors MVP)
 
