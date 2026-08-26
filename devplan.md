@@ -244,6 +244,15 @@ un filet de compatibilité ne se retire pas d'office (D14). Le contrat lui a ét
 demande de confirmation envoyée le 26/08
 ([note](note_web_alexandre_context_mission_confirmation.md)) : **en attente de sa réponse.**
 
+**Constaté le 2026-08-26, sans attendre sa réponse** : l'écran fonctionne — on choisit un type, et le
+questionnaire qui revient est bien celui de ce type. Ce n'est pas un détail de confort : le jeu de
+champs est dérivé du type **enregistré chez Order**, donc un identifiant mal apparié ramènerait le
+mauvais formulaire. **Le risque des identifiants en dur est donc levé par l'observation**, et avec lui
+le seul risque qui portait sur la donnée.
+
+Le doute restant ne porte plus que sur les **chemins de refus**, qu'aucun usage normal ne déclenche
+aujourd'hui — donc que le bon fonctionnement observé ne teste pas.
+
 ⚠️ Tant que ce double chemin existe, **A6 ne peut pas s'exécuter** — les tables qu'elle supprime sont
 exactement ce que le désarmement rebranche.
 
