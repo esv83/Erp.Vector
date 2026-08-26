@@ -71,19 +71,11 @@ public class JobLocationMappingTests
         public bool Exists(Guid id) => false;
     }
 
-    private sealed class FakeOverlay : IJobAttributeOverlay
-    {
-        public ClContractType BuildContractType(Guid missionId, IDictionary<string, IEnumerable<string>> erpBaselines) => null!;
-        public void Save(Guid missionId, ClContractType contractType, IDictionary<string, IEnumerable<string>> erpBaselines) { }
-        public IReadOnlyList<ClContractType> GetContracts() => throw new NotSupportedException();
-        public int? GetSelectedContractId(Guid missionId) => null;
-        public void SelectContract(Guid missionId, int contractId) { }
-    }
 
     private static ClJob BuildJob(ErpStageDto stage)
     {
         var erp = new FakeErp { Pickup = stage };
-        var repo = new JobRepository(erp, new FakeJobTime(), new FakeSignature(), new FakeOverlay(), NullLogger<JobRepository>.Instance);
+        var repo = new JobRepository(erp, new FakeJobTime(), new FakeSignature(), NullLogger<JobRepository>.Instance);
         return repo.GetJob(JobId);
     }
 

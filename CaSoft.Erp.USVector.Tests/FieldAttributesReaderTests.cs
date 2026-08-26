@@ -35,34 +35,23 @@ public class FieldAttributesReaderTests
     }
 
     /// <summary>
-    /// ⚠️ Le cœur d'OC-7. Le paquet passait par la résolution du type de mission, qui depuis la
-    /// bascule interroge Orders.Api : un appel réseau par mission, sur un traitement mesuré à 14,7 s
-    /// pour 284 missions, pour une information dont ce paquet ne fait rien.
+    /// ⚠️ Le cœur d'OC-7 : le paquet se construit <b>sans toucher au réseau</b>. Le seul client ERP
+    /// disponible est ici piégé — le monter dans le conteneur du paquet est donc une erreur qui se
+    /// voit, au lieu d'une facturation qui ralentit sans que personne ne sache pourquoi.
     /// <para>
-    /// Le test met les deux montages côte à côte : celui du détail mission, qui consulte bien le
-    /// résolveur, et celui du paquet, qui s'en passe. C'est la seule façon de rendre la différence
-    /// visible — recâbler le résolveur sur le paquet ne casserait rien d'observable, juste la
-    /// facturation qui ralentit.
+    /// Le montage est désormais unique : depuis le retrait des drapeaux, l'overlay n'a plus aucune
+    /// dépendance vers Orders.Api. Ce test fige le fait que la seule source du bloc est la BD Mobile.
     /// </para>
     /// </summary>
     [Fact]
-    public void N_interroge_pas_l_ERP_la_ou_le_detail_mission_le_ferait()
+    public void Se_construit_sans_aucun_appel_reseau()
     {
         var ctx = SeededContext();
-        var resolveur = new ExplosiveResolver();
 
-        // 1. Monté AVEC le résolveur — c'est le montage du détail mission : la résolution du type est
-        //    bien vivante, donc l'appel Orders.Api aussi.
-        var commeLeDetailMission = new JobAttributeOverlayRepository(ctx, resolveur);
-        var act = () => commeLeDetailMission.BuildContractType(Mission, new Dictionary<string, IEnumerable<string>>());
-        act.Should().Throw<InvalidOperationException>();
-        resolveur.Consulté.Should().BeTrue("sinon ce test ne prouverait rien du montage d'en face");
-
-        // 2. Monté SANS résolveur — c'est le montage du paquet, celui de la racine de composition.
-        //    Aucune résolution, donc aucun appel réseau, et le bloc sort quand même.
         var block = new FieldAttributesReader(new JobAttributeOverlayRepository(ctx)).Read(Mission);
 
         block.Values.Should().NotBeEmpty();
+        block.ContractDisplay.Should().Be("Transport standard");
     }
 
     /// <summary>
@@ -109,18 +98,5 @@ public class FieldAttributesReaderTests
 
         ctx.SaveChanges();
         return ctx;
-    }
-
-    /// <summary>Résolveur qui n'a pas le droit d'être appelé sur le chemin du paquet.</summary>
-    private sealed class ExplosiveResolver : IEffectiveContractTypeResolver
-    {
-        public bool Consulté { get; private set; }
-
-        public EffectiveContractType? Resolve(Guid missionId)
-        {
-            Consulté = true;
-            throw new InvalidOperationException(
-                "Le paquet terrain ne doit pas résoudre le type de mission : ce serait un appel Orders.Api par mission.");
-        }
     }
 }

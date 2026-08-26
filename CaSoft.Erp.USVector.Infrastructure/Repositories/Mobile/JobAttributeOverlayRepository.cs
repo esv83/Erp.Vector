@@ -3,60 +3,38 @@ using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Persistence.Entities;
-using CaSoft.Erp.USVector.Infrastructure.Repositories.Erp;
 
 namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 
 /// <summary>
-/// MOB-13 — Overlay des attributs de mission en BD Mobile (aucune écriture ERP).
+/// Relecture du magasin Vector des attributs de mission — plus rien n'y écrit.
 ///
-/// <para><b>Lecture</b> : assemble le <see cref="ClContractType"/> de la mission = attributs
-/// « core » + attributs du contrat sélectionné (contrat actif par défaut sinon), valeurs overlay
-/// fusionnées. Chaque attribut porte son type de contrôle (<c>FieldType</c>) et, pour une liste de
-/// choix, ses options. Pour les champs multi-valués (téléphones/e-mails), la valeur affichée =
-/// baseline ERP ∪ items overlay (dédoublonnés).</para>
+/// <para>Assemble le <see cref="ClContractType"/> tel que ce magasin l'a connu : attributs « core »
+/// + attributs du contrat sélectionné (premier type actif à défaut), valeurs saisies fusionnées.
+/// Chaque attribut porte son type de contrôle et, pour une liste de choix, ses options ; pour les
+/// champs multi-valués, la valeur rendue = baseline ERP ∪ items du magasin (dédoublonnés).</para>
 ///
-/// <para><b>Écriture</b> : upsert dans <c>MOB_JOB_ATTRIBUTE_VALUE</c>. Multi-valué : on ne stocke
-/// que les items hors baseline ERP (on ne peut pas modifier ceux de l'ERP, doublons écartés).</para>
-///
-/// <para><b>OC-3b</b> : le <i>quel contrat</i> peut désormais venir d'ailleurs. Quand la bascule est
-/// armée, le type de la mission est celui d'Order — <c>MOB_JOB_CONTRACT</c> n'est plus alimenté — et
-/// c'est <see cref="IEffectiveContractTypeResolver"/> qui le dit. Le reste ne bouge pas : les
-/// définitions d'attributs et les valeurs saisies restent en BD Mobile jusqu'à OC-5. Les valeurs
-/// étant stockées <b>par nom d'attribut</b> et non sous l'id d'un type, un changement de source ne
-/// peut pas les rattacher au mauvais contrat.</para>
+/// <para><b>Un seul appelant</b> : le bloc « attributs » du paquet terrain, qui transporte vers la
+/// facturation la saisie antérieure à la bascule du 2026-08-25. Order sert et enregistre tout le
+/// reste. Ce type disparaît avec les tables qu'il lit.</para>
 /// </summary>
 public class JobAttributeOverlayRepository : IJobAttributeOverlay
 {
     private static readonly StringComparer Cmp = StringComparer.OrdinalIgnoreCase;
 
     private readonly MobileDbContext _ctx;
-    private readonly IEffectiveContractTypeResolver? _effectiveContractType;
 
-    /// <param name="effectiveContractType">
-    /// OC-3b — Facultatif. Quand la bascule est armée, c'est lui qui dit le type de la mission :
-    /// il vit chez Order, plus dans <c>MOB_JOB_CONTRACT</c> que plus rien n'écrit. Absent ou
-    /// abstenu, le chemin historique reprend la main à l'identique.
-    /// </param>
-    public JobAttributeOverlayRepository(
-        MobileDbContext ctx, IEffectiveContractTypeResolver? effectiveContractType = null)
-    {
-        _ctx = ctx;
-        _effectiveContractType = effectiveContractType;
-    }
+    public JobAttributeOverlayRepository(MobileDbContext ctx) => _ctx = ctx;
 
     public ClContractType BuildContractType(
         Guid missionId, IDictionary<string, IEnumerable<string>> erpBaselines)
     {
         erpBaselines ??= new Dictionary<string, IEnumerable<string>>();
 
-        // OC-3b — Une réponse du résolveur fait autorité, y compris quand elle vaut « aucun type » :
-        // à ne pas confondre avec son abstention, qui laisse jouer la résolution historique.
-        var effective = _effectiveContractType?.Resolve(missionId);
-
-        int? contractId = effective.HasValue
-            ? effective.Value.ContractTypeId
-            : _ctx.JobContracts
+        // Le type tel que le magasin Vector le connaît, et à défaut le premier type actif. C'est le
+        // comportement d'avant la bascule, reproduit à l'identique : ce magasin ne sert plus qu'à
+        // l'historique que le paquet terrain transporte vers la facturation.
+        int? contractId = _ctx.JobContracts
                 .Where(c => c.JCT_MISSION_ID == missionId)
                 .Select(c => (int?)c.JCT_CONTRACT_ID)
                 .FirstOrDefault()
@@ -121,101 +99,6 @@ public class JobAttributeOverlayRepository : IJobAttributeOverlay
         }
 
         return new ClContractType(contractId ?? 0, display, collection);
-    }
-
-    public void Save(
-        Guid missionId, ClContractType contractType, IDictionary<string, IEnumerable<string>> erpBaselines)
-    {
-        if (contractType?.Attributs is null) return;
-        erpBaselines ??= new Dictionary<string, IEnumerable<string>>();
-
-        var existing = _ctx.JobAttributeValues
-            .Where(v => v.JAV_MISSION_ID == missionId)
-            .ToDictionary(v => v.JAV_ATTRIBUTE_NAME, v => v, Cmp);
-
-        foreach (var attr in contractType.Attributs.Values)
-        {
-            string? toStore;
-            bool isEmpty;
-            if (attr.IsMulti)
-            {
-                // On ne persiste que les items AJOUTÉS (hors baseline ERP), sans doublon.
-                var baseline = erpBaselines.TryGetValue(attr.Name, out var b)
-                    ? new HashSet<string>(b ?? Enumerable.Empty<string>(), Cmp)
-                    : new HashSet<string>(Cmp);
-                var added = Dedup(ParseJsonArray(attr.Value).Where(x => !baseline.Contains(x)));
-                toStore = JsonSerializer.Serialize(added);
-                isEmpty = added.Count == 0;
-            }
-            else
-            {
-                toStore = attr.Value;
-                isEmpty = string.IsNullOrWhiteSpace(attr.Value);
-            }
-
-            var hasRow = existing.TryGetValue(attr.Name, out var row);
-
-            // Pas de ligne overlay vide : on ne crée rien pour un attribut non renseigné.
-            // Une ligne existante reste modifiable (y compris remise à vide).
-            if (isEmpty && !hasRow) continue;
-
-            if (hasRow)
-            {
-                row!.JAV_VALUE = toStore;
-                row.JAV_UPDATED_AT = DateTime.UtcNow;
-            }
-            else
-            {
-                _ctx.JobAttributeValues.Add(new MOB_JOB_ATTRIBUTE_VALUE
-                {
-                    JAV_MISSION_ID = missionId,
-                    JAV_ATTRIBUTE_NAME = attr.Name,
-                    JAV_VALUE = toStore,
-                    JAV_UPDATED_AT = DateTime.UtcNow,
-                });
-            }
-        }
-
-        _ctx.SaveChanges();
-    }
-
-    public IReadOnlyList<ClContractType> GetContracts()
-        => _ctx.ContractTypes
-            .Where(t => t.CTT_ACTIVE)
-            .OrderBy(t => t.CTT_ID)
-            .AsEnumerable()
-            .Select(t => new ClContractType(t.CTT_ID, t.CTT_DISPLAY, new ClAttributCollection()))
-            .ToList();
-
-    public int? GetSelectedContractId(Guid missionId)
-        => _ctx.JobContracts
-            .Where(c => c.JCT_MISSION_ID == missionId)
-            .Select(c => (int?)c.JCT_CONTRACT_ID)
-            .FirstOrDefault();
-
-    public void SelectContract(Guid missionId, int contractId)
-    {
-        var exists = _ctx.ContractTypes.Any(t => t.CTT_ID == contractId && t.CTT_ACTIVE);
-        if (!exists)
-            throw new InvalidOperationException($"Type de contrat {contractId} inconnu ou inactif.");
-
-        var row = _ctx.JobContracts.SingleOrDefault(c => c.JCT_MISSION_ID == missionId);
-        if (row is null)
-        {
-            _ctx.JobContracts.Add(new MOB_JOB_CONTRACT
-            {
-                JCT_MISSION_ID = missionId,
-                JCT_CONTRACT_ID = contractId,
-                JCT_UPDATED_AT = DateTime.UtcNow,
-            });
-        }
-        else
-        {
-            row.JCT_CONTRACT_ID = contractId;
-            row.JCT_UPDATED_AT = DateTime.UtcNow;
-        }
-
-        _ctx.SaveChanges();
     }
 
     private Dictionary<int, IDictionary<int, string>> LoadOptions(List<int> attributeIds)

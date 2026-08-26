@@ -3,8 +3,8 @@
 -- Base : BD_ERP_MOBILE_APP
 -- Idempotent : rejouable, chaque DROP est gardé par un test d'existence.
 --
--- ⛔ NE PAS JOUER EN L'ÉTAT — voir PRÉALABLE. Le script est versionné pour être prêt,
---    pas pour être exécuté aujourd'hui.
+-- ⛔ NE PAS JOUER EN L'ÉTAT — le SECOND préalable n'est pas rempli. Le script est versionné
+--    pour être prêt, pas pour être exécuté aujourd'hui.
 --
 -- DÉCISION
 -- --------
@@ -16,8 +16,8 @@
 -- Ce qu'on assume : la saisie terrain antérieure à la bascule du 2026-08-25 n'est plus
 -- relisible. Elle n'a jamais alimenté la facturation, qui lit les valeurs chez Orders.
 --
--- PRÉALABLE — le seul, et il n'est pas rempli
--- -------------------------------------------
+-- PREMIER PRÉALABLE — ✅ levé le 2026-08-27
+-- ------------------------------------------
 -- Ces tables portent encore le **chemin de désarmement** de la bascule. Tant que
 -- ContextOrder:UseOrderCatalog / UseOrderAttributes existent dans le code, les remettre à
 -- false doit rendre une API qui fonctionne : c'est le levier d'incident décrit en §3.A1,
@@ -26,7 +26,10 @@
 -- Jouer ce script avant d'avoir retiré les drapeaux transforme donc le levier d'incident
 -- en panne : le désarmement rendrait des 500 au lieu de l'ancien comportement.
 --
--- À jouer quand, et seulement quand, les « Fin » d'A1 et d'A2 sont atteintes :
+-- ✅ LEVÉ le 2026-08-27 : les drapeaux et le second chemin sont retirés du code. Ce préalable-ci
+-- est donc satisfait. Il reste le SECOND, ci-dessous.
+--
+-- Historique de ce qu'il exigeait :
 --   1. les refus 409 / 400 sont annoncés au dev web et absorbés côté front ;
 --   2. les drapeaux et le second chemin qu'ils portent sont retirés du code
 --      (ClListContractsUseCase, ClSelectContractUseCase, ClGetJobEditFormStructureUseCase,

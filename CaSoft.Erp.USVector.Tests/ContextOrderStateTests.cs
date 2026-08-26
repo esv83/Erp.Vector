@@ -106,27 +106,6 @@ public class ContextOrderStateTests
         state.Should().BeNull();
     }
 
-    [Fact]
-    public void Le_verrou_est_reporte_sur_chaque_item_du_selecteur()
-    {
-        var result = new ClListContractsUseCase(Guid.NewGuid(), new FakeOverlay(), locked: true).Handle();
-
-        result.Value.Should().OnlyContain(c => c.Locked);
-    }
-
-    /// <summary>
-    /// D14 — l'ajout est neutre : sans état connu, la liste sort exactement comme avant OC-3a.
-    /// </summary>
-    [Fact]
-    public void Sans_verrou_connu_la_liste_reste_celle_d_avant()
-    {
-        var result = new ClListContractsUseCase(Guid.NewGuid(), new FakeOverlay()).Handle();
-
-        result.Value.Should().OnlyContain(c => !c.Locked);
-        result.Value.Select(c => c.Id).Should().Equal(1, 2);
-        result.Value.Single(c => c.IsSelected).Id.Should().Be(1, "le premier actif reste le défaut");
-    }
-
     private static async Task<ClContextOrderStateDtoOut?> ReadState(string payload)
         => await BuildService(new StubHandler(HttpStatusCode.OK, payload))
             .GetAsync(Guid.Parse("9f3ca1b2-0000-0000-0000-000000000001"), CancellationToken.None);
@@ -136,23 +115,6 @@ public class ContextOrderStateTests
             new HttpClient(handler) { BaseAddress = new Uri(BaseUrl) },
             NullLogger<HttpErpReadApiClient>.Instance));
 
-    private sealed class FakeOverlay : IJobAttributeOverlay
-    {
-        public ClContractType BuildContractType(Guid missionId, IDictionary<string, IEnumerable<string>> baselines)
-            => new();
-
-        public void Save(Guid m, ClContractType c, IDictionary<string, IEnumerable<string>> b) { }
-
-        public IReadOnlyList<ClContractType> GetContracts() => new List<ClContractType>
-        {
-            new(1, "Standard", null!),
-            new(2, "Article 80", null!)
-        };
-
-        public int? GetSelectedContractId(Guid m) => null;
-
-        public void SelectContract(Guid m, int c) { }
-    }
 
     private sealed class StubHandler : HttpMessageHandler
     {

@@ -15,7 +15,7 @@ namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Erp;
 /// Le flag de présence de signature (MOB-8) vient de la BD Mobile via <see cref="ISignatureRepository"/>.</para>
 ///
 /// <para>La timeline opérationnelle (GetJobTime/SaveJobTime) reste BD Mobile (<see cref="IJobTimeRepository"/>).
-/// Les attributs dynamiques (MOB-13) sont gérés par <see cref="IJobAttributeOverlay"/>.</para>
+/// Les attributs de la mission ne passent plus par ici : Order les sert et les enregistre.</para>
 ///
 /// <para>Pont sync/async : le contrat legacy IJobRepository est synchrone. Sûr hors
 /// SynchronizationContext (ASP.NET Core).</para>
@@ -25,20 +25,17 @@ public class JobRepository : IJobRepository
     private readonly IErpReadApiClient _erp;
     private readonly IJobTimeRepository _jobTimeRepository;
     private readonly ISignatureRepository _signatures;
-    private readonly IJobAttributeOverlay _overlay;
     private readonly ILogger<JobRepository> _logger;
 
     public JobRepository(
         IErpReadApiClient erp,
         IJobTimeRepository jobTimeRepository,
         ISignatureRepository signatures,
-        IJobAttributeOverlay overlay,
         ILogger<JobRepository> logger)
     {
         _erp = erp;
         _jobTimeRepository = jobTimeRepository;
         _signatures = signatures;
-        _overlay = overlay;
         _logger = logger;
     }
 
@@ -66,22 +63,9 @@ public class JobRepository : IJobRepository
             .WithMission(domainMission)
             .WithBeneficiary(domainBeneficiary)
             .WithTimeData(timeData)
-            // MOB-13 : attributs dynamiques (overlay BD Mobile). Coordonnées ERP = baseline verrouillée.
-            .WithContractType(_overlay.BuildContractType(gJobId, BuildBaselines(domainBeneficiary)))
             .WithPersistentSource()
             .Build();
     }
-
-    /// <summary>
-    /// Baseline ERP (verrouillée) des attributs multi-valués : on peut ajouter des
-    /// téléphones/e-mails côté mobile, jamais modifier ceux déjà présents dans l'ERP.
-    /// </summary>
-    private static IDictionary<string, IEnumerable<string>> BuildBaselines(ClJobBeneficiary beneficiary)
-        => new Dictionary<string, IEnumerable<string>>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["PHONES"] = beneficiary.Phones ?? new List<string>(),
-            ["MAILS"] = beneficiary.Emails ?? new List<string>(),
-        };
 
     public bool IsExist(Guid jobId)
         => _erp.GetMissionFullAsync(jobId, CancellationToken.None).GetAwaiter().GetResult() is not null;
@@ -93,10 +77,6 @@ public class JobRepository : IJobRepository
 
     public void SaveJobTime(ClJobTimeData jobTime)
         => _jobTimeRepository.Save(jobTime.JobId, jobTime);
-
-    // ── Édition des attributs : overlay BD Mobile (MOB-13) ───────────────────────
-    public void Save(ClJob Job)
-        => _overlay.Save(Job.Id, Job.ContractType, BuildBaselines(Job.Beneficiary));
 
 
     // ── Mapping ERP (DTO HTTP) → domaine mobile ──────────────────────────────────

@@ -54,15 +54,6 @@ Public Class ClJob
             Return GetProperty(beneficiaryProperty)
         End Get
     End Property
-    Private contractTypeProperty = RegisterProperty(Of ClContractType)(Function(f) f.contractTypeProperty, RelationshipTypes.Child)
-    Public Property ContractType As ClContractType
-        Get
-            Return GetProperty(contractTypeProperty)
-        End Get
-        Private Set(value As ClContractType)
-            SetProperty(contractTypeProperty, value)
-        End Set
-    End Property
 
     Private timeDataProperty = RegisterProperty(Of ClJobTimeData)(Function(f) f.TimeData, RelationshipTypes.Child)
     Public Property TimeData As ClJobTimeData
@@ -129,18 +120,6 @@ Public Class ClJob
     Public Sub SetBeneficiary(beneficiary As ClJobBeneficiary)
         SetProperty(beneficiaryProperty, beneficiary)
     End Sub
-    Public Sub UpdateAttribute(strName As String, newValue As Object) 'As String
-
-        If ContractType.Attributs.ContainsKey(strName) Then
-            If newValue IsNot Nothing Then
-                ContractType.Attributs(strName).Value = newValue.ToString
-            End If
-
-        Else
-            'Throw New ArgumentNullException(strName + " n'est pas présent dans la liste d'attributs")
-        End If
-
-    End Sub
 
     Public Sub SetGoTime(utcDateTime As DateTime?)
 
@@ -189,11 +168,6 @@ Public Class ClJob
         End Function
         Public Function WithTimeData(timeData As ClJobTimeData) As ClJobBuilder
             _job.TimeData = timeData
-            Return Me
-
-        End Function
-        Public Function WithContractType(contractType As ClContractType) As ClJobBuilder
-            _job.ContractType = contractType
             Return Me
 
         End Function

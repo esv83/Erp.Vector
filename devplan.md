@@ -169,7 +169,7 @@ une couche déclarative que la facturation relit et corrige.
 
 | Chapitre | Nature | Attaquable maintenant ? |
 |---|---|---|
-| **A** — Contexte de mission (`OC`) | bascule d'un référentiel, contrat mobile en jeu | A1, A2, A4 **en service**, A5 fait ; A3 et A6 attendent la même chose — la réponse du dev web |
+| **A** — Contexte de mission (`OC`) | bascule d'un référentiel, contrat mobile en jeu | A1, A2, A4, A5 **faits**, A3 vérifié côté API ; restent l'écran web (A3) et une question de calendrier à la facturation (A6) |
 | **B** — Dépendances amont Orders | rien à coder ici : suivre, réclamer, ou coder dans l'autre dépôt | — |
 | **C** — Identité & authentification | sécurité, chaîne de connexion | oui (C2, C3) ; C1 sur décision |
 | **D** — Robustesse des appels sortants | plomberie HTTP, aucun contrat touché | **oui, isolé** |
@@ -215,7 +215,7 @@ cas courant. *(Côté Order : ne pas rejouer le script `062`, défait par `063`.
 écrasement en place, aucun audit. Si la facturation ou l'arbitrage d'un litige doit pouvoir la relire,
 il faut une trace. Sinon, on assume la perte.
 
-### A1 — 🟢 Sélection du contexte (`OC-3b` + `OC-4`) — en service depuis le 2026-08-25
+### A1 — ✅ Sélection du contexte (`OC-3b` + `OC-4`) — en service, chemin unique
 
 En production, la liste des types de mission vient d'Order et le choix de l'ambulancier y retourne.
 Le front n'a changé ni de route ni de format de réponse.
@@ -236,42 +236,22 @@ Le front n'a changé ni de route ni de format de réponse.
 3. L'identifiant reçu est vérifié contre les types réellement proposés. C'était le filet du jour de
    la bascule, pour le client resté sur l'ancienne liste.
 
-**Ce qu'il reste à faire — une seule chose**
+**Ce qu'il reste à faire — plus rien ici.** Le double chemin est retiré (2026-08-27) : les drapeaux,
+les cas d'usage du catalogue local, le résolveur de type et l'aiguillage des contrôleurs ont disparu.
+Il ne reste qu'une source, celle d'Order.
 
-La bascule est **encore réversible par configuration** : l'ancien chemin vit donc toujours dans le
-code, à côté du nouveau. On ne le retire qu'une fois le front confirmé capable d'absorber les refus —
-un filet de compatibilité ne se retire pas d'office (D14). Le contrat lui a été décrit le 25/08, la
-demande de confirmation envoyée le 26/08
-([note](note_web_alexandre_context_mission_confirmation.md)) : **en attente de sa réponse.**
+**Pourquoi sans attendre la réponse du dev web**, alors que la règle est de ne retirer un filet que
+sur confirmation (D14) : parce que la mesure a montré que ce filet-là était plus dangereux que ce
+qu'il protégeait. Le chemin de désarmement ne posait **jamais** `IsReadOnly` et ne validait **aucune**
+valeur. Le rebrancher aurait rouvert à la saisie les **34 dates de naissance verrouillées sur 40**
+(A3) et accepté un NIR à clé fausse en silence — pour se prémunir contre un message d'erreur mal
+affiché. Ce n'était plus un retour arrière, c'était une régression.
 
-**Constaté le 2026-08-26, sans attendre sa réponse** : l'écran fonctionne — on choisit un type, et le
-questionnaire qui revient est bien celui de ce type. Ce n'est pas un détail de confort : le jeu de
-champs est dérivé du type **enregistré chez Order**, donc un identifiant mal apparié ramènerait le
-mauvais formulaire. **Le risque des identifiants en dur est donc levé par l'observation**, et avec lui
-le seul risque qui portait sur la donnée.
+⚠️ **Conséquence assumée** : un incident se corrige désormais par un redéploiement, donc une coupure
+d'API, et non plus par une clé de configuration. Le dev web en est informé — c'est le seul point de
+la note du 2026-08-27 qui appelle une réaction rapide de sa part.
 
-Le doute restant ne porte plus que sur les **chemins de refus**, qu'aucun usage normal ne déclenche
-aujourd'hui — donc que le bon fonctionnement observé ne teste pas.
-
-**Ce que le désarmement rebrancherait, vérifié le 2026-08-26** : le chemin d'avant n'a **ni verrou par
-champ ni validation de valeur** — le cas d'usage historique ne pose jamais `IsReadOnly`, et n'inspecte
-aucune valeur. Désarmer aujourd'hui rouvrirait donc à la saisie les **34 dates de naissance
-verrouillées sur 40** (A3), et accepterait un NIR à clé fausse sans rien dire, dans un magasin que la
-facturation ne lit pas.
-
-⚠️ **Le filet est donc moins sûr que ce qu'il protège.** Le seul défaut qu'on reproche au chemin armé
-est de rendre un message d'erreur là où le front n'en attendait pas ; le désarmement, lui, rouvre une
-donnée de santé non corrigeable. Ce n'est plus un retour arrière, c'est une régression.
-
-⚠️ Tant que ce double chemin existe, **A6 ne peut pas s'exécuter** — les tables qu'elle supprime sont
-exactement ce que le désarmement rebranche.
-
-**En cas d'incident d'ici là** : désarmer par variable d'environnement (`ContextOrder__UseOrderCatalog=false`
-dans le `web.config`), effet immédiat sans coupure. Ne pas repasser le fichier versionné à `false` :
-il faudrait redéployer, donc couper l'API. ⚠️ Ne pas armer en dev sans avoir d'abord redirigé
-`OrdersApi:BaseUrl` — sa valeur de référence pointe la production, et un enregistrement y serait réel.
-
-### A2 — 🟢 Attributs pilotés par Order (`OC-5`) — en service depuis le 2026-08-25
+### A2 — ✅ Attributs pilotés par Order (`OC-5`) — en service, chemin unique
 
 Le questionnaire d'attributs et les valeurs saisies viennent d'Order. Le front garde sa route et son
 format ; deux propriétés s'ajoutent, qui disent qu'un champ est verrouillé et pourquoi.
@@ -295,8 +275,8 @@ format ; deux propriétés s'ajoutent, qui disent qu'un champ est verrouillé et
 Sans le premier cran, l'ambulancier choisirait un type dans un catalogue et verrait les champs d'un
 autre.
 
-**Ce qu'il reste à faire** : le retrait du double chemin, exactement comme en A1 et sous la même
-condition — la réponse du dev web.
+**Ce qu'il reste à faire — plus rien ici.** Le double chemin est retiré avec celui d'A1
+(2026-08-27), pour la même raison et au même moment.
 
 ### A3 — 🟡 Règles métier portées par Order (`OC-6`) — côté API : vérifié
 
@@ -364,19 +344,18 @@ facturation, qui lit les valeurs chez Order.
 Le script de suppression est écrit et **volontairement non joué** :
 [`MOB_008_DropContractOverlay.sql`](CaSoft.Erp.USVector.Infrastructure/Sql/MOB_008_DropContractOverlay.sql).
 
-⛔ **Deux verrous, pas un — et le second m'avait échappé.**
+⛔ **Un seul verrou reste, et ce n'est pas celui qu'on croyait.**
 
-1. **Le chemin de désarmement.** Ces tables *sont* le chemin d'avant : tant qu'on peut revenir en
-   arrière par configuration, les supprimer transformerait ce retour arrière en panne.
-2. **Le paquet terrain.** `FieldAttributesReader` (A4) compose le bloc `attributes` depuis ce même
-   magasin, **indépendamment des drapeaux** — vérifié le 2026-08-27 en tirant le paquet en
-   production, qui sert bien `ContractId: 1 / "Transport standard"`, ids du catalogue Vector. Jouer
-   le `DROP` casserait donc le transfert vers la facturation.
+1. ~~Le chemin de désarmement~~ — **levé le 2026-08-27** : les drapeaux et le second chemin sont
+   retirés (A1), plus rien ne rebranche ces tables.
+2. **Le paquet terrain.** `FieldAttributesReader` (A4) compose le bloc `attributes` depuis ce
+   magasin — vérifié le 2026-08-27 en tirant le paquet en production, qui sert bien
+   `ContractId: 1 / "Transport standard"`. Jouer le `DROP` casserait le transfert vers la facturation.
 
-**Ce qu'il reste à faire** : le premier verrou tombe avec le retrait des drapeaux d'A1/A2. Le second
-n'est pas technique — c'est une question de calendrier à poser à la facturation : *jusqu'à quand
+**Ce qu'il reste à faire** : une question de calendrier à poser à la facturation — *jusqu'à quand
 l'historique d'avant le 2026-08-25 doit-il rester servi ?* Elle lit déjà les valeurs d'Order et les
-fait primer ; ce bloc ne comble que les trous des missions antérieures.
+fait primer ; ce bloc ne comble que les trous des missions antérieures. Le jour où la réponse tombe,
+il reste à retirer le bloc du paquet, puis à jouer `MOB_008`.
 
 ---
 

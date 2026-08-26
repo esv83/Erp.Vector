@@ -1,8 +1,8 @@
 # 🖥️ Note UI Web Vector — Fermer la bascule du contexte : ce qu'il me faut de toi
 
-> **Date** : 2026-08-26 · **Pour** : Alexandre, dev web de l'UI Vector.
-> **Objet** : la bascule du contexte de mission est **en service depuis le 25/08**. Il reste un filet
-> de secours dans le code, et je voudrais le retirer — ça demande ton feu vert.
+> **Date** : 2026-08-27 · **Pour** : Alexandre, dev web de l'UI Vector.
+> **Objet** : la bascule du contexte de mission est **en service depuis le 25/08**, et le filet de
+> secours vient d'être retiré (§3). Je te dois l'explication, et il me reste quatre points à te demander.
 > **Aucune nouveauté de contrat dans cette note** : pas de nouveau champ, pas de nouvelle route, rien
 > à intégrer. Le détail technique est dans [`note_web_alexandre_context_mission_dto.md`](note_web_alexandre_context_mission_dto.md)
 > (25/08), celle-ci ne fait que te demander un **oui / pas encore**.
@@ -14,12 +14,12 @@ Salut Alexandre 👋
 Quatre points, tous déjà décrits dans la note du 25/08 — je les remets en une ligne chacun pour que
 celle-ci se lise seule.
 
-| # | Ce qui a changé | Détail |
+| # | Ce qui a changé | Où c'est détaillé |
 |---|---|---|
-| 1 | **`POST api/Contract/{jobId}` peut échouer** — `409` (type imposé par la régulation), `400` (type non applicable), `404`. Il réussissait **toujours** avant. | §3 |
-| 2 | **`PATCH api/JobEdit/{jobId}` peut échouer** — `409` (champ scellé), `400` (valeur invalide), et c'est **tout ou rien** : sur un 400, *rien* n'est enregistré. | §5 |
-| 3 | **`IsReadOnly` / `ReadOnlyReason`** sur chaque champ du formulaire : afficher la valeur, désactiver la saisie, montrer le motif. | §4 |
-| 4 | **Le NIR n'est corrigeable dans aucun module une fois posé** : à faire relire, ou confirmer avant validation. | « Trois comportements métier » |
+| 1 | **`POST api/Contract/{jobId}` peut échouer** — `409` (type imposé par la régulation), `400` (type non applicable), `404`. Il réussissait **toujours** avant. | note du 25/08, §3 |
+| 2 | **`PATCH api/JobEdit/{jobId}` peut échouer** — `409` (champ scellé), `400` (valeur invalide), et c'est **tout ou rien** : sur un 400, *rien* n'est enregistré. | note du 25/08, §5 |
+| 3 | **`IsReadOnly` / `ReadOnlyReason`** sur chaque champ du formulaire : afficher la valeur, désactiver la saisie, montrer le motif. | note du 25/08, §4 |
+| 4 | **Le NIR n'est corrigeable dans aucun module une fois posé** : à faire relire, ou confirmer avant validation. | note du 25/08, « Trois comportements métier » |
 
 ## 2. Pourquoi je te demande une confirmation plutôt que de conclure que ça marche
 
@@ -36,20 +36,26 @@ voie**, et se réveiller le jour où la régulation configurera son premier type
 de panne qui arrive six semaines plus tard, sur une mission réelle, sans rapport apparent avec quoi
 que ce soit.
 
-## 3. Il y a encore un filet, et c'est lui que je veux retirer
+## 3. Il y avait un filet. Je l'ai retiré, et je te dois l'explication
 
-La bascule est pilotée par deux drapeaux de configuration (`ContextOrder:UseOrderCatalog` et
-`UseOrderAttributes`). Les repasser à `false` **rebranche l'ancien comportement** : catalogue local,
-formulaire d'avant, appels qui réussissent toujours.
+Jusqu'ici, deux drapeaux de configuration permettaient de **revenir à l'ancien comportement en deux
+minutes**, sans redéploiement : catalogue local, formulaire d'avant, appels qui réussissent toujours.
+Je comptais attendre ton feu vert pour les enlever. La mesure m'a fait changer d'avis.
 
-| | Aujourd'hui | Une fois les drapeaux retirés |
-|---|---|---|
-| Si ça casse chez toi | **désarmement en 2 minutes**, par variable d'environnement, **sans coupure d'API ni redéploiement** | retour arrière = redéploiement, donc **API coupée** le temps de la publication |
-| Le code | deux chemins vivants, celui d'avant et celui d'après | un seul |
-| Les six tables `MOB_*` du contrat | encore là, elles *sont* le chemin d'avant | supprimables (script `MOB_008` écrit, non joué) |
+**Ce que j'ai relevé le 26/08 sur 40 missions de production** : la date de naissance est renseignée
+sur 34 d'entre elles, et **verrouillée dans les 34 cas** — avec son motif. Le NIR, lui, n'est
+**jamais** pré-rempli : c'est toujours le terrain qui le pose.
 
-Règle qu'on s'est donnée (D14) : **un filet de compatibilité ne se retire que sur confirmation du
-front, jamais d'office.** D'où cette note.
+**Et ce que faisait l'ancien chemin** : il ne pose *jamais* `isReadOnly` et ne valide *aucune* valeur.
+Revenir en arrière aurait donc rouvert à la saisie ces 34 dates de naissance, et accepté un NIR à clé
+fausse sans un mot — dans un magasin que la facturation ne lit même pas.
+
+Autrement dit, le filet protégeait contre un message d'erreur mal géré en rouvrant une donnée de
+santé non corrigeable. Ce n'était plus un retour arrière, c'était une régression. Il est parti.
+
+⚠️ **Ce que ça change pour toi, concrètement** : si tu constates un problème, le correctif est un
+redéploiement — donc une courte coupure d'API — et non plus une bascule de configuration
+instantanée. **Signale vite plutôt que de contourner.**
 
 ## 4. Ce que je te demande — quatre cases à cocher
 
@@ -68,13 +74,18 @@ Un test qui vaut pour les points 1 et 2, sans rien casser : envoie un `POST api/
 avec un `Id` bidon (`999999`) — tu récupères un **400** propre, aucune écriture, et tu vois comment
 ton écran se comporte.
 
-## 5. Ce qui se passe ensuite
+## 5. Ce que je fais de ta réponse
 
-- **Tu confirmes** → je retire les drapeaux et le second chemin, puis les six tables `MOB_*`. Le
-  chapitre se ferme.
-- **Pas encore** → rien ne bouge, le filet reste en place. Dis-moi juste ce qui manque et sous quel
-  délai, que je ne relance pas dans le vide.
-- **Ça casse aujourd'hui** → dis-le tout de suite : on désarme sans coupure, et on reprend après.
+Ces quatre points ne bloquent plus rien de mon côté — c'est ton écran qu'ils protègent, pas mon
+chantier.
+
+- **Tout est traité** → parfait, je n'ai plus qu'à supprimer les vieilles tables et le chapitre se
+  ferme.
+- **Un ou deux points restent à faire** → dis-le simplement, avec un ordre d'idée de délai. Le `409`
+  ne se déclenche sur aucune mission aujourd'hui, donc rien ne brûle ; le `400` de la saisie, lui,
+  peut arriver dès qu'un ambulancier tape une valeur invalide.
+- **Ça casse déjà** → préviens-moi tout de suite. Le correctif passe maintenant par un
+  redéploiement, autant ne pas le découvrir dans deux semaines.
 
 ## 6. Question sans rapport, tant que je t'écris
 
@@ -104,8 +115,9 @@ c'est de là que ça vient — signale-le, c'est un oubli de notre côté, pas u
 1. **Rien à intégrer** dans cette note : je demande une réponse, pas du travail (sauf le NIR).
 2. Les **409 / 400** ne se déclenchent sur aucune mission aujourd'hui — ton écran peut être cassé
    dessus sans que ça se voie. C'est pour ça que je demande une confirmation explicite.
-3. Tant que tu n'as pas confirmé, **je peux tout remettre comme avant en 2 minutes, sans coupure**.
-   Après retrait du filet, un retour arrière coupe l'API.
+3. **Le retour arrière par configuration n'existe plus** : il rouvrait 34 dates de naissance
+   verrouillées sur 40 et acceptait un NIR faux en silence (§3). Un correctif passe désormais par un
+   redéploiement — signale vite.
 4. **Quatre cases** au §4 → réponds point par point.
 5. **Une question bonus** au §6 : est-ce que tu appelles `api/Contact`, `api/MecanicLog` ou
    `analyze/…` ? Elles répondent 500 depuis toujours.
