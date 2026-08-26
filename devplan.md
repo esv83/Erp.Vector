@@ -215,7 +215,7 @@ cas courant. *(Côté Order : ne pas rejouer le script `062`, défait par `063`.
 écrasement en place, aucun audit. Si la facturation ou l'arbitrage d'un litige doit pouvoir la relire,
 il faut une trace. Sinon, on assume la perte.
 
-### A1 — ✅ Sélection du contexte (`OC-3b` + `OC-4`) — en service, chemin unique
+### A1 — ✅ Sélection du contexte (`OC-3b` + `OC-4`) — en service, chemin unique, déployé
 
 En production, la liste des types de mission vient d'Order et le choix de l'ambulancier y retourne.
 Le front n'a changé ni de route ni de format de réponse.
@@ -251,7 +251,12 @@ affiché. Ce n'était plus un retour arrière, c'était une régression.
 d'API, et non plus par une clé de configuration. Le dev web en est informé — c'est le seul point de
 la note du 2026-08-27 qui appelle une réaction rapide de sa part.
 
-### A2 — ✅ Attributs pilotés par Order (`OC-5`) — en service, chemin unique
+✅ **Déployé et vérifié le 2026-08-27** (commit `4e6de8b`, publication à 00:21). Trois contrôles :
+la section `ContextOrder` a bien disparu de la configuration déployée, l'API répond, et le **paquet
+terrain est identique à l'octet près** à celui d'avant le retrait — c'est le seul point qui pouvait
+régresser, puisque le bloc `attributes` lit encore le magasin Vector (A4).
+
+### A2 — ✅ Attributs pilotés par Order (`OC-5`) — en service, chemin unique, déployé
 
 Le questionnaire d'attributs et les valeurs saisies viennent d'Order. Le front garde sa route et son
 format ; deux propriétés s'ajoutent, qui disent qu'un champ est verrouillé et pourquoi.
@@ -304,6 +309,13 @@ démarrage à froid probable, 40/40 en `200` au tir suivant. Pas de conclusion, 
 **Ce qu'il reste à faire** : rien côté API. Côté écran, afficher le motif du verrou plutôt qu'un
 champ grisé sans explication, et faire relire le numéro de sécurité sociale à la saisie — il n'est
 corrigeable dans aucun module une fois posé. Demandé au dev web le 26/08, avec le reste.
+
+**Les messages de verrou ne nomment plus le référentiel, ils nomment la facturation** *(Order,
+déployé le 2026-08-27)*. L'ambulancier lisait « la modification doit être faite dans AidesNSoft » —
+un système auquel il n'a pas accès et dont il ignore le plus souvent l'existence : le message nommait
+un outil au lieu de dire quoi faire. Mesuré après déploiement sur 25 missions : **8 servent le
+nouveau texte, 0 mentionne encore AidesNSoft**. Les 12 autres portent l'autre motif (« déjà
+renseignée sur la fiche »), qui ne nommait aucun système et n'a pas bougé.
 
 ### A4 — 🟢 Le paquet terrain ne proxifie pas les attributs (`OC-7`) — livré le 2026-08-25
 
@@ -641,6 +653,19 @@ Avec la table de suivi de schéma de **G4**, cela fait deux choses à mettre en 
 lecture** pour répondre à « qu'est-ce qui tourne, où, et sur quoi ». Aujourd'hui la réponse coûte une
 demi-heure et reste incertaine.
 
+
+> 🔎 **En attendant, un moyen fiable existe — il est juste manuel.** Le `.pdb` publié porte le
+> sourcelink, donc le **commit exact** du binaire en service :
+>
+> ```
+> grep -a -o "esv83/Erp.Vector/[0-9a-f]\{40\}" \\192.168.1.112\prod_api\Vector.Api\CaSoft.Erp.USVector.Api.pdb
+> ```
+>
+> C'est ce qui a permis, le 2026-08-26, d'établir que la prod tournait un commit absent de git — puis
+> de vérifier chaque publication. **Les deux modules sont désormais reproductibles depuis git** :
+> Vector à `4e6de8b` et Orders.Api à `28bb9b5`, tous deux vérifiés le 2026-08-27. Cette commande ne
+> remplace pas la route de diagnostic : elle exige un accès au partage, ne dit rien de la base
+> résolue, et personne n'y pense au moment où l'on en a besoin.
 ⚠️ **À gated comme `/api/diag`** : nom de serveur et nom de base ne sont pas des secrets, mais ne se
 publient pas non plus sans authentification.
 
