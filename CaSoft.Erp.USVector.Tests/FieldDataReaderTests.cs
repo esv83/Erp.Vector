@@ -89,8 +89,12 @@ public class FieldDataReaderTests
     {
         public ClMutuelleCard? Current;
         public void Save(ClMutuelleCard c) { }
-        public ClMutuelleCard? GetCurrent(Guid b) => Current;
-        public ClMutuelleCard? GetById(Guid id) => null;
+        public ClMutuelleCard? GetCurrentMetadata(Guid b) => Current;
+        // Le paquet terrain ne doit jamais descendre jusqu'aux octets : ces trois-là lèvent, et
+        // c'est ce qui le prouve.
+        public ClMutuelleCardImage? GetImage(Guid id) => throw new NotSupportedException();
+        public ClMutuelleCardImage? GetCurrentImage(Guid b) => throw new NotSupportedException();
+        public IReadOnlyList<ClMutuelleCardPresence> ListPresence(IReadOnlyCollection<Guid> ids) => throw new NotSupportedException();
         public ClMutuelleCard? Update(ClMutuelleCard c) => null;
     }
 

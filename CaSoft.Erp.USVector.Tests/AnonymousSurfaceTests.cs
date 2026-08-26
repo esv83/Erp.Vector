@@ -27,20 +27,47 @@ namespace CaSoft.Erp.USVector.Tests;
 public class AnonymousSurfaceTests
 {
     /// <summary>
-    /// Les quatre premières sont tirées par la facturation en serveur-à-serveur, sans jeton, faute
-    /// d'authentification de service (DEC-6, devplan §3.C2) — c'est leur unique justification, et
-    /// elle est temporaire. Les deux dernières sont des outils de diagnostic : l'une doit pouvoir
-    /// <i>dire</i> pourquoi l'authentification échoue, l'autre est déjà fermée par configuration.
+    /// Tirées par la facturation en serveur-à-serveur, sans jeton, faute d'authentification de
+    /// service (DEC-6, devplan §3.C2). C'est leur unique justification, et elle est <b>temporaire</b> :
+    /// ces quatre entrées disparaissent le jour où Vector saura présenter un jeton.
     /// </summary>
-    private static readonly string[] SurfaceAttendue =
+    private static readonly string[] OuverturesFauteDeDec6 =
     {
-        "AuthController.WhoAmI",              // doit pouvoir répondre « pas de jeton » — c'est son rôle
-        "DiagController.*",                   // 404 hors dev/staging (Diagnostics:Enabled)
         "DocumentController.GetContent",      // octets d'un document — tirés par la facturation (D8)
         "FieldDataController.Get",            // paquet terrain — tiré par la facturation
         "MutuelleCardController.GetImage",    // ⚠️ donnée de santé — tirée par la facturation (D8)
         "SignatureController.GetSignature"    // octets de la signature — tirés par la facturation (D8)
     };
+
+    /// <summary>
+    /// Ouvertes pour les <b>écrans</b> d'Order et de la facturation, qui affichent la carte mutuelle
+    /// du patient. Justification distincte de la précédente, et il faut la garder distincte : une
+    /// balise <c>&lt;img src&gt;</c> ne portera <b>jamais</b> de jeton, donc ces deux-là ne se
+    /// referment pas en donnant un compte de service à un module — elles se referment le jour où ces
+    /// écrans passent à un <c>fetch</c> authentifié (DEVPLAN_2, 🔴 H1).
+    /// <para>
+    /// Ce qu'elles divulguent est borné : les octets d'une photo, et « ce bénéficiaire en a une ».
+    /// Ni nom de mutuelle, ni code AMC — le sondage de présence les tait délibérément.
+    /// </para>
+    /// </summary>
+    private static readonly string[] OuverturesPourLesEcransAmont =
+    {
+        "MutuelleCardController.GetCurrentImage",  // ⚠️ donnée de santé — <img src> côté Order
+        "MutuelleCardController.ListPresence"      // présence seule, pour une liste de bénéficiaires
+    };
+
+    /// <summary>
+    /// Outils de diagnostic : l'un doit pouvoir <i>dire</i> pourquoi l'authentification échoue,
+    /// l'autre est déjà fermé par configuration.
+    /// </summary>
+    private static readonly string[] OuverturesDeDiagnostic =
+    {
+        "AuthController.WhoAmI",              // doit pouvoir répondre « pas de jeton » — c'est son rôle
+        "DiagController.*"                    // 404 hors dev/staging (Diagnostics:Enabled)
+    };
+
+    private static IEnumerable<string> SurfaceAttendue
+        => OuverturesFauteDeDec6.Concat(OuverturesPourLesEcransAmont).Concat(OuverturesDeDiagnostic);
 
     [Fact]
     public void La_surface_anonyme_est_exactement_celle_qui_est_justifiee()
@@ -58,10 +85,21 @@ public class AnonymousSurfaceTests
     [Fact]
     public void Les_ouvertures_pour_la_facturation_sont_au_nombre_de_quatre()
     {
-        SurfaceAnonyme()
-            .Where(a => a.StartsWith("Document") || a.StartsWith("FieldData")
-                     || a.StartsWith("MutuelleCard") || a.StartsWith("Signature"))
+        SurfaceAnonyme().Intersect(OuverturesFauteDeDec6)
             .Should().HaveCount(4, "elles ne subsistent que faute d'authentification de service (DEC-6)");
+    }
+
+    /// <summary>
+    /// Les ouvertures pour les écrans amont sont **comptées à part**, et doivent le rester : les
+    /// confondre avec les précédentes ferait croire qu'un compte de service les refermera, alors
+    /// qu'elles attendent une décision de front (H1). Deux, pas plus — la carte mutuelle et rien
+    /// d'autre.
+    /// </summary>
+    [Fact]
+    public void Les_ouvertures_pour_les_ecrans_amont_sont_au_nombre_de_deux()
+    {
+        SurfaceAnonyme().Intersect(OuverturesPourLesEcransAmont)
+            .Should().HaveCount(2, "seule la carte mutuelle est consultable depuis les écrans amont");
     }
 
     /// <summary>

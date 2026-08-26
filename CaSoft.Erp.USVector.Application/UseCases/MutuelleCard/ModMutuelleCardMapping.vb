@@ -20,4 +20,14 @@ Public Module ModMutuelleCardMapping
         }
     End Function
 
+    ''' <summary>Présence → DTO, avec l'URL de l'image par bénéficiaire.</summary>
+    <Extension>
+    Public Function ToDtoOut(presence As ClMutuelleCardPresence) As ClMutuelleCardPresenceDtoOut
+        Return New ClMutuelleCardPresenceDtoOut With {
+            .BeneficiaryId = presence.BeneficiaryId,
+            .CapturedAt = presence.CapturedAt,
+            .ImageUrl = $"api/beneficiaries/{presence.BeneficiaryId}/mutuelle-card/image"
+        }
+    End Function
+
 End Module

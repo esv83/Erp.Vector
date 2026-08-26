@@ -58,20 +58,23 @@ secondes** pendant qu'un ambulancier regarde son écran.
 
 ## 1.2 ⚠️ Ce qui a bougé depuis la rédaction *(2026-08-26)*
 
-**La carte mutuelle cesse d'être une route orpheline.** Trois choses, le même jour :
+**La carte mutuelle cesse d'être une route orpheline.** Quatre choses, le même jour :
 
-- l'**écran web de capture est en cours de développement** — la photo va donc être prise, et relue,
-  depuis un navigateur ;
+- l'**écran web de capture est passé en production** — la photo est prise, et relue, depuis un
+  navigateur ;
 - le blocage qui tenait la table vide depuis juin est levé : le détail mission sert désormais
   `beneficiaryId`, sans lequel le front ne pouvait pas construire l'URL de capture
   ([`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) §3.1) ;
 - la décision **M7** pose que la carte est un **document consultable par les autres modules** —
-  **Order** et **BillingGateway** —, et non une source de colonne de facturation.
+  **Order** et **BillingGateway** —, et non une source de colonne de facturation ;
+- **H1 est tranchée** : ces écrans affichent par **balise `<img src>`**, Order une carte à la fois et
+  la facturation une liste de bénéficiaires. Deux routes ouvertes ont été ajoutées pour eux le jour
+  même (§6.0).
 
-⇒ **`GET api/mutuelle-card/{id}/image` n'est plus fermable au motif qu'elle ne sert à personne.** Elle
-va servir à trois publics : l'ambulancier qui relit sa photo, et deux modules serveur. E3 change donc
-de nature (§5) : ce n'est plus « fermer une route morte », c'est **nommer trois appelants**, dont deux
-qui devront présenter un jeton de service qu'ils n'ont pas encore.
+⇒ **Trois publics, et aucun ne peut présenter de jeton pour une image** : un navigateur qui rend une
+balise n'en porte pas. Les routes de carte mutuelle **sortent d'E3** : elles ne sont pas « pas encore
+fermables », elles sont **ouvertes par décision**, et elles ne se refermeront pas avec `DEC-6` mais le
+jour où ces écrans passeront à un `fetch` authentifié.
 
 > 🪤 **La leçon, et elle vaut au-delà de ce plan** : « aucun consommateur prouvé » est un constat
 > **daté**, pas une propriété. Ici il a tenu **un jour**. Toute étape qui ferme une porte sur ce motif
@@ -323,7 +326,16 @@ les 5 min) — **pas** plusieurs milliers. C'est le test réel du cache.
 | `GET api/missions/{id}/field-data` | facturation (`ClVectorFieldDataClient`) | ❌ après compte de service côté facturation |
 | `GET api/Signature/{id}` | facturation (`ClVectorSignatureClient`) | ❌ idem |
 | `GET api/documents/{id}/content` | **aucun prouvé** — absent du DTO tolérant | ✅ sous réserve de 🔴 H1 |
-| `GET api/mutuelle-card/{id}/image` | ⚠️ **trois attendus** *(26/08)* : écran web ambulancier (en cours), **Order** et **BillingGateway** (M7) | ❌ **nommer les trois** avant de fermer — cf. §1.2 |
+| `GET api/mutuelle-card/{id}/image` | facturation (D8) | ❌ avec les deux premières |
+| `GET api/beneficiaries/{id}/mutuelle-card/image` | ⚠️ **écrans** Order + facturation, par balise `<img src>` *(26/08)* | ❌ **pas par DEC-6** — cf. ci-dessous |
+| `POST api/mutuelle-card/presence` | ⚠️ **écran** facturation, liste de bénéficiaires *(26/08)* | ❌ idem |
+
+> ⚠️ **Les deux dernières ne relèvent pas de ce chantier**, et c'est le point à ne pas confondre.
+> Elles sont ouvertes parce qu'une balise `<img src>` **ne portera jamais de jeton** — donner un
+> compte de service à Order n'y changerait rien, puisque c'est un navigateur qui affiche. Elles se
+> referment le jour où ces écrans passent à un `fetch` authentifié, pas le jour où `DEC-6` est fait.
+> `AnonymousSurfaceTests` les compte **à part**, dans un tableau distinct, pour que personne ne les
+> croie couvertes par la séquence E.
 
 ## E1 — ⏳ Mesurer, avant de conclure
 
@@ -382,23 +394,25 @@ par la politique de repli. En dev : jeton ambulancier → tout marche ; jeton de
 **Risque.** **Le plus élevé des trois chantiers** : elle touche la politique globale. À déployer
 **seule**, sur le serveur de dev d'abord, avec `api/Auth/WhoAmI` et `api/JobList/…` comme témoins.
 
-## E3 — ⛔ Nommer les appelants des deux routes d'octets
+## E3 — ⛔ Fermer `documents/content` — *réduit à une seule route*
 
-*Anciennement « fermer les deux routes sans consommateur » — reformulé le 26/08, cf. §1.2.*
+*Anciennement « fermer les deux routes sans consommateur ». Réduit le 26/08 : H1 a été tranchée en
+faveur de la **balise `<img src>`**, donc les routes de carte mutuelle restent ouvertes et sortent de
+cette étape (§6.0).*
 
-**Préalables** : E1 conforme à l'attendu sur 7 jours **et** réponse à 🔴 H1.
+**Préalable** : E1 à zéro sur 7 jours pour `documents/content`.
 
 **Contenu.** `[AllowAnonymous]` → `[Authorize(Policy = "ServiceOuAmbulancier")]` sur
-`DocumentController.GetContent` et `MutuelleCardController.GetImage`. Mettre à jour
-`AnonymousSurfaceTests`. Remplacer les commentaires « ⛔ … se referme avec DEC-6 » par ce qui reste
-ouvert, à qui.
+`DocumentController.GetContent`. Mettre à jour `AnonymousSurfaceTests`. Remplacer le commentaire
+« ⛔ … se referme avec DEC-6 » par ce qui reste ouvert, à qui.
 
-⚠️ **Pour l'image de carte, fermer suppose que les trois appelants sachent présenter un jeton** :
-l'écran web (jeton ambulancier — d'où H1, qui devient bloquant *pour de bon*), **Order** et
-**BillingGateway** (comptes de service à créer dans leurs dépôts respectifs, comme E4.b le fait pour
-la facturation). Fermer avant eux casserait une consultation que M7 vient d'acter.
+⚠️ **Ne pas y rajouter la carte mutuelle par symétrie.** Ses deux routes sont ouvertes **par
+décision**, pas par défaut d'authentification : un navigateur affiche par balise, et une balise ne
+porte pas de jeton. Les fermer ici casserait les écrans d'Order et de la facturation le jour du
+déploiement, sans erreur console et sans qu'aucun test ne le voie. Elles se referment ailleurs — le
+jour où ces écrans passent au `fetch` authentifié.
 
-**Fin.** La donnée de santé n'est plus accessible sans jeton, et chacun de ses lecteurs est nommé.
+**Fin.** Les octets d'un document ne sont plus accessibles sans jeton.
 
 ## E4 — ⛔ Fermer `field-data` et `Signature` — *cross-repo, ordre non permutable*
 
@@ -442,13 +456,13 @@ qui rouvrirait ces quatre routes à l'ambulancier, dont le dossier terrain compl
 
 | # | Décision | Bloque | Enjeu |
 |---|---|---|---|
-| **H1** | L'app web consomme-t-elle `FileUrl` / `ImageUrl`, et par `fetch` ou par **balise directe** ? | **E3** | ⚠️ **Devenue urgente le 26/08** : l'écran de capture de carte mutuelle est en cours d'écriture, donc la réponse existe **maintenant**, chez la personne qui l'écrit. Une balise `<img src>` ne portera **jamais** de jeton : la photo deviendrait un cadre cassé, sans erreur console, sans qu'aucun test ne le voie. **Aucune ligne de code d'E3 avant la réponse.** |
+| ~~**H1**~~ | ~~L'app web consomme-t-elle `ImageUrl` par `fetch` ou par balise directe ?~~ | ~~E3~~ | ✅ **Tranchée le 26/08 : balise `<img src>`**, pour l'écran ambulancier comme pour ceux d'Order et de la facturation. Conséquence assumée : les deux routes de carte mutuelle **restent ouvertes** et sortent du périmètre d'E3 (§6.0). ⚠️ Reste ouverte pour `documents/content`, dont aucun écran n'est identifié — E3 ne concerne plus que celle-là. |
 | **H2** | Rendre `us-facturation` confidentiel, ou créer `us-facturation-svc` ? | **E4.a** | Le rendre confidentiel **casserait son flux OIDC navigateur**. Recommandation : **client distinct** — écran et compte de service ont des cycles de vie et des rayons d'explosion différents. |
 | **H3** | Créer `usvector-api` (sans rôle `realm-management`) et poser son secret. | **S5** | Purement Keycloak + `web.config`. Le code est prêt et inerte sans. |
-| **H4** | Drapeau de réouverture par variable d'environnement sur les routes d'octets ? | **E3** | Assurance d'un cycle de déploiement contre une machinerie permanente. **Recommandation : s'en passer** si H1 est clair. |
+| **H4** | Drapeau de réouverture par variable d'environnement sur `documents/content` ? | **E3** | Assurance d'un cycle de déploiement contre une machinerie permanente. **Recommandation : s'en passer** — H1 est tranchée, et la route n'a aucun consommateur identifié. |
 | **H5** | Accepter **10 s** en lecture et **15 s** en écriture. | **D1** | Arbitrage **produit** — « au bout de combien de temps l'ambulancier préfère-t-il une erreur à une attente ? » — pas une constante technique. |
 | **H6** | Accepter que la politique de repli interdise à tout compte de service d'atteindre l'API mobile. | **E2** | Interdit d'emblée un usage service-à-service futur non prévu, qui devra passer par une politique nommée explicite. **C'est voulu.** |
-| **H7** | **Order et BillingGateway consultent l'image de carte mutuelle (M7) : par quel compte ?** | **E3** | Nouveau *(26/08)*. Soit chacun son client de service, soit un client « lecteur de pièces » partagé. La réponse détermine la liste d'`azp` d'E2 et **le nombre de dépôts à modifier avant de fermer**. |
+| ~~**H7**~~ | ~~Par quel compte Order et BillingGateway consultent-ils l'image ?~~ | ~~E3~~ | ✅ **Sans objet depuis H1** : leurs écrans affichent par `<img src>`, donc **aucun compte**. Les deux routes qu'ils utilisent sont ouvertes et le restent ; aucun `azp` à ajouter, aucun dépôt tiers à modifier. La question renaîtra le jour où l'on voudra les fermer. |
 
 ---
 
@@ -462,7 +476,7 @@ qui rouvrirait ces quatre routes à l'ambulancier, dont le dossier terrain compl
 | **`Directory.Packages.props`** pour Vector | Hygiène ; chantier G du devplan principal. |
 | **`Microsoft.Extensions.Http.Resilience`** | Introuvable dans le parc — **T2**. |
 | **L'autorisation fine** | Comme le dit `Identity.Api`, une liste d'`azp` « n'est pas une autorisation fine : c'est une liste d'appelants reconnus, pas une liste de droits ». Vector va un cran plus loin — deux publics, deux politiques — mais reste **en deçà d'un modèle de droits**. À dire, pour que personne ne croie le problème résolu. |
-| **Le mapping de la carte mutuelle vers une colonne de facturation** | Écarté par **M7** *(26/08)* : la carte est un document **consultable**, pas une source de colonne. Ce plan n'en traite que l'**accès** (E3, H7). |
+| **Le mapping de la carte mutuelle vers une colonne de facturation** | Écarté par **M7** *(26/08)* : la carte est un document **consultable**, pas une source de colonne. Ce plan n'en traite que l'**accès** — et depuis H1, il n'a plus rien à y faire : les deux routes de consultation sont ouvertes et le restent. |
 
 ---
 
@@ -481,7 +495,7 @@ qui rouvrirait ces quatre routes à l'ambulancier, dont le dossier terrain compl
 | S5 | Activation | 🔴 H3 |
 | E1 | Sonde de surface anonyme + 7 jours de mesure | ⏳ |
 | E2 | Deux publics, deux politiques nommées | ⏳ |
-| E3 | Nommer les appelants de `documents/content` et `mutuelle-card/image` | ⛔ E1 + H1 + H7 |
+| E3 | Fermer `documents/content` — la carte mutuelle en est sortie (H1) | ⛔ E1 |
 | E4 | Fermer `field-data` et `Signature` | ⛔ E2 + H2 + facturation |
 | E5 | Retourner `AnonymousSurfaceTests` | ⛔ E4 |
 
@@ -494,7 +508,7 @@ qui rouvrirait ces quatre routes à l'ambulancier, dont le dossier terrain compl
 | [`devplan.md`](devplan.md) §3.C2 | `DEC-6`, les deux sens — **l'état fait foi là-bas** |
 | [`devplan.md`](devplan.md) §3.D | `DEC-7` — idem |
 | [`VECTOR_ORDERS_DECOUPLING_devplan.md`](VECTOR_ORDERS_DECOUPLING_devplan.md) §2 | le chantier d'origine, et les trois restes hors périmètre |
-| [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) | M7 et le contrat exposé — ce qui rend `mutuelle-card/image` non orpheline (§1.2, E3, H7) |
+| [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) | M7 et le contrat exposé — les deux routes de consultation ouvertes le 26/08 (§1.2, §6.0) |
 | `CaSoft.Erp.USVector.Tests/AnonymousSurfaceTests.cs` | la définition exécutable d'« avoir fini » pour `DEC-6` entrant |
 
 ---

@@ -29,7 +29,7 @@ public class MutuelleCardRepositoryTests
         };
 
     [Fact]
-    public void Save_then_GetById_returns_card_with_image()
+    public void Save_then_GetImage_returns_bytes()
     {
         using var ctx = NewContext();
         var sut = new MutuelleCardRepository(ctx);
@@ -37,15 +37,70 @@ public class MutuelleCardRepositoryTests
 
         sut.Save(card);
 
-        var loaded = sut.GetById(card.Id);
+        var loaded = sut.GetImage(card.Id);
         loaded.Should().NotBeNull();
-        loaded!.BeneficiaryId.Should().Be(Ben);
-        loaded.Image.Should().Equal(1, 2, 3);
+        loaded!.Bytes.Should().Equal(1, 2, 3);
         loaded.ContentType.Should().Be("image/jpeg");
     }
 
+    /// <summary>
+    /// Le point du correctif : lire des métadonnées ne doit pas sortir le binaire de la base. Une
+    /// carte de 8 Mo était chargée en entier pour rendre un nom de mutuelle — une fois par mission
+    /// dans la construction du paquet terrain.
+    /// </summary>
     [Fact]
-    public void GetCurrent_returns_most_recent_capture()
+    public void GetCurrentMetadata_ne_charge_pas_le_binaire()
+    {
+        using var ctx = NewContext();
+        var sut = new MutuelleCardRepository(ctx);
+        sut.Save(Card(new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc), 1, 2, 3));
+
+        var meta = sut.GetCurrentMetadata(Ben);
+
+        meta.Should().NotBeNull();
+        meta!.ByteSize.Should().Be(3, "la taille reste une métadonnée, elle");
+        meta.ContentType.Should().Be("image/jpeg");
+        meta.Image.Should().BeNull("le binaire n'est pas dans la projection");
+    }
+
+    /// <summary>
+    /// Le sondage par lot : une entrée par bénéficiaire qui porte une carte, la plus récente, et
+    /// <b>rien</b> pour ceux qui n'en ont pas — c'est ce qui permet à l'appelant de ne rien afficher
+    /// sans avoir demandé ligne par ligne.
+    /// </summary>
+    [Fact]
+    public void ListPresence_rend_la_plus_recente_et_ignore_les_beneficiaires_sans_carte()
+    {
+        using var ctx = NewContext();
+        var sut = new MutuelleCardRepository(ctx);
+        var autre = Guid.Parse("dddddddd-0000-0000-0000-000000000002");
+        var sansCarte = Guid.Parse("dddddddd-0000-0000-0000-000000000003");
+
+        sut.Save(Card(new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc), 1));
+        sut.Save(Card(new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc), 9));
+        var carteAutre = Card(new DateTime(2026, 6, 12, 0, 0, 0, DateTimeKind.Utc), 7);
+        carteAutre.BeneficiaryId = autre;
+        sut.Save(carteAutre);
+
+        var presences = sut.ListPresence(new[] { Ben, autre, sansCarte });
+
+        presences.Should().HaveCount(2);
+        presences.Single(p => p.BeneficiaryId == Ben).CapturedAt
+            .Should().Be(new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc));
+        presences.Should().NotContain(p => p.BeneficiaryId == sansCarte);
+    }
+
+    [Fact]
+    public void ListPresence_sur_un_lot_vide_ne_touche_pas_la_base()
+    {
+        using var ctx = NewContext();
+        var sut = new MutuelleCardRepository(ctx);
+
+        sut.ListPresence(Array.Empty<Guid>()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void GetCurrentMetadata_returns_most_recent_capture()
     {
         using var ctx = NewContext();
         var sut = new MutuelleCardRepository(ctx);
@@ -53,16 +108,16 @@ public class MutuelleCardRepositoryTests
         var recent = Card(new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc), 9);
         sut.Save(recent);
 
-        sut.GetCurrent(Ben)!.Id.Should().Be(recent.Id);
+        sut.GetCurrentMetadata(Ben)!.Id.Should().Be(recent.Id);
     }
 
     [Fact]
-    public void GetCurrent_returns_null_when_no_card()
+    public void GetCurrentMetadata_returns_null_when_no_card()
     {
         using var ctx = NewContext();
         var sut = new MutuelleCardRepository(ctx);
 
-        sut.GetCurrent(Ben).Should().BeNull();
+        sut.GetCurrentMetadata(Ben).Should().BeNull();
     }
 
     [Fact]
@@ -89,7 +144,7 @@ public class MutuelleCardRepositoryTests
         updated.Should().NotBeNull();
         updated!.AmcCode.Should().Be("AMC123");
         updated.OcrStatus.Should().Be("validated");
-        sut.GetById(card.Id)!.Image.Should().Equal(1, 2); // image intacte
+        sut.GetImage(card.Id)!.Bytes.Should().Equal(1, 2); // image intacte
     }
 
     [Fact]

@@ -60,8 +60,24 @@ résout aucun, pour que le bouton de capture disparaisse au lieu de créer une c
 détail mission. Le plan disait « rien à coder côté API » — c'était faux, et c'est ce qui a tenu la
 table vide pendant deux mois.
 
-**Reste** : l'écran web (en cours), puis **mesurer le remplissage de `MOB_MUTUELLE_CARD` en
-production**. L'OCR (§3.2) n'a aucun intérêt tant qu'aucune photo n'arrive.
+**Reste** : **mesurer le remplissage de `MOB_MUTUELLE_CARD` en production**. L'OCR (§3.2) n'a aucun
+intérêt tant qu'aucune photo n'arrive. *(L'écran ambulancier est en production depuis le 26/08.)*
+
+### 3.1.b ✅ Consultation depuis les modules amont *(26/08)*
+
+**Order affiche une carte à la fois, la facturation une liste de bénéficiaires.** Deux formes, deux
+routes, toutes deux **sans jeton** — cohérent avec l'affichage par balise `<img src>` retenu :
+
+- `GET /api/beneficiaries/{id}/mutuelle-card/image` — Order compose l'URL avec le `BEN_ID` qu'il
+  affiche déjà. **Rien à coder côté Order** : il lui faut seulement la base Vector dans sa config front.
+- `POST /api/mutuelle-card/presence` — la facturation envoie les bénéficiaires de sa page en **un
+  appel** et sait lesquels ont une photo. ⚠️ Le sondage ligne par ligne était l'anti-patron à éviter :
+  c'est la forme qui coûte déjà **14,7 s pour 284 missions** sur le paquet terrain.
+
+**Reste côté facturation, et seulement si elle veut les quatre champs saisis** (nom de mutuelle, AMC,
+concentrateur, télétransmission) : son `ClFieldEnrichmentDto` ne déclare **ni `Mutuelle` ni
+`Documents`**, donc Vector sert le bloc et sa désérialisation le jette. Pour la seule photo, elle n'a
+rien à changer.
 
 **Trois points pour le dev web :**
 - validation à l'upload — `image/*` obligatoire, **8 Mo maximum**, sinon `400` avec le motif ; une
@@ -123,8 +139,10 @@ on reste en blob SQL, le firewall ayant retiré le motif DMZ d'origine.
 | Route | Usage |
 |---|---|
 | `POST /api/beneficiaries/{beneficiaryId}/mutuelle-card` | Capture, **multipart** (`IFormFile`), traçabilité optionnelle `crewId` / `missionId` → renvoie l'id de la carte. Validation : MIME `image/*`, taille max. |
-| `GET /api/beneficiaries/{beneficiaryId}/mutuelle-card` | Carte courante : métadonnées + les 4 champs + `imageUrl`. |
-| `GET /api/mutuelle-card/{id}/image` | Les octets, avec le `Content-Type` d'origine. |
+| `GET /api/beneficiaries/{beneficiaryId}/mutuelle-card` | Carte courante : métadonnées + les 4 champs + `imageUrl`. **Jeton requis** (client mobile). ⚠️ Ne charge plus le binaire depuis le 26/08 — il sortait jusqu'à 8 Mo de la base pour rendre un nom de mutuelle. |
+| `GET /api/mutuelle-card/{id}/image` | Les octets d'une carte **désignée**, `Content-Type` d'origine. **Ouverte** (D8). |
+| **`GET /api/beneficiaries/{id}/mutuelle-card/image`** | *(26/08)* Les octets de la carte **courante** — l'URL **stable**, qui suit les nouvelles captures. **Ouverte** : c'est elle que les écrans d'Order et de la facturation affichent par une balise `<img src>`, laquelle ne portera jamais de jeton. |
+| **`POST /api/mutuelle-card/presence`** | *(26/08)* `{ beneficiaryIds: [...] }` → pour ceux qui portent une carte : `{ beneficiaryId, capturedAt, imageUrl }`. Les autres sont **absents** de la réponse. **Ouverte**, plafonnée à **500** par appel. Ne divulgue ni nom de mutuelle ni code AMC. |
 | `PATCH /api/mutuelle-card/{cardId}` | Saisie manuelle `{ mutuelleName, amcCode, concentrateur, teletransmission }` → statut `validated`. |
 | `GET /api/missions/{id}/field-data` | Bloc `mutuelle` du dossier terrain (chemin réellement emprunté par la facturation). |
 

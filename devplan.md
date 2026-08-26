@@ -13,7 +13,7 @@
 > basculé et en service depuis le 2026-08-25** (§3.A).
 > **Prod** : `\\192.168.1.112\prod_api\Vector.Api` (IIS `/vector`) — trafic servi, jetons Keycloak
 > réellement validés depuis le 2026-08-02.
-> **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **136 tests verts** (2026-08-26).
+> **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **140 tests verts** (2026-08-26).
 > **Dernière mise à jour** : 2026-08-26.
 
 | | Sens |
@@ -125,7 +125,7 @@ une couche déclarative que la facturation relit et corrige.
 | Consommation réelle du paquet terrain | mesurée le 2026-08-06 par la facturation : 284 missions acquises |
 | Contexte de mission (type, attributs, paquet terrain) | 58 tests ; **les trois refus constatés en production** le 2026-08-24 ; bascule armée le 2026-08-25 |
 | Verrou par valeur + motif au terrain | Vector `655020a` + Orders `2f7218a`, **déployés en production le 2026-08-26** — vérification terrain à faire (§3.A3) |
-| Suite complète | **136 tests verts** (2026-08-26) · Orders : 840 |
+| Suite complète | **140 tests verts** (2026-08-26) · Orders : 840 |
 
 ## 1.8 ⚠️ Livré mais pas encore exploité
 
@@ -202,7 +202,8 @@ Notes envoyées : [le contrat](note_web_alexandre_context_mission_dto.md) (25/08
 
 > ⚠️ **Deux numérotations `OC-` coexistent.** Ici, un `OC-x` nu désigne la tâche **Vector** ; la tâche
 > Order s'écrit toujours `Order OC-x`
-> ([plan Order](../Erp.Order/feature_order_context_devplan.md) §7, où `Order OC-11` = *tout* ce chapitre).
+> ([`featDesc_ContextOrder.md`](../Erp.Order/docs/features/featDesc_ContextOrder.md) §7, où la ligne
+> « Migration Vector » désigne *tout* ce chapitre).
 
 > ⚠️ **Les identifiants ont changé d'espace le jour de la bascule.** Les deux catalogues n'ont jamais
 > partagé leurs ids — `4` désignait « Article 80 » côté Vector et « Centre 15 » côté Order. Un id
@@ -475,8 +476,10 @@ par `CrewAccess` étaient protégés**. Tout le reste répondait 200 à qui conn
 mission — y compris la structure du formulaire, **valeurs comprises** : une date de naissance de
 patient a été relevée servie sans authentification.
 
-Il reste **quatre ouvertures**, et elles n'ont qu'une justification : la facturation les tire en
-serveur-à-serveur, sans jeton, faute de `DEC-6`.
+Il reste **six ouvertures**, de **deux natures différentes** — et il faut les garder distinctes : les
+confondre ferait croire qu'un compte de service les refermera toutes.
+
+**Quatre faute de `DEC-6`** : la facturation les tire en serveur-à-serveur, sans jeton.
 
 | Route ouverte | Ce qu'elle expose |
 |---|---|
@@ -486,6 +489,18 @@ serveur-à-serveur, sans jeton, faute de `DEC-6`.
 | `GET api/mutuelle-card/{id}/image` | ⚠️ **carte mutuelle — donnée de santé** |
 
 Elles se referment **ensemble**, le jour où Vector saura présenter un jeton de service.
+
+**Deux pour les écrans amont** *(26/08)* : Order et la facturation affichent la carte mutuelle du
+patient par une balise `<img src>`, qui **ne portera jamais de jeton**.
+
+| Route ouverte | Ce qu'elle expose |
+|---|---|
+| `GET api/beneficiaries/{id}/mutuelle-card/image` | ⚠️ la photo, par son bénéficiaire |
+| `POST api/mutuelle-card/presence` | « ce bénéficiaire a une photo », par lot de 500 max — ni nom de mutuelle, ni code AMC |
+
+⚠️ Celles-là **ne se referment pas avec `DEC-6`** : donner un compte de service à Order n'y changerait
+rien, puisque c'est un navigateur qui affiche. Elles attendent que ces écrans passent à un `fetch`
+authentifié — décision `H1` de [`DEVPLAN_2.md`](DEVPLAN_2.md).
 
 ⚠️ **Garde-fou en place** : `AnonymousSurfaceTests` fige la liste exacte de ce qui répond sans jeton.
 Toute route anonyme ajoutée fait échouer la suite — une exception doit être une décision, pas un
@@ -561,8 +576,13 @@ l'écran qui capture est celui d'une **mission**, et **aucun endpoint mobile ne 
 l'identifiant** — le front ne pouvait pas construire l'URL. ✅ **`beneficiaryId` est servi dans le
 bloc patient du détail mission depuis le 2026-08-26**, `null` quand la mission n'en résout aucun.
 
-**Reste** : l'écran web (en cours), puis **mesurer le remplissage en production**. L'extraction
-automatique n'a aucun intérêt tant qu'aucune photo n'arrive.
+✅ **L'écran ambulancier est en production depuis le 26/08**, et la carte est **consultable depuis
+les modules amont** : `GET api/beneficiaries/{id}/mutuelle-card/image` (Order, une carte à la fois)
+et `POST api/mutuelle-card/presence` (facturation, une liste de bénéficiaires en un appel).
+
+**Reste** : **mesurer le remplissage en production** — c'est la seule preuve que la chaîne est
+débloquée, et elle se lit en une requête. L'extraction automatique n'a aucun intérêt tant qu'aucune
+photo n'arrive.
 
 ⚠️ **La carte n'alimente aucune colonne du fichier de facturation** (M7) : c'est un **document
 consultable** par Order et BillingGateway, qu'un opérateur lit et interprète. `C54` n'est donc pas

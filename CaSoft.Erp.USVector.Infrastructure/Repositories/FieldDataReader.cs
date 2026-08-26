@@ -78,7 +78,10 @@ public sealed class FieldDataReader : IFieldDataReader
         // Carte mutuelle courante du bénéficiaire.
         ClMutuelleCardDtoOut? mutuelle = null;
         if (beneficiaryId.HasValue)
-            mutuelle = _mutuelle.GetCurrent(beneficiaryId.Value)?.ToDtoOut();
+            // Métadonnées seules : le paquet annonce l'image par son URL, il ne la transporte pas
+            // (D8, l'aval tire les octets). Lire le binaire ici l'aurait sorti de la base une fois
+            // par mission, pour rien.
+            mutuelle = _mutuelle.GetCurrentMetadata(beneficiaryId.Value)?.ToDtoOut();
 
         // Documents + anomalies (mission-scoped).
         var documents = _documents.ListByMission(missionId).Select(d => d.ToDtoOut()).ToList();
