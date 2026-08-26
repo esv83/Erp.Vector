@@ -89,7 +89,7 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
         throw new HttpRequestException($"Orders.Api PATCH missions/{missionId}/contextOrder → {(int)response.StatusCode}.");
     }
 
-    public async Task<EnContextOrderValuesWriteOutcome> SetContextOrderValuesAsync(
+    public async Task<ContextOrderValuesWriteResult> SetContextOrderValuesAsync(
         Guid missionId,
         IReadOnlyCollection<(string Name, string? Value)> values,
         string? setBy = null,
@@ -97,7 +97,8 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
     {
         var body = new { values = values.Select(v => new { name = v.Name, value = v.Value }).ToList(), setBy };
         var response = await _http.PatchAsJsonAsync($"missions/{missionId}/contextOrder/values", body, JsonOptions, ct);
-        if (response.IsSuccessStatusCode) return EnContextOrderValuesWriteOutcome.Applied;
+        if (response.IsSuccessStatusCode)
+            return new ContextOrderValuesWriteResult(EnContextOrderValuesWriteOutcome.Applied);
 
         // 409/400/404 = réponses métier (ProblemDetails), pas des pannes.
         var outcome = response.StatusCode switch
@@ -111,13 +112,58 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
         var content = await response.Content.ReadAsStringAsync(ct);
         if (outcome.HasValue)
         {
+            // Le corps reste journalisé en entier : le motif extrait part vers le mobile, la trace
+            // garde de quoi diagnostiquer si l'extraction elle-même se met à rendre Nothing.
             _logger.LogWarning("Orders.Api PATCH missions/{MissionId}/contextOrder/values refusé ({Outcome}) : {Status} {Body}",
                 missionId, outcome.Value, (int)response.StatusCode, content);
-            return outcome.Value;
+            return new ContextOrderValuesWriteResult(outcome.Value, ReadProblemDetail(content));
         }
 
         _logger.LogError("Orders.Api PATCH missions/{MissionId}/contextOrder/values a échoué : {Status} {Body}",
             missionId, (int)response.StatusCode, content);
         throw new HttpRequestException($"Orders.Api PATCH missions/{missionId}/contextOrder/values → {(int)response.StatusCode}.");
+    }
+
+    /// <summary>
+    /// Motif affichable d'un refus d'Orders.Api : le <c>detail</c> de son ProblemDetails (RFC 7807),
+    /// à défaut son <c>title</c>. <c>null</c> si le corps n'est pas exploitable.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Rien ne lève ici.</b> Un corps vide, tronqué ou non-JSON est un cas ordinaire — Orders.Api
+    /// n'est pas le seul à pouvoir répondre sur ce chemin (un reverse proxy peut rendre du HTML sur
+    /// un 400). Le refus, lui, est acquis : le perdre parce que sa formulation est illisible
+    /// remplacerait un message imparfait par une exception, ce qui serait strictement pire.
+    /// </para>
+    /// <para>
+    /// <c>title</c> en repli reste utile : « Conflit d'état » n'explique pas la règle, mais dit au
+    /// moins que la saisie a été <b>refusée</b> — c'est déjà ce qui manquait à l'ambulancier.
+    /// </para>
+    /// </remarks>
+    private static string? ReadProblemDetail(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(content);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) return null;
+
+            foreach (var name in new[] { "detail", "title" })
+            {
+                if (doc.RootElement.TryGetProperty(name, out var value)
+                    && value.ValueKind == JsonValueKind.String)
+                {
+                    var text = value.GetString();
+                    if (!string.IsNullOrWhiteSpace(text)) return text.Trim();
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // Corps non-JSON : pas de motif, et surtout pas de panne.
+        }
+
+        return null;
     }
 }

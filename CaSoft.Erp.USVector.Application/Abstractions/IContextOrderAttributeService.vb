@@ -42,12 +42,17 @@ Namespace Port
         ''' reposer une valeur inchangée est sans effet côté Order, seule une <i>modification</i> de
         ''' champ verrouillé est refusée.
         ''' </para>
+        ''' <para>
+        ''' L'issue rendue porte <b>le motif d'Order</b> quand il en donne un : lui seul nomme le
+        ''' champ fautif et la règle enfreinte. Sans lui, l'ambulancier ne peut que constater que
+        ''' sa saisie n'est plus là, et conclure à une perte plutôt qu'à un refus.
+        ''' </para>
         ''' </summary>
         ''' <param name="setBy">Ambulancier à l'origine de la saisie, tracé côté Order. Optionnel.</param>
         Function SaveValuesAsync(missionId As Guid,
                                  values As List(Of ClAttributValueModel),
                                  setBy As String,
-                                 ct As CancellationToken) As Task(Of EnContextOrderValuesOutcome)
+                                 ct As CancellationToken) As Task(Of ClContextOrderValuesResult)
 
     End Interface
 

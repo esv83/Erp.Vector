@@ -52,15 +52,33 @@ public interface IErpWriteApiClient
     /// <see cref="EnContextOrderValuesWriteOutcome"/> et jamais en exception : seule une panne
     /// réelle (5xx, réseau) lève.
     /// </para>
+    /// <para>
+    /// Le refus rapporte aussi <b>le motif d'Order</b> (<c>detail</c> du ProblemDetails), qui nomme
+    /// le champ et la règle : « clé de contrôle du numéro de sécurité sociale incorrecte », « la
+    /// fiche bénéficiaire est maîtrisée par le référentiel AidesNSoft ». C'est la seule phrase qui
+    /// permette à l'ambulancier de corriger sa saisie plutôt que de la croire perdue.
+    /// </para>
     /// </summary>
     /// <param name="values">Couples nom/valeur, tels que le mobile les a saisis.</param>
     /// <param name="setBy">Identifiant ambulancier/équipage, tracé côté Order. Optionnel.</param>
-    Task<EnContextOrderValuesWriteOutcome> SetContextOrderValuesAsync(
+    Task<ContextOrderValuesWriteResult> SetContextOrderValuesAsync(
         Guid missionId,
         IReadOnlyCollection<(string Name, string? Value)> values,
         string? setBy = null,
         CancellationToken ct = default);
 }
+
+/// <summary>
+/// Issue d'une écriture de valeurs d'attributs (OC-5), <b>et le motif qu'Order en a donné</b>.
+/// </summary>
+/// <param name="Outcome">Famille de l'issue, traduite en code HTTP par le contrôleur.</param>
+/// <param name="Reason">
+/// Motif exact rendu par Order, destiné à être affiché. <c>null</c> quand Order n'a pas répondu de
+/// ProblemDetails lisible : le refus reste valable, seul son libellé retombe sur un générique.
+/// </param>
+public sealed record ContextOrderValuesWriteResult(
+    EnContextOrderValuesWriteOutcome Outcome,
+    string? Reason = null);
 
 /// <summary>
 /// Issue d'une écriture de valeurs d'attributs (OC-5). Les trois refus sont des cas métier attendus.

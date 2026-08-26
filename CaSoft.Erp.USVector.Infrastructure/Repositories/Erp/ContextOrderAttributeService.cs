@@ -51,12 +51,15 @@ public sealed class ContextOrderAttributeService : IContextOrderAttributeService
                 Options = IsList(f.Type) ? ToMobileOptions(f.Options) : null,
                 Value = f.Value,
                 IsReadOnly = f.IsReadOnly,
-                ReadOnlyReason = f.ReadOnlyReason
+                // Le verrou est servi tel quel ; son motif, non. Order s'adresse à la régulation et
+                // nomme le référentiel où la fiche se corrige — un système auquel l'ambulancier n'a
+                // pas accès, et dont le nom se lit sur le terrain comme une panne.
+                ReadOnlyReason = ModTerrainLockWording.ForField(f.Name, f.IsReadOnly, f.ReadOnlyReason)
             })
             .ToList();
     }
 
-    public async Task<EnContextOrderValuesOutcome> SaveValuesAsync(
+    public async Task<ClContextOrderValuesResult> SaveValuesAsync(
         Guid missionId, List<ClAttributValueModel> values, string? setBy, CancellationToken ct)
     {
         var payload = (values ?? new List<ClAttributValueModel>())
@@ -65,11 +68,13 @@ public sealed class ContextOrderAttributeService : IContextOrderAttributeService
             .ToList();
 
         // Lot vide : rien à écrire, et surtout pas un aller-retour réseau pour le dire.
-        if (payload.Count == 0) return EnContextOrderValuesOutcome.Applied;
+        if (payload.Count == 0) return ClContextOrderValuesResult.Applied();
 
-        var outcome = await _write.SetContextOrderValuesAsync(missionId, payload, setBy, ct);
+        var write = await _write.SetContextOrderValuesAsync(missionId, payload, setBy, ct);
 
-        return outcome switch
+        // Le motif d'Order traverse tel quel : c'est lui qui nomme le champ et la règle, et le
+        // reformuler ici reviendrait à réécrire une règle qu'on ne détient pas.
+        var outcome = write.Outcome switch
         {
             EnContextOrderValuesWriteOutcome.Applied => EnContextOrderValuesOutcome.Applied,
             EnContextOrderValuesWriteOutcome.FieldLocked => EnContextOrderValuesOutcome.FieldLocked,
@@ -77,6 +82,10 @@ public sealed class ContextOrderAttributeService : IContextOrderAttributeService
             EnContextOrderValuesWriteOutcome.MissionNotFound => EnContextOrderValuesOutcome.MissionNotFound,
             _ => EnContextOrderValuesOutcome.Invalid
         };
+
+        return outcome == EnContextOrderValuesOutcome.Applied
+            ? ClContextOrderValuesResult.Applied()
+            : ClContextOrderValuesResult.Refused(outcome, ModTerrainLockWording.ForRefusal(write.Reason));
     }
 
     private static bool IsList(string? type)

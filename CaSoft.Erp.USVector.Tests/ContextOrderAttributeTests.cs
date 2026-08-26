@@ -86,12 +86,18 @@ public class ContextOrderAttributeTests
 
         var ddn = fields!.Single(f => f.Name == "DDN");
         ddn.IsReadOnly.Should().BeTrue();
-        ddn.ReadOnlyReason.Should().Be("Déjà renseignée sur la fiche du bénéficiaire");
+        ddn.ReadOnlyReason.Should().Be(ModTerrainLockWording.FicheLocked,
+            "DDN et NIR s'adossent à la fiche : leur motif est toujours reformulé pour le terrain");
         ddn.Value.Should().Be("1954-03-02", "un champ verrouillé s'affiche, il ne disparaît pas");
 
         var nir = fields!.Single(f => f.Name == "NIR");
         nir.IsReadOnly.Should().BeFalse();
         nir.ReadOnlyReason.Should().BeNull();
+
+        // Un verrou qui ne s'adosse pas à la fiche garde le motif d'Order : il nomme la cause réelle
+        // et se lit très bien sur le terrain.
+        fields!.Single(f => f.Name == "PMT").ReadOnlyReason
+            .Should().Be("Document déjà récupéré à l'aller");
     }
 
     /// <summary>
@@ -159,7 +165,7 @@ public class ContextOrderAttributeTests
             new() { AttributName = "DDN", AttributValue = "1954-03-02" }
         }, "amb-42", default);
 
-        outcome.Should().Be(EnContextOrderValuesOutcome.Applied);
+        outcome.Outcome.Should().Be(EnContextOrderValuesOutcome.Applied);
         handler.PatchUri!.ToString().Should().Be($"{BaseUrl}missions/{Mission}/contextOrder/values");
 
         using var sent = JsonDocument.Parse(handler.PatchBody!);
@@ -181,7 +187,8 @@ public class ContextOrderAttributeTests
 
         var outcome = await Build(handler).SaveValuesAsync(Mission, new List<ClAttributValueModel>(), null, default);
 
-        outcome.Should().Be(EnContextOrderValuesOutcome.Applied);
+        outcome.Outcome.Should().Be(EnContextOrderValuesOutcome.Applied);
+        outcome.HasReason.Should().BeFalse("un succès n'a rien à expliquer");
         handler.PatchUri.Should().BeNull();
     }
 
@@ -203,7 +210,115 @@ public class ContextOrderAttributeTests
             new() { AttributName = "DDN", AttributValue = "2099-01-01" }
         }, null, default);
 
-        outcome.Should().Be(expected);
+        outcome.Outcome.Should().Be(expected);
+    }
+
+    /// <summary>
+    /// Le cœur du correctif : le motif d'Order arrive intact jusqu'à l'appelant. C'est lui qui nomme
+    /// le champ et la règle — sans lui, l'ambulancier voit sa saisie disparaître et conclut à une
+    /// perte, alors qu'il s'agit d'un refus qu'il pourrait corriger.
+    /// </summary>
+    [Fact]
+    public async Task Le_motif_d_Order_remonte_intact()
+    {
+        const string detail = "'NIR' : clé de contrôle du numéro de sécurité sociale incorrecte.";
+        var handler = new StubHandler(FormPayload,
+            patchStatus: HttpStatusCode.BadRequest,
+            patchBody: $$"""{"title":"Requête invalide","status":400,"detail":"{{detail}}"}""");
+
+        var outcome = await Build(handler).SaveValuesAsync(Mission, new List<ClAttributValueModel>
+        {
+            new() { AttributName = "NIR", AttributValue = "1540375116009" }
+        }, null, default);
+
+        outcome.Outcome.Should().Be(EnContextOrderValuesOutcome.Invalid);
+        outcome.Reason.Should().Be(detail);
+    }
+
+    /// <summary>
+    /// Le motif d'Order nomme le référentiel où la fiche se corrige : utile à la régulation, illisible
+    /// sur un brancard — l'ambulancier n'y a pas accès et le lit comme une panne. Le terrain reçoit
+    /// donc une formulation à son adresse, et le nom du référentiel ne franchit pas la frontière.
+    /// </summary>
+    [Fact]
+    public async Task Le_motif_qui_nomme_le_referentiel_est_reformule_pour_le_terrain()
+    {
+        var handler = new StubHandler(FormPayload,
+            patchStatus: HttpStatusCode.Conflict,
+            patchBody: """
+            {"title":"Conflit d'état","status":409,"detail":"Numéro de sécurité sociale verrouillé : la fiche bénéficiaire est maîtrisée par le référentiel AidesNSoft, la modification doit être faite dans AidesNSoft."}
+            """);
+
+        var outcome = await Build(handler).SaveValuesAsync(Mission, new List<ClAttributValueModel>
+        {
+            new() { AttributName = "NIR", AttributValue = "1540375116001" }
+        }, null, default);
+
+        outcome.Outcome.Should().Be(EnContextOrderValuesOutcome.FieldLocked);
+        outcome.Reason.Should().Be(ModTerrainLockWording.FicheLocked);
+        outcome.Reason.Should().NotContain("AidesNSoft");
+    }
+
+    /// <summary>
+    /// Le reste passe intact : « case déjà cochée » se lit très bien sur le terrain, et le
+    /// remplacer par une phrase générique appauvrirait l'écran sans rien protéger.
+    /// </summary>
+    [Fact]
+    public async Task Un_motif_sans_reference_au_referentiel_passe_intact()
+    {
+        const string detail = "Case « Bon de transport » déjà cochée : elle ne peut plus être décochée.";
+        var handler = new StubHandler(FormPayload,
+            patchStatus: HttpStatusCode.Conflict,
+            patchBody: $$"""{"title":"Conflit d'état","status":409,"detail":"{{detail}}"}""");
+
+        var outcome = await Build(handler).SaveValuesAsync(Mission, new List<ClAttributValueModel>
+        {
+            new() { AttributName = "BT", AttributValue = "1" }
+        }, null, default);
+
+        outcome.Reason.Should().Be(detail);
+    }
+
+    /// <summary>
+    /// À défaut de <c>detail</c>, le <c>title</c> vaut mieux que rien : il n'explique pas la règle,
+    /// mais il dit que la saisie a été <b>refusée</b> — ce qui manquait précisément.
+    /// </summary>
+    [Fact]
+    public async Task Sans_detail_le_titre_du_ProblemDetails_sert_de_motif()
+    {
+        var handler = new StubHandler(FormPayload,
+            patchStatus: HttpStatusCode.Conflict,
+            patchBody: """{"title":"Conflit d'état","status":409}""");
+
+        var outcome = await Build(handler).SaveValuesAsync(Mission, new List<ClAttributValueModel>
+        {
+            new() { AttributName = "NIR", AttributValue = "1540375116001" }
+        }, null, default);
+
+        outcome.Outcome.Should().Be(EnContextOrderValuesOutcome.FieldLocked);
+        outcome.Reason.Should().Be("Conflit d'état");
+    }
+
+    /// <summary>
+    /// Un corps illisible ne doit pas coûter le refus lui-même : l'issue reste typée, seul le motif
+    /// manque, et l'appelant retombe sur son libellé générique. Perdre le refus parce que sa
+    /// formulation est mauvaise serait strictement pire que l'ancien comportement.
+    /// </summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("<html>502 Bad Gateway</html>")]
+    [InlineData("""{"title":"   ","detail":""}""")]
+    public async Task Un_corps_illisible_laisse_l_issue_intacte_et_le_motif_vide(string body)
+    {
+        var handler = new StubHandler(FormPayload, patchStatus: HttpStatusCode.Conflict, patchBody: body);
+
+        var outcome = await Build(handler).SaveValuesAsync(Mission, new List<ClAttributValueModel>
+        {
+            new() { AttributName = "NIR", AttributValue = "1540375116001" }
+        }, null, default);
+
+        outcome.Outcome.Should().Be(EnContextOrderValuesOutcome.FieldLocked);
+        outcome.HasReason.Should().BeFalse();
     }
 
     /// <summary>
@@ -237,14 +352,17 @@ public class ContextOrderAttributeTests
         private readonly string _body;
         private readonly HttpStatusCode _status;
         private readonly HttpStatusCode _patchStatus;
+        private readonly string _patchBody;
 
         public StubHandler(string body = "",
                            HttpStatusCode status = HttpStatusCode.OK,
-                           HttpStatusCode patchStatus = HttpStatusCode.NoContent)
+                           HttpStatusCode patchStatus = HttpStatusCode.NoContent,
+                           string patchBody = "")
         {
             _body = body;
             _status = status;
             _patchStatus = patchStatus;
+            _patchBody = patchBody;
         }
 
         public Uri? PatchUri { get; private set; }
@@ -256,7 +374,7 @@ public class ContextOrderAttributeTests
             {
                 PatchUri = request.RequestUri;
                 PatchBody = request.Content is null ? null : await request.Content.ReadAsStringAsync(ct);
-                return new HttpResponseMessage(_patchStatus) { Content = new StringContent("", Encoding.UTF8, "application/json") };
+                return new HttpResponseMessage(_patchStatus) { Content = new StringContent(_patchBody, Encoding.UTF8, "application/json") };
             }
 
             return new HttpResponseMessage(_status)
