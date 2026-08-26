@@ -98,9 +98,6 @@ public class JobRepository : IJobRepository
     public void Save(ClJob Job)
         => _overlay.Save(Job.Id, Job.ContractType, BuildBaselines(Job.Beneficiary));
 
-    // Écriture commande ERP + sélection de contrat (liste) : hors ossature (MOB-13.8).
-    public void UpdateCommande(ClUpdateCommandeDto CommandDto) => throw new NotImplementedException("MOB-13.8");
-    public IInvoicingRepository Invoicing => throw new NotImplementedException("MOB-13.8");
 
     // ── Mapping ERP (DTO HTTP) → domaine mobile ──────────────────────────────────
 

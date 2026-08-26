@@ -318,8 +318,6 @@ builder.Services.AddHttpClient<CaSoft.Erp.USVector.Infrastructure.Diagnostics.Ke
 builder.Services.AddScoped<ILogRepository, LogRepositoryStub>();
 builder.Services.AddScoped<ILogAnalyzeRepository, LogAnalyzeRepositoryStub>();
 builder.Services.AddScoped<IContactRepository, ContactRepositoryStub>();
-builder.Services.AddScoped<IInvoicingRepository, InvoicingRepositoryStub>();
-builder.Services.AddScoped<IMissionRepositary, MissionRepositoryStub>();
 
 // ── Services applicatifs (portés tels quels de MobApp.Application) ───────────
 builder.Services.AddScoped<ICrewCache, ClCrewListCache>();

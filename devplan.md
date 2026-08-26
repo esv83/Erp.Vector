@@ -169,7 +169,7 @@ une couche déclarative que la facturation relit et corrige.
 
 | Chapitre | Nature | Attaquable maintenant ? |
 |---|---|---|
-| **A** — Contexte de mission (`OC`) | bascule d'un référentiel, contrat mobile en jeu | A1, A2, A4 **en service** ; restent A3, A5, A6 |
+| **A** — Contexte de mission (`OC`) | bascule d'un référentiel, contrat mobile en jeu | A1, A2, A4 **en service**, A5 fait ; A3 et A6 tiennent au même reliquat — l'annonce au dev web |
 | **B** — Dépendances amont Orders | rien à coder ici : suivre, réclamer, ou coder dans l'autre dépôt | — |
 | **C** — Identité & authentification | sécurité, chaîne de connexion | oui (C2, C3) ; C1 sur décision |
 | **D** — Robustesse des appels sortants | plomberie HTTP, aucun contrat touché | **oui, isolé** |
@@ -344,15 +344,26 @@ qu'un complément d'historique, et il reste servi. Rien ne se perd le jour de l'
 **Fin.** Le formulaire dynamique est servi par Order en production, et le drapeau — comme le second
 chemin qu'il porte — est retiré du code.
 
-### A3 — ⏳ Règles métier portées par Order (`OC-6`)
+### A3 — 🟡 Règles métier portées par Order (`OC-6`) — *côté API : vérifié ; reste l'UI*
 
-À respecter côté API/UI Vector, une fois A2 en place :
-- `DDN` / `NIR` pré-remplis depuis la fiche bénéficiaire et **verrouillés dès qu'ils sont connus** ;
-  une saisie sur fiche vide alimente la fiche. DDN en ISO (date future refusée) ; NIR à clé de
-  contrôle vérifiée et **non corrigeable une fois posé** — le faire relire à la saisie.
-- `PMT` / `BT` (prescription, bon de transport) vivent **au niveau commande** : l'aller et le retour
-  partagent la case, scellée dès qu'elle est cochée (409 si on tente de la décocher).
-- `locked` gèle **le choix du type**, pas la saisie des attributs.
+Les règles vivent chez Order et Vector les **relaie sans les rejouer**. Vérifié par lecture du code
+le 2026-08-26, trois points, tous structurels :
+
+- **Le verrou par champ traverse intact** : `IsReadOnly` et `ReadOnlyReason` vont du DTO d'Orders.Api
+  (`ErpReadDtos`) à `ClMobileAppFieldModel` en une recopie, sans condition ni valeur par défaut.
+- **Aucune règle n'est recopiée** : clé de contrôle du NIR, refus d'une date future, partage de la
+  case PMT/BT entre l'aller et le retour — rien de tout cela n'existe côté Vector. Les seules
+  occurrences de `NIR` / `DDN` sont le mapping de la fiche bénéficiaire en lecture. Les refus
+  remontent tels quels en `Invalid` (400) et `FieldLocked` (409).
+- **`locked` ne touche pas le formulaire** : ni `FormStructureController`, ni `JobEditController`, ni
+  `ContextOrderAttributeService` ne le consultent. Le seul verrou qu'ils connaissent est celui **par
+  champ**, qui est une autre notion. La règle « `locked` gèle le choix du type, pas la saisie » tient
+  donc par construction, pas par convention.
+
+**Ce qui reste est côté UI web, et rien côté API** : afficher le motif (`readOnlyReason`) au lieu
+d'un champ grisé sans explication, et **faire relire le NIR à la saisie** — il n'est corrigeable dans
+aucun module une fois posé. À joindre à l'annonce des 409 / 400 (§3.A1), c'est le même interlocuteur
+et le même envoi.
 
 ### A4 — 🟢 Le paquet terrain ne proxifie pas les attributs (`OC-7`) — **livré**
 
@@ -390,20 +401,54 @@ reste servi pour l'historique.
 **Fin.** Atteinte, sauf la dernière ligne (« plus aucune lecture de `MOB_JOB_ATTRIBUTE_VALUE` »), qui
 appartient à A6.
 
-### A5 — ⏳ Nettoyage du code que la bascule remplace (`OC-9`)
+### A5 — 🟢 Nettoyage du code que la bascule remplace (`OC-9`) — **fait le 2026-08-26**
 
-Retirer `JobRepository.UpdateCommande` et `.Invoicing` (`NotImplementedException`),
-`InvoicingRepositoryStub` et `AttributsRepositoryStub` (`NotImplementedStubs.cs`) et leurs
-enregistrements DI. **Préalable** : A1 + A2 livrés. **Fin** : `NotImplementedStubs.cs` supprimé.
+Retirés : `JobRepository.UpdateCommande` et `.Invoicing`, les ports `IInvoicingRepository`,
+`IAttributsRepository`, `IContractTypeRepository`, `IMissionRepositary` — plus aucun consommateur —
+et leurs enregistrements DI. Avec eux partent les DTO et cas d'usage qui n'étaient joignables que par
+là : `ClUpdateJobValuesUseCase` et sa commande, `ClGetJobEditPresenter`, `ClGJobValuePresenter`,
+`ClAttributValueDto`, `ClUpdateCommandeDto`, `ClUpdateContactDto`, et les trois adaptateurs privés
+jamais instanciés de `ClUpdateJobEditUseCase`. **126 tests verts**, aucune route touchée.
 
-### A6 — ⬜ Dépréciation des tables `MOB_*` du contrat (`OC-8`) — *décision d'abord*
+**`NotImplementedStubs.cs` n'est pas supprimé, et la « Fin » annoncée était trop optimiste.** Il en
+reste trois — `ContactRepositoryStub`, `LogRepositoryStub`, `LogAnalyzeRepositoryStub` — parce que
+`ContactController`, `MecanicLogController` et `AnalyzeLogController` les injectent encore. Ces routes
+répondent donc **500** aujourd'hui, et le faisaient déjà : ce n'est pas une régression, c'est une
+dette antérieure que ce lot met au jour. Les quatre stubs qui n'étaient plus injectés nulle part
+(`JobRepositoryStub`, `CrewRepositoryStub`, `SignatureRepositoryStub`, `JobTimeRepositoryStub`) sont
+partis avec le reste.
+
+**Ce qui reste, et qui n'est pas du nettoyage** : trancher le sort de ces trois routes — les
+implémenter ou les retirer du contrat mobile, ce qui relève de **D14** et se coordonne avec le dev
+web. Tant que la question n'est pas posée, le fichier survit avec trois classes et la raison écrite
+en tête.
+
+### A6 — 🟡 Dépréciation des tables `MOB_*` du contrat (`OC-8`) — *décision prise, exécution bloquée*
 
 Concerne `MOB_CONTRACT_TYPE` / `_ATTRIBUTE` / `_ATTRIBUTE_CONTRACT` / `_ATTRIBUTE_OPTION`,
 `MOB_JOB_CONTRACT`, `MOB_JOB_ATTRIBUTE_VALUE`, `JobAttributeOverlayRepository` et ses 11 tests.
 **Donnée en base au 2026-08-24** : `MOB_JOB_ATTRIBUTE_VALUE` = **2 132 lignes**, `MOB_JOB_CONTRACT` =
 **0 ligne** (aucun type jamais sélectionné ; seed = `STANDARD` + `ART80`).
-→ **trancher** : abandon pur (hypothèse retenue — ce sont des données de test) ou reprise vers
-`ORD_ORDER_CONTEXT_VALUE`. La décision conditionne l'écriture d'un script de reprise.
+
+✅ **Tranché le 2026-08-26 : abandon pur.** Ce sont des données de test ; aucune reprise vers
+`ORD_ORDER_CONTEXT_VALUE` ne sera écrite, et le script de reprise côté Order
+(`042_MigrateVectorJobAttributeValues.sql`, jamais joué) reste sans emploi. Ce qu'on assume : la
+saisie terrain antérieure au 2026-08-25 ne sera plus relisible. Elle n'a jamais alimenté la
+facturation, qui lit les valeurs chez Orders.
+
+**Script écrit, volontairement non joué** : [`MOB_008_DropContractOverlay.sql`](CaSoft.Erp.USVector.Infrastructure/Sql/MOB_008_DropContractOverlay.sql)
+— état des lieux, six `DROP` gardés dans l'ordre des clés étrangères, contrôle final, et un filet
+d'archivage laissé en commentaire.
+
+⛔ **Pourquoi il ne peut pas être joué aujourd'hui — et ce n'est pas une question de données.** Ces
+tables portent le **chemin de désarmement** de la bascule. Tant que `ContextOrder:UseOrderCatalog` et
+`UseOrderAttributes` existent, les repasser à `false` doit rendre une API qui fonctionne : c'est le
+levier d'incident d'**A1**, et le seul retour arrière qui n'impose pas de coupure. Jouer le `DROP`
+avant le retrait des drapeaux transformerait ce levier en panne — le désarmement rendrait des 500.
+
+**L'exécution est donc suspendue aux « Fin » d'A1 et d'A2**, elles-mêmes suspendues à l'annonce des
+refus 409 / 400 au dev web. Autrement dit : **A6 ne se ferme pas par une décision de plus, mais par
+la seule chose qui reste due de toute la bascule** — cette annonce.
 
 ---
 
@@ -801,7 +846,7 @@ Prérequis : `net use \\192.168.1.112\prod_api /user:192.168.1.112\DeployApi *`.
 | **Claim `per_id` dans le jeton** | Écarté (2026-07-12) : figé jusqu'au prochain login et non invalidable ; sous turnover, la résolution HTTP cachée est préférée car son cache s'invalide (TTL ramené à 30 min). |
 | **Table `MOB_KM`** telle que planifiée | Le kilométrage est équipage/véhicule-scoped ; il n'y a pas de km par mission. Le besoin réel reste à arbitrer (§3.E1). |
 | **Catalogue autonome de contrats** (`MOB_CONTRACT_*`), son **seed métier** et la **purge des valeurs orphelines** | Le référentiel passe côté Order (§3.A). Le seed provisoire `STANDARD` + `ART80` ne sera jamais complété ; la purge serait au pire un script ponctuel, pas une fonctionnalité. |
-| **Interfaces legacy `IContractTypeRepository` / `IAttributsRepository` / `IInvoicingRepository`** et `JobRepository.UpdateCommande` / `.Invoicing` | Remplacées par un port ciblé, lui-même remplacé par les endpoints ContextOrder. Stubs à retirer (§3.A5). |
+| **Interfaces legacy `IContractTypeRepository` / `IAttributsRepository` / `IInvoicingRepository`** et `JobRepository.UpdateCommande` / `.Invoicing` | Remplacées par un port ciblé, lui-même remplacé par les endpoints ContextOrder. **Retirées le 2026-08-26** (§3.A5). |
 | **`FetchInstructionList` / `AckInstruction` / `GetCrewIdList(date)` / `GetCrewDriver(vehicleId)`** | Aucun équivalent ERP ; hors périmètre, laissés en `NotImplementedException`. |
 | **Blocages levés** : migrations `MOB_003/004/005` « à exécuter en db_owner » · « projection du statut de fin différée, faute de transition côté Orders » | Résolus : tables présentes en base (§4.1) ; la dérivation existe et Vector la pousse — seule la clôture reste la main du régulateur (D11). |
 | **Documents « source PDF ERP »** | Livré autrement : documents et photos stockés côté Vector, servis par Vector.Api. |
