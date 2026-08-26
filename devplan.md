@@ -253,6 +253,16 @@ le seul risque qui portait sur la donnée.
 Le doute restant ne porte plus que sur les **chemins de refus**, qu'aucun usage normal ne déclenche
 aujourd'hui — donc que le bon fonctionnement observé ne teste pas.
 
+**Ce que le désarmement rebrancherait, vérifié le 2026-08-26** : le chemin d'avant n'a **ni verrou par
+champ ni validation de valeur** — le cas d'usage historique ne pose jamais `IsReadOnly`, et n'inspecte
+aucune valeur. Désarmer aujourd'hui rouvrirait donc à la saisie les **34 dates de naissance
+verrouillées sur 40** (A3), et accepterait un NIR à clé fausse sans rien dire, dans un magasin que la
+facturation ne lit pas.
+
+⚠️ **Le filet est donc moins sûr que ce qu'il protège.** Le seul défaut qu'on reproche au chemin armé
+est de rendre un message d'erreur là où le front n'en attendait pas ; le désarmement, lui, rouvre une
+donnée de santé non corrigeable. Ce n'est plus un retour arrière, c'est une régression.
+
 ⚠️ Tant que ce double chemin existe, **A6 ne peut pas s'exécuter** — les tables qu'elle supprime sont
 exactement ce que le désarmement rebranche.
 
@@ -294,6 +304,22 @@ Les règles vivent chez Order, Vector les transmet sans les rejouer. Vérifié d
 2026-08-26 : le verrou par champ traverse en recopie, aucune validation n'est refaite ici, et le
 verrou du **type** n'est consulté nulle part dans le formulaire — un type imposé laisse donc la
 saisie ouverte, par construction et non par convention.
+
+**Mesuré en production le 2026-08-26**, sur 40 missions des trois derniers jours, en interrogeant
+Order directement :
+
+| | |
+|---|---|
+| Champs servis sur toutes les missions | `DDN`, `NIR`, `PHONES`, `MAILS`, `COMMENTS` — puis selon le type : `PMT` (21/40), `BT` (11), `MUTUELLE` (10), `NUM_CENTAURE` (7) |
+| `DDN` renseignée | **34 / 40 — et verrouillée dans les 34 cas, sans une exception** |
+| `NIR` renseigné | **0 / 40** — donc jamais verrouillé, et ouvert à la saisie sur *toutes* les missions |
+
+La règle « renseigné ⇒ verrouillé » est donc appliquée à la lettre, motif affichable compris. Le NIR,
+lui, n'est **jamais** pré-rempli : c'est toujours le terrain qui le pose, et personne ne peut le
+corriger ensuite. C'est ce qui met sa relecture à la saisie au-dessus du reste de la liste.
+
+*(Au passage : interrogé en rafale, l'endpoint a rendu 16 `503` d'affilée avant de se stabiliser —
+démarrage à froid probable, 40/40 en `200` au tir suivant. Pas de conclusion, mais c'est noté.)*
 
 **Ce qu'il reste à faire** : rien côté API. Côté écran, afficher le motif du verrou plutôt qu'un
 champ grisé sans explication, et faire relire le numéro de sécurité sociale à la saisie — il n'est
