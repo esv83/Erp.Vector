@@ -169,7 +169,7 @@ une couche déclarative que la facturation relit et corrige.
 
 | Chapitre | Nature | Attaquable maintenant ? |
 |---|---|---|
-| **A** — Contexte de mission (`OC`) | bascule d'un référentiel, contrat mobile en jeu | A1, A2, A4 **en service**, A5 fait ; A3 et A6 tiennent au même reliquat — l'annonce au dev web |
+| **A** — Contexte de mission (`OC`) | bascule d'un référentiel, contrat mobile en jeu | A1, A2, A4 **en service**, A5 fait ; A3 et A6 attendent la même chose — la réponse du dev web |
 | **B** — Dépendances amont Orders | rien à coder ici : suivre, réclamer, ou coder dans l'autre dépôt | — |
 | **C** — Identité & authentification | sécurité, chaîne de connexion | oui (C2, C3) ; C1 sur décision |
 | **D** — Robustesse des appels sortants | plomberie HTTP, aucun contrat touché | **oui, isolé** |
@@ -182,273 +182,159 @@ une couche déclarative que la facturation relit et corrige.
 
 ## A. Contexte de mission — bascule vers Order (`OC`)
 
-**Le plus gros reste à faire, et il périme une partie du livré.** Le référentiel de type de mission
-a migré côté Order (`Order OC-9`) ; Vector doit devenir consommateur, son catalogue autonome et son
-magasin d'attributs deviennent des doublons.
+Le référentiel des types de mission a migré côté Order ; Vector en est devenu consommateur. **La
+bascule est en service en production depuis le 2026-08-25** : la sélection du type (A1) et le
+questionnaire d'attributs (A2) viennent d'Order, le paquet terrain a suivi (A4), et le code qu'elle
+remplaçait a été retiré (A5).
 
-> ⚠️ **Deux numérotations `OC-` coexistent.** Ici, un `OC-x` nu désigne la tâche **Vector** (commits
-> `OC-x (vector)`). La tâche Order s'écrit toujours `Order OC-x`
-> ([`../Erp.Order/feature_order_context_devplan.md`](../Erp.Order/feature_order_context_devplan.md) §7 —
-> `Order OC-11` = *tout* ce chapitre).
-> **Sources** : [`../Erp.Order/note_vector_orderContext_mission.md`](../Erp.Order/note_vector_orderContext_mission.md)
-> (intégration) · [`note_web_alexandre_vector_type_mission.md`](note_web_alexandre_vector_type_mission.md) (contrat UI).
+**Ce qui reste tient en une phrase.** La bascule est encore réversible par configuration, et on ne
+retire ce filet qu'une fois le dev web confirmé capable d'absorber les nouveaux refus. Sa réponse
+débloque A3 et A6 ; rien d'autre n'attend.
+Notes envoyées : [le contrat](note_web_alexandre_context_mission_dto.md) (25/08) ·
+[la demande de confirmation](note_web_alexandre_context_mission_confirmation.md) (26/08).
 
-**Déjà en place, inerte** (aucun appelant, contrat mobile inchangé) : la **lecture** et l'**écriture**
-HTTP du contexte (`OC-1`, `OC-2`), les **deux ajouts additifs** qui rendent le verrou lisible par le
-front (`OC-3a` : propriété `Locked` par item + route `GET api/Contract/{jobId}/state` →
-`{ locked, contextOrderId, contextOrderCode, contextOrderDisplay, origin }`), et le **relais**
-d'écriture (`OC-4`, traduction par **code** et non par id). Lecture et refus (409/400/404) **vérifiés
-contre l'API de production** le 2026-08-24 ; seule l'issue `Applied` (204) reste non vérifiée en réel
-— elle écrirait pour de bon, et aucun endpoint ne sait annuler la ligne créée.
+> ⚠️ **Deux numérotations `OC-` coexistent.** Ici, un `OC-x` nu désigne la tâche **Vector** ; la tâche
+> Order s'écrit toujours `Order OC-x`
+> ([plan Order](../Erp.Order/feature_order_context_devplan.md) §7, où `Order OC-11` = *tout* ce chapitre).
 
-> **Pourquoi `origin` à côté de `locked`** : un booléen ne porte que deux des quatre situations. Le cas
-> demandé — *« la régulation a posé une valeur, l'ambulancier peut quand même la changer »* — n'est
-> lisible que si l'UI sait d'où vient la valeur. Sans `origin`, une valeur pré-cochée passerait pour
-> un défaut technique et serait changée sans y penser.
+> ⚠️ **Les identifiants ont changé d'espace le jour de la bascule.** Les deux catalogues n'ont jamais
+> partagé leurs ids — `4` désignait « Article 80 » côté Vector et « Centre 15 » côté Order. Un id
+> resté en dur dans le front affiche donc faux **sans lever d'erreur** : c'est le principal risque qui
+> subsiste côté écran.
 
-> ⚠️ **Le piège des identifiants, mesuré en base le 2026-08-24** — les deux catalogues ne partagent
-> pas leurs ids :
->
-> | id | Vector `MOB_CONTRACT_TYPE` | Order `ORD_ORDER_CONTEXT` |
-> |---|---|---|
-> | 1 | `STANDARD` | `CPAM` |
-> | 2 | — | **`ART80`** |
-> | 4 | **`ART80`** | `CENTRE15` |
->
-> Relayer l'entier reçu écrirait **« Centre 15 » là où l'ambulancier a coché « Article 80 »**, sans que
-> rien ne le signale jusqu'à la facturation. D'où la traduction **par code**, avec l'id Order repris de
-> la réponse d'Orders.Api (déjà filtrée agence/mode) — aucune table de correspondance à maintenir.
-> `STANDARD → CPAM` est arbitré (2026-08-24) ; le libellé `ART80` a été corrigé en « Article 80 »
-> (script `MOB_007`). Ce composant **disparaît avec A1**, où l'id reçu sera déjà le bon.
+### ✅ Dépendance levée : le verrou est devenu intentionnel (`Order OC-28`)
 
-### ✅ Dépendance levée : la surchargeabilité passe au catalogue (`Order OC-28`)
+Le verrou n'était pas décidé, il était **dérivé de l'auteur de l'écriture** : toute valeur posée par
+la régulation gelait la mission, sans que personne l'ait voulu — les 4 099 assignations de production
+viennent toutes de la régulation. Depuis le correctif déployé le 2026-08-25, la surchargeabilité est
+une propriété du **type**, configurée une fois, et tout est surchargeable par défaut : plus aucune
+mission n'arrive verrouillée, et « la régulation propose, l'ambulancier garde la main » est devenu le
+cas courant. *(Côté Order : ne pas rejouer le script `062`, défait par `063`.)*
 
-Une seule colonne portait **deux informations** — *qui a écrit* et *est-ce gelé* — et `locked` n'en
-était qu'un dérivé, recopié en trois endroits : **toute** valeur posée par la régulation verrouillait,
-sans que personne l'ait voulu (les **4 099 assignations** de production viennent toutes de la
-régulation). Côté Order, la surchargeabilité devient une colonne du **type** (`OCT_FIELD_OVERRIDABLE`,
-script `063`, `DEFAULT 1` → plus aucune mission verrouillée), `origin` est exposé, et la règle vit en
-un seul endroit — c'est la leçon du bug. **Schéma joué le 2026-08-25** sur `109` et `118`, vérifié
-(7 types sur 7 surchargeables) ; *ne pas rejouer `062`, défait par `063`*. Côté Vector, le vrai
-`origin` est lu avec **repli** sur la déduction : l'ordre de déploiement des deux modules est
-indifférent.
+**À trancher** : quand le terrain écrase une proposition de la régulation, celle-ci est **perdue** —
+écrasement en place, aucun audit. Si la facturation ou l'arbitrage d'un litige doit pouvoir la relire,
+il faut une trace. Sinon, on assume la perte.
 
-**À trancher** : quand le terrain écrase une proposition de la régulation, celle-ci est **perdue**
-(écrasement en place, aucun audit). Si la facturation ou l'arbitrage d'un litige doit pouvoir la
-relire, il faut une colonne dédiée ou une trace d'audit. Sinon on assume la perte.
+### A1 — 🟢 Sélection du contexte (`OC-3b` + `OC-4`) — en service depuis le 2026-08-25
 
-### A1 — 🟢 Bascule de la sélection du contexte (`OC-3b` + `OC-4`) — **déployée et armée**
+En production, la liste des types de mission vient d'Order et le choix de l'ambulancier y retourne.
+Le front n'a changé ni de route ni de format de réponse.
 
-> ✅ **Armée en production depuis le 2026-08-25**, les deux crans. Constaté en service :
-> `GET api/Contract` sert le catalogue Order (7 types, aucun défaut pré-sélectionné) et
-> `GET api/FormStructure` sert le formulaire d'Order, verrou par champ compris (`IsReadOnly`,
-> `ReadOnlyReason` renseignés).
->
-> Les deux valeurs sont **versionnées** dans `appsettings.Production.json`, pas posées à la main sur
-> le serveur : ce fichier est shippé par la publication, donc une valeur serveur serait effacée au
-> déploiement suivant, sans bruit (§5.2).
->
-> ⚠️ **Retour arrière** : ne pas rebasculer le fichier versionné à `false` en cas d'incident — cela
-> demande un déploiement, donc une coupure d'API. Passer par une **variable d'environnement du
-> `web.config`** (`ContextOrder__UseOrderCatalog=false`), seule couche qui survit à une publication et
-> qui l'emporte sur le fichier.
->
-> ⛔ **Reste dû au dev web** : l'annonce des **nouveaux refus** — `409` sur la sélection du type,
-> `409`/`400` sur la saisie des attributs — là où l'appel réussissait toujours. C'est le seul point de
-> la bascule qui n'a pas été traité.
+**Ce que le terrain voit de différent**
+- Aucun type n'est présélectionné : « non renseigné » est l'état de départ normal, là où l'API
+  cochait le premier de la liste.
+- Enregistrer un type peut désormais échouer — la régulation l'a imposé, ou il ne convient pas à la
+  commande — alors que l'appel réussissait toujours.
+- Si l'ERP ne répond pas, la liste arrive **vide** plutôt que fausse : les identifiants du catalogue
+  local ne désignent pas les mêmes types côté Order.
 
-**Livré le 2026-08-25, sous drapeau ; armé en production le jour même.** Les trois
-préalables ci-dessous ne conditionnent plus le *codage* mais l'*armement* : ils sont devenus une
-décision d'exploitation, réversible par une clé de configuration.
+**Trois décisions à ne pas rejouer**
+1. Le lien type ↔ attributs est refait par le code à chaque lecture, plutôt que par une écriture en
+   double dans l'ancienne table — sans quoi on aurait recréé le doublon que tout ce chapitre supprime.
+2. Une panne d'Orders rend une liste vide, jamais le catalogue local : ne rien proposer vaut mieux
+   qu'enregistrer un type pour un autre.
+3. L'identifiant reçu est vérifié contre les types réellement proposés. C'était le filet du jour de
+   la bascule, pour le client resté sur l'ancienne liste.
 
-**Ce que l'armement change** — et rien d'autre :
+**Ce qu'il reste à faire — une seule chose**
 
-| | Désarmé (aujourd'hui) | Armé |
-|---|---|---|
-| `GET api/Contract/{jobId}` | `MOB_CONTRACT_TYPE`, défaut = premier type actif | `availableContextOrders` d'Order (déjà filtré agence/mode), **aucun défaut** — « non renseigné » est un état valide |
-| `POST api/Contract/{jobId}` | écrit `MOB_JOB_CONTRACT`, réussit toujours | relaie le `PATCH` Order ; **409** si verrouillé, **400** si non applicable |
-| `GET api/FormStructure/{jobId}` | jeu d'attributs du type de `MOB_JOB_CONTRACT` | jeu d'attributs du type **effectif chez Order**, retrouvé par code |
+La bascule est **encore réversible par configuration** : l'ancien chemin vit donc toujours dans le
+code, à côté du nouveau. On ne le retire qu'une fois le front confirmé capable d'absorber les refus —
+un filet de compatibilité ne se retire pas d'office (D14). Le contrat lui a été décrit le 25/08, la
+demande de confirmation envoyée le 26/08
+([note](note_web_alexandre_context_mission_confirmation.md)) : **en attente de sa réponse.**
 
-La **forme** des réponses ne bouge pas (D14) : tableau `{ Id, Display, IsSelected, Locked }`. Le
-passage tableau → objet et le renommage `/api/Contract` → `/api/ContextOrder` restent hors de portée
-tant que le front n'a pas basculé.
+⚠️ Tant que ce double chemin existe, **A6 ne peut pas s'exécuter** — les tables qu'elle supprime sont
+exactement ce que le désarmement rebranche.
 
-**Trois décisions prises en codant, à ne pas rejouer :**
-1. **Le lien type ↔ attributs est refait par le code, pas par une double écriture.** Une fois armé,
-   plus rien n'alimente `MOB_JOB_CONTRACT` — d'où `FormStructure` tirait son jeu de champs. Sans
-   traitement, l'ambulancier cocherait « Article 80 » et saisirait les champs du transport standard.
-   Le type effectif est donc **lu chez Order et traduit par code** vers le catalogue Vector, au prix
-   d'un appel HTTP de plus sur le détail mission. Écrire en double dans `MOB_JOB_CONTRACT` aurait
-   coûté moins cher, mais aurait recréé le doublon que tout le chapitre cherche à supprimer.
-2. **Une panne d'Orders.Api rend une liste vide, pas le catalogue local.** Avant la bascule, la liste
-   survivait à une panne de l'ERP ; ce repli deviendrait un piège, puisque les ids locaux seraient
-   relus comme des ids Order au `POST` suivant. Rien à choisir vaut mieux qu'un choix qui part de
-   travers. ⚠️ **Asymétrie volontaire sur `FormStructure`** : une panne y est une *abstention* — on
-   sert le formulaire d'avant la bascule plutôt que d'en retirer des champs à un ambulancier en
-   train de les remplir. Aucun risque au passage : les valeurs sont stockées **par nom d'attribut**,
-   jamais sous l'id d'un type.
-3. **L'id posté est vérifié contre les types réellement proposés.** C'est le filet du jour de
-   l'armement : un client resté sur l'ancienne liste posterait `4` pour `ART80`, quand `4` vaut
-   `CENTRE15` côté Order. Il est refusé sans écriture.
+**En cas d'incident d'ici là** : désarmer par variable d'environnement (`ContextOrder__UseOrderCatalog=false`
+dans le `web.config`), effet immédiat sans coupure. Ne pas repasser le fichier versionné à `false` :
+il faudrait redéployer, donc couper l'API. ⚠️ Ne pas armer en dev sans avoir d'abord redirigé
+`OrdersApi:BaseUrl` — sa valeur de référence pointe la production, et un enregistrement y serait réel.
 
-**Préalables d'armement — trois, tous externes et mesurés :**
-1. **`Order OC-28` déployé.** Le code est écrit et le schéma est joué, mais **l'API en service dérive
-   encore le verrou de l'origine** : 20 missions sur 25 arrivent verrouillées. Armer aujourd'hui
-   ferait échouer quatre sélections sur cinq.
-2. **Le cadenas affiché côté web.** `OC-3a` est livré mais doit être **consommé** : sans lui,
-   l'ambulancier reçoit un 409 sans comprendre pourquoi.
-3. **Les ids en dur levés côté front** (l'id `4` vaut `ART80` côté Vector et `CENTRE15` côté Order).
+### A2 — 🟢 Attributs pilotés par Order (`OC-5`) — en service depuis le 2026-08-25
 
-**Comment on arme** : `ContextOrder:UseOrderCatalog = true` dans l'`appsettings` d'environnement.
-Le désarmement est la même clé — donc un retour arrière **sans redéploiement**, et sans la coupure
-d'API qu'impose `app_offline.htm`. ⚠️ **Ne pas armer en dev sans avoir d'abord redirigé
-`OrdersApi:BaseUrl`** : la valeur de référence pointe la production, et un `POST` y écrirait une
-assignation réelle qu'aucun endpoint Order ne sait annuler.
+Le questionnaire d'attributs et les valeurs saisies viennent d'Order. Le front garde sa route et son
+format ; deux propriétés s'ajoutent, qui disent qu'un champ est verrouillé et pourquoi.
 
-**Fin.** `MOB_CONTRACT_TYPE` n'est plus lu en production, le 409 et le 400 ont été annoncés au dev
-web, et le drapeau — comme le second chemin qu'il porte — est retiré du code.
+**Ce que le terrain voit de différent**
+- Une valeur saisie à l'aller vaut pour le retour : elle vit au niveau de la commande, plus de la
+  mission. Un bon de transport coché à l'aller arrive coché au retour.
+- Date de naissance et n° de sécurité sociale arrivent pré-remplis et **verrouillés** dès que la
+  fiche bénéficiaire les connaît.
+- La saisie devient **tout ou rien** et peut être refusée — valeur invalide, ou champ déjà scellé —
+  là où elle réussissait toujours.
 
-### A2 — 🟢 Attributs pilotés par Order (`OC-5`) — **déployée et armée**
+**Deux décisions à ne pas rejouer**
+1. On renvoie le formulaire entier sans trier les champs verrouillés : Order ignore une valeur
+   reposée à l'identique. Trier ici obligerait à y recopier sa règle du verrou, donc à la voir
+   diverger le jour où il la change.
+2. Aucune règle métier n'est rejouée côté Vector — clé de contrôle du NIR, refus d'une date future,
+   partage de la case entre l'aller et le retour. Elle vit là où vit la donnée.
 
-**Livré le 2026-08-25 sous son propre drapeau** — `ContextOrder:UseOrderAttributes`, distinct de
-celui d'A1 pour que la bascule se fasse en **deux crans observables** plutôt qu'en un saut.
+**Garde-fou de démarrage** : armer les attributs sans la sélection **empêche l'API de démarrer**.
+Sans le premier cran, l'ambulancier choisirait un type dans un catalogue et verrait les champs d'un
+autre.
 
-`GET /missions/{id}/contextOrder/form-structure` et `PATCH …/values` alimentent désormais
-`GET api/FormStructure/{jobId}` et `PATCH api/JobEdit/{jobId}`. Le front ne change **ni d'URL ni de
-parsing** : mêmes champs, mêmes couples nom/valeur. Deux propriétés s'ajoutent (D14) — `IsReadOnly`
-et `ReadOnlyReason` — et portent le verrou **par champ**, celui qui fige une date de naissance déjà
-connue sans figer le reste du formulaire ; à ne pas confondre avec le `locked` du type.
+**Ce qu'il reste à faire** : le retrait du double chemin, exactement comme en A1 et sous la même
+condition — la réponse du dev web.
 
-**Ce que l'armement change pour le terrain** : `PATCH api/JobEdit` devient **tout ou rien** et peut
-refuser — **409** si la saisie *modifie* un champ verrouillé (DDN/NIR connus, PMT/BT scellés),
-**400** si une valeur est invalide. À annoncer au dev web, comme le 409 d'A1.
+### A3 — 🟡 Règles métier portées par Order (`OC-6`) — côté API : vérifié
 
-**Deux décisions prises en codant :**
-1. **Le formulaire entier est renvoyé sans trier les champs verrouillés.** Order ignore une valeur
-   reposée à l'identique et ne refuse que les *modifications*. Trier côté Vector obligerait à y
-   recopier la règle du verrou — donc à la voir diverger le jour où Order la change.
-2. **Aucune règle métier n'est reprise ici.** Clé de contrôle du NIR, refus d'une date future,
-   partage de la case PMT entre l'aller et le retour : tout cela vit chez Order, là où la donnée
-   vit. Vector traduit, il ne valide pas une seconde fois.
+Les règles vivent chez Order, Vector les transmet sans les rejouer. Vérifié dans le code le
+2026-08-26 : le verrou par champ traverse en recopie, aucune validation n'est refaite ici, et le
+verrou du **type** n'est consulté nulle part dans le formulaire — un type imposé laisse donc la
+saisie ouverte, par construction et non par convention.
 
-**Garde-fou de démarrage** : armer `UseOrderAttributes` sans `UseOrderCatalog` **empêche l'API de
-démarrer**, avec un message explicite. Les deux endpoints d'attributs résolvent eux-mêmes
-mission → context effectif : sans le premier cran, l'ambulancier choisirait un type dans un catalogue
-et verrait les champs de l'autre.
+**Ce qu'il reste à faire** : rien côté API. Côté écran, afficher le motif du verrou plutôt qu'un
+champ grisé sans explication, et faire relire le numéro de sécurité sociale à la saisie — il n'est
+corrigeable dans aucun module une fois posé. Demandé au dev web le 26/08, avec le reste.
 
-✅ **Le préalable d'armement soulevé à la livraison est levé (A4, 2026-08-25).** On craignait que
-l'armement vide silencieusement le bloc `attributes` du paquet terrain. Vérification faite, la
-facturation lit ces valeurs **directement chez Orders** et les fait primer : le bloc Vector n'est plus
-qu'un complément d'historique, et il reste servi. Rien ne se perd le jour de l'armement.
+### A4 — 🟢 Le paquet terrain ne proxifie pas les attributs (`OC-7`) — livré le 2026-08-25
 
-**Fin.** Le formulaire dynamique est servi par Order en production, et le drapeau — comme le second
-chemin qu'il porte — est retiré du code.
+**Le plan visait la mauvaise cible.** Il demandait que le bloc `attributes` du paquet terrain vienne
+d'Order ; vérification faite, la facturation lit **déjà** ces valeurs chez Orders et les fait primer.
+Les faire transiter par Vector aurait construit un troisième chemin vers une donnée que le
+consommateur possède avant même de nous appeler — au prix d'un appel HTTP par mission, sur un
+traitement déclenché par un clic et déjà mesuré à 14,7 s pour 284 missions.
 
-### A3 — 🟡 Règles métier portées par Order (`OC-6`) — *côté API : vérifié ; reste l'UI*
+**Ce qui a été fait à la place** : le paquet lit le magasin Vector et rien d'autre, sans passer par le
+résolveur de type. Il est donc **plus rapide qu'avant la bascule**, à contenu identique.
 
-Les règles vivent chez Order et Vector les **relaie sans les rejouer**. Vérifié par lecture du code
-le 2026-08-26, trois points, tous structurels :
+**Pourquoi ce bloc survit** : les valeurs saisies *avant* la bascule n'existent que côté Vector, et
+elles comblent les trous de l'historique. Son retrait n'est pas un sujet de code — il vient avec A6.
 
-- **Le verrou par champ traverse intact** : `IsReadOnly` et `ReadOnlyReason` vont du DTO d'Orders.Api
-  (`ErpReadDtos`) à `ClMobileAppFieldModel` en une recopie, sans condition ni valeur par défaut.
-- **Aucune règle n'est recopiée** : clé de contrôle du NIR, refus d'une date future, partage de la
-  case PMT/BT entre l'aller et le retour — rien de tout cela n'existe côté Vector. Les seules
-  occurrences de `NIR` / `DDN` sont le mapping de la fiche bénéficiaire en lecture. Les refus
-  remontent tels quels en `Invalid` (400) et `FieldLocked` (409).
-- **`locked` ne touche pas le formulaire** : ni `FormStructureController`, ni `JobEditController`, ni
-  `ContextOrderAttributeService` ne le consultent. Le seul verrou qu'ils connaissent est celui **par
-  champ**, qui est une autre notion. La règle « `locked` gèle le choix du type, pas la saisie » tient
-  donc par construction, pas par convention.
+### A5 — 🟢 Nettoyage du code que la bascule remplace (`OC-9`) — fait le 2026-08-26
 
-**Ce qui reste est côté UI web, et rien côté API** : afficher le motif (`readOnlyReason`) au lieu
-d'un champ grisé sans explication, et **faire relire le NIR à la saisie** — il n'est corrigeable dans
-aucun module une fois posé. À joindre à l'annonce des 409 / 400 (§3.A1), c'est le même interlocuteur
-et le même envoi.
+Retirés : les quatre ports qui n'avaient plus aucun consommateur et dont les seules implémentations
+levaient une exception, leurs enregistrements, et tout ce qui n'était joignable que par eux — deux
+présentateurs, un cas d'usage, trois DTO, et des adaptateurs jamais instanciés. **126 tests verts,
+aucune route touchée.**
 
-### A4 — 🟢 Le paquet terrain ne proxifie pas les attributs (`OC-7`) — **livré**
+**La « fin » annoncée — supprimer `NotImplementedStubs.cs` — n'est pas atteignable en l'état.** Il en
+reste trois, injectés par les routes de recherche de bénéficiaire et de main courante mécanicien. Ces
+routes répondent **500**, et le faisaient déjà : ce n'est pas une régression, c'est une dette
+ancienne que ce nettoyage met au jour.
 
-**Livré le 2026-08-25, sans drapeau : le comportement est le même armé ou non.**
+**Ce qu'il reste à faire** : décider du sort de ces trois routes — les implémenter ou les retirer du
+contrat mobile. La question est partie au dev web le 26/08 : est-ce que le front les appelle ?
 
-**Le plan disait « le bloc `attributes` doit venir d'Order ». Vérification faite, c'était la mauvaise
-cible.** Trois constats, relevés dans le code des consommateurs :
+### A6 — 🟡 Dépréciation des tables `MOB_*` du contrat (`OC-8`) — décidée, exécution bloquée
 
-1. `ModUpstreamTranslator.FusionnerAttributs` (facturation) lit **déjà** `mission.ContextOrderAttributes`
-   **chez Orders**, et **Orders l'emporte** à nom égal. Le commentaire y annonce même la disparition du
-   bloc Vector « quand Vector deviendra client d'Orders ».
-2. `ContractId` / `ContractDisplay` sont déclarés dans le DTO miroir de la facturation mais **lus par
-   aucun code de production** — ni chez elle, ni chez la certification.
-3. Le paquet passait par `BuildContractType`, donc par le résolveur de type d'A1 : **un appel HTTP par
-   mission** s'était glissé là sans que personne le demande, sur un traitement mesuré à **14,7 s pour
-   284 missions** déclenché par un clic.
+✅ **Tranché le 2026-08-26 : abandon pur.** Les 2 132 valeurs d'attributs et les 0 sélection de type
+présentes en base sont des données de test ; aucune reprise ne sera écrite. Ce qu'on assume : la
+saisie terrain antérieure au 2026-08-25 ne sera plus relisible — elle n'a jamais alimenté la
+facturation, qui lit les valeurs chez Order.
 
-Faire venir le bloc d'Order aurait donc construit un **troisième chemin** vers une donnée que le
-consommateur possède avant même de nous appeler — au prix de deux appels de plus par mission.
+Le script de suppression est écrit et **volontairement non joué** :
+[`MOB_008_DropContractOverlay.sql`](CaSoft.Erp.USVector.Infrastructure/Sql/MOB_008_DropContractOverlay.sql).
 
-**Ce qui a été fait à la place** : le paquet lit le magasin Vector, et rien d'autre. Port dédié
-`IFieldAttributesReader`, monté sur un overlay **sans résolveur de type** à la racine de composition.
-Le paquet est donc **plus rapide qu'avant la bascule**, pas plus lent, et son contenu est identique à
-l'octet près.
+⛔ **Ce qui bloque n'est pas la donnée, c'est le code.** Ces tables *sont* le chemin de secours de la
+bascule : tant qu'on peut revenir en arrière par configuration, les supprimer transformerait ce
+retour arrière en panne.
 
-**Ce que le bloc apporte encore, et qui justifie qu'il survive** : les valeurs des missions saisies
-**avant** la bascule n'existent que côté Vector. La facturation fait primer celles d'Order ;
-celles-ci comblent les trous. Le retrait complet du bloc n'est donc pas un sujet de code — c'est la
-**décision A6** sur le sort des 2 132 lignes de `MOB_JOB_ATTRIBUTE_VALUE`.
-
-**Effet de bord bienvenu** : le préalable d'armement que la livraison d'A2 avait fait apparaître
-tombe. Armer `UseOrderAttributes` ne vide plus rien — la facturation lit Order, et le bloc Vector
-reste servi pour l'historique.
-
-**Fin.** Atteinte, sauf la dernière ligne (« plus aucune lecture de `MOB_JOB_ATTRIBUTE_VALUE` »), qui
-appartient à A6.
-
-### A5 — 🟢 Nettoyage du code que la bascule remplace (`OC-9`) — **fait le 2026-08-26**
-
-Retirés : `JobRepository.UpdateCommande` et `.Invoicing`, les ports `IInvoicingRepository`,
-`IAttributsRepository`, `IContractTypeRepository`, `IMissionRepositary` — plus aucun consommateur —
-et leurs enregistrements DI. Avec eux partent les DTO et cas d'usage qui n'étaient joignables que par
-là : `ClUpdateJobValuesUseCase` et sa commande, `ClGetJobEditPresenter`, `ClGJobValuePresenter`,
-`ClAttributValueDto`, `ClUpdateCommandeDto`, `ClUpdateContactDto`, et les trois adaptateurs privés
-jamais instanciés de `ClUpdateJobEditUseCase`. **126 tests verts**, aucune route touchée.
-
-**`NotImplementedStubs.cs` n'est pas supprimé, et la « Fin » annoncée était trop optimiste.** Il en
-reste trois — `ContactRepositoryStub`, `LogRepositoryStub`, `LogAnalyzeRepositoryStub` — parce que
-`ContactController`, `MecanicLogController` et `AnalyzeLogController` les injectent encore. Ces routes
-répondent donc **500** aujourd'hui, et le faisaient déjà : ce n'est pas une régression, c'est une
-dette antérieure que ce lot met au jour. Les quatre stubs qui n'étaient plus injectés nulle part
-(`JobRepositoryStub`, `CrewRepositoryStub`, `SignatureRepositoryStub`, `JobTimeRepositoryStub`) sont
-partis avec le reste.
-
-**Ce qui reste, et qui n'est pas du nettoyage** : trancher le sort de ces trois routes — les
-implémenter ou les retirer du contrat mobile, ce qui relève de **D14** et se coordonne avec le dev
-web. Tant que la question n'est pas posée, le fichier survit avec trois classes et la raison écrite
-en tête.
-
-### A6 — 🟡 Dépréciation des tables `MOB_*` du contrat (`OC-8`) — *décision prise, exécution bloquée*
-
-Concerne `MOB_CONTRACT_TYPE` / `_ATTRIBUTE` / `_ATTRIBUTE_CONTRACT` / `_ATTRIBUTE_OPTION`,
-`MOB_JOB_CONTRACT`, `MOB_JOB_ATTRIBUTE_VALUE`, `JobAttributeOverlayRepository` et ses 11 tests.
-**Donnée en base au 2026-08-24** : `MOB_JOB_ATTRIBUTE_VALUE` = **2 132 lignes**, `MOB_JOB_CONTRACT` =
-**0 ligne** (aucun type jamais sélectionné ; seed = `STANDARD` + `ART80`).
-
-✅ **Tranché le 2026-08-26 : abandon pur.** Ce sont des données de test ; aucune reprise vers
-`ORD_ORDER_CONTEXT_VALUE` ne sera écrite, et le script de reprise côté Order
-(`042_MigrateVectorJobAttributeValues.sql`, jamais joué) reste sans emploi. Ce qu'on assume : la
-saisie terrain antérieure au 2026-08-25 ne sera plus relisible. Elle n'a jamais alimenté la
-facturation, qui lit les valeurs chez Orders.
-
-**Script écrit, volontairement non joué** : [`MOB_008_DropContractOverlay.sql`](CaSoft.Erp.USVector.Infrastructure/Sql/MOB_008_DropContractOverlay.sql)
-— état des lieux, six `DROP` gardés dans l'ordre des clés étrangères, contrôle final, et un filet
-d'archivage laissé en commentaire.
-
-⛔ **Pourquoi il ne peut pas être joué aujourd'hui — et ce n'est pas une question de données.** Ces
-tables portent le **chemin de désarmement** de la bascule. Tant que `ContextOrder:UseOrderCatalog` et
-`UseOrderAttributes` existent, les repasser à `false` doit rendre une API qui fonctionne : c'est le
-levier d'incident d'**A1**, et le seul retour arrière qui n'impose pas de coupure. Jouer le `DROP`
-avant le retrait des drapeaux transformerait ce levier en panne — le désarmement rendrait des 500.
-
-**L'exécution est donc suspendue aux « Fin » d'A1 et d'A2**, elles-mêmes suspendues à l'annonce des
-refus 409 / 400 au dev web. Autrement dit : **A6 ne se ferme pas par une décision de plus, mais par
-la seule chose qui reste due de toute la bascule** — cette annonce.
+**Ce qu'il reste à faire** : rien ici. A6 s'exécute le jour où A1 et A2 retirent leur double chemin —
+donc le jour où le dev web répond.
 
 ---
 
