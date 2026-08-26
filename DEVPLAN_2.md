@@ -5,11 +5,15 @@
 > (authentification de service, **dans les deux sens**) et `DEC-7` (résilience des appels sortants).
 >
 > **Ce document n'est pas une seconde source de vérité.** Le devplan principal garde l'état
-> (`devplan.md` §3.C2 et §3.D) ; ici vit le détail d'exécution : quoi coder, dans quel ordre, et
-> comment savoir que c'est fini. Les trois autres restes du §2 — `DET-4`, `DET-3`, option 4b — ne
-> sont **pas** dans ce plan et restent suivis au devplan principal.
+> ([`devplan.md`](devplan.md) §3.C2 et §3.D) ; ici vit le détail d'exécution : quoi coder, dans quel
+> ordre, et comment savoir que c'est fini. Les trois autres restes du §2 — `DET-4`, `DET-3`,
+> option 4b — ne sont **pas** dans ce plan et restent suivis au devplan principal.
 >
-> **Branche** : `feat/decouplage-dec6-dec7` · **Créé le** : 2026-08-25.
+> **Statut** : ⏳ **aucune étape livrée** — le plan est écrit, le code ne l'est pas. Rien ici n'est
+> commencé, et rien n'y bloque hors décisions humaines (§6).
+> **Branche** : `feat/decouplage-dec6-dec7` — ⚠️ elle porte aujourd'hui **autre chose** que ce plan
+> (correctifs du contexte de mission et carte mutuelle, §1.2). Le premier commit `DEC-` reste à venir.
+> **Créé le** : 2026-08-25 · **Dernière mise à jour** : 2026-08-26.
 
 | | Sens |
 |---|---|
@@ -17,13 +21,14 @@
 | ⏳ | à faire, rien ne bloque |
 | ⛔ | bloqué (décision humaine, ou livrable d'un autre dépôt) |
 | 🔴 | décision qui appartient à un humain |
+| ⚠️ | piège avéré / garde-fou |
 
 ---
 
 # 1. Pourquoi ce plan existe
 
 Le découplage est **livré** : Vector ne compile plus Orders, il le consomme en HTTP. Ce qui restait
-au §2 tenait de la précaution — jusqu'à aujourd'hui.
+au §2 tenait de la précaution — jusqu'au 25/08.
 
 `DEC-6` était écrit comme une **anticipation** : « le jour où Orders.Api sera protégée ». Or la
 fermeture de l'API Vector par défaut, livrée et déployée le 2026-08-25, a laissé **quatre routes
@@ -40,21 +45,65 @@ secondes** pendant qu'un ambulancier regarde son écran.
    rejeté**. `DEC-6` sortant est intégralement livrable **sans coordination avec Orders**, et sans
    risque : inerte tant qu'il n'est pas configuré, en-tête ignoré une fois qu'il l'est.
 
-2. **Deux des quatre routes ouvertes n'ont aucun consommateur prouvé.** Le DTO tolérant de la
-   facturation (`ClVectorFieldDataClient.vb`) déclare `MissionId, OrderId, UpdatedAt, Timeline,
-   Signature, Attributes, Kilometers` — **ni `Documents`, ni `Mutuelle`**. Les `FileUrl` / `ImageUrl`
-   que Vector produit sont donc **jetés à la désérialisation**. La certification, elle, n'appelle pas
-   Vector du tout. Il ne reste qu'un consommateur possible : **l'app web** — et c'est la seule
-   question à poser avant de fermer (🔴 H1).
+2. **Deux des quatre routes ouvertes n'avaient aucun consommateur prouvé** *(constat du 25/08 —
+   ⚠️ **partiellement périmé, cf. §1.2**)*. Le DTO tolérant de la facturation
+   (`ClVectorFieldDataClient.vb`) déclare `MissionId, OrderId, UpdatedAt, Timeline, Signature,
+   Attributes, Kilometers` — **ni `Documents`, ni `Mutuelle`**. Les `FileUrl` / `ImageUrl` que Vector
+   produit sont donc jetés à la désérialisation. La certification, elle, n'appelle pas Vector du tout.
 
 3. **Les tests existants n'exercent pas le pipeline d'injection.** `ContextOrderAttributeTests.Build()`
    construit les clients à la main. Conséquence double : `DEC-7` **ne peut pas casser** les tests
    existants, et il **ne peut pas être testé** si les politiques restent inlinées dans `Program.cs`.
    D'où la fabrique publique en D2.
 
+## 1.2 ⚠️ Ce qui a bougé depuis la rédaction *(2026-08-26)*
+
+**La carte mutuelle cesse d'être une route orpheline.** Trois choses, le même jour :
+
+- l'**écran web de capture est en cours de développement** — la photo va donc être prise, et relue,
+  depuis un navigateur ;
+- le blocage qui tenait la table vide depuis juin est levé : le détail mission sert désormais
+  `beneficiaryId`, sans lequel le front ne pouvait pas construire l'URL de capture
+  ([`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) §3.1) ;
+- la décision **M7** pose que la carte est un **document consultable par les autres modules** —
+  **Order** et **BillingGateway** —, et non une source de colonne de facturation.
+
+⇒ **`GET api/mutuelle-card/{id}/image` n'est plus fermable au motif qu'elle ne sert à personne.** Elle
+va servir à trois publics : l'ambulancier qui relit sa photo, et deux modules serveur. E3 change donc
+de nature (§5) : ce n'est plus « fermer une route morte », c'est **nommer trois appelants**, dont deux
+qui devront présenter un jeton de service qu'ils n'ont pas encore.
+
+> 🪤 **La leçon, et elle vaut au-delà de ce plan** : « aucun consommateur prouvé » est un constat
+> **daté**, pas une propriété. Ici il a tenu **un jour**. Toute étape qui ferme une porte sur ce motif
+> doit revérifier le motif au moment de la fermer — c'est ce que fait E1, et c'est pourquoi il reste
+> le premier de la séquence.
+
+⚠️ **La branche porte autre chose que ce plan.** `feat/decouplage-dec6-dec7` contient à ce jour le
+correctif du verrou de contexte, la remontée du motif de refus au mobile, la mise à jour des plans et
+le `beneficiaryId`. Aucun commit `DEC-`. Qui reprend la branche ne doit pas en déduire que le chantier
+est entamé.
+
 ---
 
-# 2. Ordre de livraison
+# 2. Décisions actées — ne pas rejouer
+
+| # | Décision |
+|---|---|
+| **T1** | **`DelegatingHandler`, et ce sera le premier du parc.** Trois raisons indépendantes : *(a)* les deux clients HTTP restent **purs**, donc testables en trois lignes — y injecter un fournisseur de jeton forcerait quatre harnais existants à stuber un jeton pour tester du parsing JSON ; *(b)* le **rejeu sur 401** n'est faisable que là, il faut voir la réponse — depuis les sites d'appel il faudrait le dupliquer dans 14 méthodes ; *(c)* l'**ordre avec Polly devient exprimable** : enregistré *après* les politiques, le handler d'auth est le plus **interne**, donc chaque tentative relit le jeton en cache. Le contre-argument (« aucun `DelegatingHandler` dans le parc ») est réel mais ne pèse pas : 40 lignes, locales à un enregistrement. |
+| **T2** | **Polly, pas `Microsoft.Extensions.Http.Resilience`.** Ce dernier est introuvable dans tout le parc ; l'introduire ferait de Vector le seul module à porter **deux** modèles de résilience. |
+| **T3** | **Fabriques de politiques publiques**, là où celles de la facturation sont privées. C'est le seul moyen de les tester (D3). Écart assumé au modèle maison, pour la raison qui manquait au modèle maison. |
+| **T4** | **Recul 200 ms / 600 ms, pas 2/4/8 s.** Sous un budget de 10 s, un recul de 2+4+8 = 14 s ne produirait **jamais** la troisième tentative. Écrire un réessai qui ne peut pas s'exécuter, c'est fabriquer une illusion de robustesse. Gigue **±50 %** pour ne pas synchroniser une flotte de mobiles sur le même redémarrage d'Orders. |
+| **T5** | **Le fournisseur de jeton a son propre `HttpClient`**, jamais celui d'Orders — sinon le jeton passerait par le disjoncteur d'Orders, et **une panne d'Orders empêcherait d'obtenir un jeton**. |
+| **T6** | **Le compte de service ne mutualise rien avec `usvector-diag`.** Deux clients Keycloak distincts : le diag porte `realm-management/view-users`, le compte d'API n'en a pas besoin et **ne doit pas les avoir**. Deux durées de vie (quelques fois par mois à la main / toutes les 5 min sous concurrence) et deux rayons d'explosion (une page de diagnostic / la joblist de toute la flotte). On recopie 15 lignes plutôt que de coupler un outil de dev au chemin chaud de production. |
+| **T7** | **Échec d'obtention de jeton = Warning + `null`, jamais une exception.** L'appel part sans en-tête et prendra un 401 le jour où Orders sera protégée — symptôme lisible, plutôt qu'un 500 fabriqué par Vector. |
+| **T8** | **Le handler d'auth est enregistré inconditionnellement, dans tous les environnements.** Le conditionner à `IsConfigured` créerait un câblage qui n'existe qu'en production, donc **jamais exercé avant d'être indispensable**. Non configuré ⇒ trafic **octet pour octet** celui d'aujourd'hui. |
+| **T9** | **Trois notions, pas deux** : jetons *acceptés* à la porte, client *ambulancier* (politique de repli → toute l'API mobile), clients *de service* (politiques nommées → quatre routes et rien d'autre). Copier telle quelle la liste d'`azp` d'`Erp.Identity` ouvrirait **toute l'API mobile** au compte de la facturation — remplacer une porte ouverte à tous par une porte ouverte à un service qui n'a rien à y faire. |
+| **T10** | **Deux politiques nommées, pas une.** `field-data` est un paquet de transfert qu'aucun écran ne consomme → service-only. Les routes d'octets ont un usage humain plausible — l'ambulancier relit la photo qu'il vient de prendre → `ServiceOuAmbulancier`. Les mettre toutes en service-only casserait une fonctionnalité mobile pour rien. |
+| **T11** | **Le point de jeton est dérivé de `Keycloak:Authority`, pas découvert par OIDC.** Vector valide déjà le format de l'Authority au démarrage, la découverte ajouterait un aller-retour sur le chemin chaud, et `/protocol/openid-connect/token` est déjà écrit en dur à `KeycloakAdminClient.cs:49` — on aligne au lieu de créer une incohérence. |
+
+---
+
+# 3. Ordre de livraison
 
 ```
 D1 → D2 → D3                                   aucune dépendance externe
@@ -68,10 +117,13 @@ E1 → [mesure 7 j] + [réponse dev web] → E2 → E3
 > 💡 **Séquence conseillée** : livrer **E1 en premier** — risque nul, et il démarre le compteur de
 > 7 jours. Dérouler D et S pendant que la mesure court. Le chemin critique du chantier E est du
 > **temps calendaire**, pas du temps de développement.
+>
+> ⚠️ Cette mesure est d'autant plus nécessaire depuis §1.2 : la surface des appelants a changé en un
+> jour, et E1 est le seul moyen de savoir qui appelle **au moment où l'on ferme**.
 
 ---
 
-# 3. Chantier D — `DEC-7`, résilience des appels sortants
+# 4. Chantier D — `DEC-7`, résilience des appels sortants
 
 ## D1 — ⏳ Timeouts explicites
 
@@ -105,25 +157,16 @@ Au chronomètre, sans instrumentation.
 
 **Risque.** Un appel Orders légitimement lent (> 10 s) deviendrait une erreur. Aucun appel unitaire
 connu ne s'en approche — les 14,7 s mesurées côté facturation sont un **cumul de 284 appels**, pas un
-appel. À valider sur le serveur de dev avant la prod.
+appel. À valider sur le serveur de dev avant la prod. *(Arbitrage produit : 🔴 H5.)*
 
 ## D2 — ⏳ Réessai et disjoncteur (Polly), en **fabrique publique**
 
 **Paquet** : `Microsoft.Extensions.Http.Polly` **8.0.10**, dans
-`CaSoft.Erp.USVector.Infrastructure.csproj` (tout y est déjà pinné en 8.0.10). ⚠️ **Ne pas**
-introduire `Microsoft.Extensions.Http.Resilience` : il est introuvable dans tout le parc, et Vector
-deviendrait le seul module à porter deux modèles de résilience. **Polly, comme partout.**
+`CaSoft.Erp.USVector.Infrastructure.csproj` (tout y est déjà pinné en 8.0.10) — cf. **T2**.
 
-**Contenu.** `Infrastructure/ErpApi/OrdersApiResilience.cs`, deux fabriques **publiques** —
+**Contenu.** `Infrastructure/ErpApi/OrdersApiResilience.cs`, deux fabriques **publiques** (**T3**) —
 `RetryPolicy(options)` et `CircuitBreakerPolicy(options)`, au-dessus de
-`HttpPolicyExtensions.HandleTransientHttpError()`. Publiques, là où celles de la facturation sont
-privées : **c'est le seul moyen de les tester** (D3). Écart assumé au modèle maison, pour la raison
-qui manquait au modèle maison.
-
-**Recul : 200 ms puis 600 ms, pas 2/4/8 s.** Sous un budget de 10 s, un recul de 2+4+8 = 14 s ne
-produirait **jamais** la troisième tentative — le budget serait épuisé avant. Écrire un réessai qui
-ne peut pas s'exécuter, c'est fabriquer une illusion de robustesse. Ajouter une **gigue ±50 %** pour
-ne pas synchroniser toute une flotte de mobiles sur le même redémarrage d'Orders.
+`HttpPolicyExtensions.HandleTransientHttpError()`. Recul selon **T4**.
 
 **Ordre** : `.AddPolicyHandler(retry).AddPolicyHandler(breaker)` — réessai à l'extérieur, disjoncteur
 à l'intérieur, comme la facturation. Cet ordre fait compter au disjoncteur **chaque tentative**, donc
@@ -176,50 +219,23 @@ Quatre tests, quatre affirmations que le code seul ne prouve pas :
 
 ---
 
-# 4. Chantier S — `DEC-6` sortant : Vector présente un jeton à Orders
+# 5. Chantier S — `DEC-6` sortant : Vector présente un jeton à Orders
 
-> **Tranché : `DelegatingHandler`**, et ce sera **le premier du parc**.
-> 1. **Les deux clients restent purs** — ils sont testables en trois lignes parce qu'ils ne
->    connaissent qu'un `HttpClient`. Y injecter un fournisseur de jeton forcerait **quatre harnais de
->    test existants** à stuber un jeton pour tester du parsing JSON.
-> 2. **Le rejeu sur 401 n'est faisable que là** : il faut voir la réponse. Depuis les sites d'appel,
->    il faudrait le dupliquer dans 14 méthodes.
-> 3. **L'ordre avec Polly devient exprimable** : enregistré *après* les politiques, le handler d'auth
->    est le plus **interne**, donc chaque tentative relit le jeton en cache. Posé dans le client, un
->    jeton expiré entre la 1ʳᵉ et la 3ᵉ tentative resterait posé — le cas même que le réessai devait
->    sauver.
->
-> Le contre-argument (« aucun `DelegatingHandler` n'existe dans le parc ») est réel mais ne pèse pas :
-> 40 lignes, locales à un enregistrement.
+*Forme tranchée en **T1** (DelegatingHandler) et **T5**/**T6**/**T7**/**T11**.*
 
 ## S0 — ⏳ Extraire `ParseAuthority`, et **ne pas** refactorer le reste
 
 **Contenu.** `Infrastructure/Security/KeycloakAuthority.cs` : le corps exact de
 `KeycloakAdminClient.cs:67-74`, commentaire compris. Le privé disparaît.
 
-**Ce qu'on ne fait pas, et pourquoi.** Il est tentant de mutualiser avec `KeycloakAdminClient`.
-**C'est faux, pour trois raisons indépendantes :**
-
-- **Deux clients Keycloak différents.** `usvector-diag` porte `realm-management/view-users` ; le
-  compte d'API n'en a pas besoin et **ne doit pas les avoir**. Mutualiser donnerait au chemin de
-  production un jeton habilité à lire l'annuaire — une extension de privilège gratuite.
-- **Deux durées de vie.** Le diag prend un jeton quelques fois par mois, à la main. L'API en prend un
-  toutes les 5 minutes, sous concurrence.
-- **Deux rayons d'explosion.** L'un casse une page de diagnostic. L'autre casse la joblist de toute
-  la flotte.
-
 On réutilise la **forme** du POST (`l.47-64`) et la **forme** de la garde `IsConfigured` (`l.25-29`),
-sentinelle `__SET_VIA_ENV__` comprise. **Recopiées, pas partagées** : 15 lignes dupliquées contre un
-couplage entre un outil de dev et le chemin chaud de production.
+sentinelle `__SET_VIA_ENV__` comprise. **Recopiées, pas partagées** — motif en **T6**.
 
 **Fin.** Suite verte, aucun changement de comportement. **Risque** : nul.
 
 ## S1 — ⏳ `KeycloakServiceTokenProvider` : cache, marge, sérialisation
 
-**Contenu.** Singleton (le cache doit survivre à la requête), avec **son propre `HttpClient`** —
-jamais celui d'Orders, sinon le jeton passerait par le disjoncteur d'Orders et **une panne d'Orders
-empêcherait d'obtenir un jeton**.
-
+**Contenu.** Singleton (le cache doit survivre à la requête), avec **son propre `HttpClient`** (T5).
 Surface : `GetTokenAsync(ct)` (rend `null` si non configuré ou en échec), `Invalidate()`,
 `IsConfigured`.
 
@@ -233,15 +249,6 @@ de rotation. Ce qu'on garde tel quel :
 - **`expires_in` → expiration absolue**, repli à 60 s si absente ou ≤ 0 ;
 - **`[JsonPropertyName("access_token")]`** explicite — `JsonSerializerDefaults.Web` ne ramène pas
   `access_token` en camelCase.
-
-Le point de jeton est **dérivé** de `Keycloak:Authority` (via S0), **pas** découvert par OIDC : Vector
-valide déjà le format de l'Authority au démarrage, la découverte ajouterait un aller-retour sur le
-chemin chaud, et le chemin `/protocol/openid-connect/token` est déjà écrit en dur à
-`KeycloakAdminClient.cs:49` — on aligne au lieu de créer une incohérence.
-
-**Sur échec** (Keycloak injoignable, secret refusé) : **journaliser en Warning et rendre `null`**, ne
-pas lever. L'appel partira sans en-tête et prendra un 401 le jour où Orders sera protégée — symptôme
-lisible, plutôt qu'un 500 fabriqué par Vector.
 
 ```jsonc
 "Keycloak": {
@@ -259,12 +266,7 @@ non configuré → `null` et **zéro** appel HTTP · 10 appels concurrents → *
 
 **Contenu.** Si `request.Headers.Authorization` est nul, demander un jeton ; s'il n'est pas nul,
 poser le `Bearer`. Enregistré sur les deux clients **après** les `AddPolicyHandler` (donc le plus
-interne — raison 3 du tranchage).
-
-**Inertie assumée** : le handler est enregistré **inconditionnellement**, dans tous les
-environnements. Le conditionner à `IsConfigured` créerait un câblage qui n'existe qu'en production,
-donc **jamais exercé avant d'être indispensable**. Non configuré ⇒ pas de jeton ⇒ **le trafic est
-octet pour octet celui d'aujourd'hui**.
+interne — raison *(c)* de **T1**). Inertie assumée : **T8**.
 
 ⚠️ Le test `if (Authorization is null)` n'est pas décoratif : il évite d'écraser un en-tête qu'un
 appelant aurait posé. Aucun ne le fait aujourd'hui — l'écrasement silencieux est un piège classique.
@@ -302,7 +304,7 @@ garde, l'API devient **silencieusement anonyme** vers Orders.
 ## S5 — 🔴 Activation *(action humaine — voir H3)*
 
 Créer `usvector-api` dans le realm, client confidentiel, *Service accounts enabled*, **sans rôle
-`realm-management`**. Poser le secret dans le `web.config`, et basculer `Enabled` **par variable
+`realm-management`** (T6). Poser le secret dans le `web.config`, et basculer `Enabled` **par variable
 d'environnement** — ⚠️ **pas** dans `appsettings.Production.json`, shippé par `dotnet publish` et
 donc effacé au déploiement suivant (piège documenté au devplan §5.2, et déjà rencontré ce mois-ci).
 
@@ -312,16 +314,16 @@ les 5 min) — **pas** plusieurs milliers. C'est le test réel du cache.
 
 ---
 
-# 5. Chantier E — `DEC-6` entrant : refermer les quatre routes
+# 6. Chantier E — `DEC-6` entrant : refermer les quatre routes
 
-## 5.0 La distinction qui structure tout
+## 6.0 La distinction qui structure tout
 
-| Route | Consommateur **prouvé** | Fermable |
+| Route | Consommateurs | Fermable |
 |---|---|---|
 | `GET api/missions/{id}/field-data` | facturation (`ClVectorFieldDataClient`) | ❌ après compte de service côté facturation |
 | `GET api/Signature/{id}` | facturation (`ClVectorSignatureClient`) | ❌ idem |
-| `GET api/documents/{id}/content` | **aucun** — absent du DTO tolérant | ✅ sous réserve de 🔴 H1 |
-| `GET api/mutuelle-card/{id}/image` | **aucun** — idem, et table vide en prod | ✅ sous réserve de 🔴 H1 |
+| `GET api/documents/{id}/content` | **aucun prouvé** — absent du DTO tolérant | ✅ sous réserve de 🔴 H1 |
+| `GET api/mutuelle-card/{id}/image` | ⚠️ **trois attendus** *(26/08)* : écran web ambulancier (en cours), **Order** et **BillingGateway** (M7) | ❌ **nommer les trois** avant de fermer — cf. §1.2 |
 
 ## E1 — ⏳ Mesurer, avant de conclure
 
@@ -338,21 +340,17 @@ uniquement**, journaliser sous un logger dédié `Vector.SurfaceAnonyme` — mé
 route ce logger vers son fichier, pour compter à la ligne.
 
 **Fin.** Après **7 jours** : pour chaque route, la liste des IP et des agents. Attendu — `field-data`
-et `Signature` vus depuis l'IP de la facturation ; les deux autres **jamais vus**. Si l'attendu n'est
-pas vérifié, **E3 s'arrête** et on repart de la mesure.
+et `Signature` vus depuis l'IP de la facturation ; `documents/content` jamais vu ; **`mutuelle-card`
+vu depuis les postes web** dès que l'écran de capture est en ligne. Si l'attendu n'est pas vérifié,
+**E3 s'arrête** et on repart de la mesure.
 
 **Risque.** Nul (lecture seule). Volume négligeable.
 
 ## E2 — ⏳ Deux publics sur la même API — *l'étape la plus risquée*
 
-⚠️ **Le vrai piège de `DEC-6` entrant est ici.** Copier telle quelle la liste d'`azp` d'`Erp.Identity`
-**ouvrirait toute l'API mobile au compte de service de la facturation** : la politique de repli
-n'exige qu'un utilisateur *authentifié*, et un jeton de service l'est. La facturation pourrait alors
-lire `api/FormStructure/{id}` — le formulaire **valeurs comprises**, donc la date de naissance et le
-NIR du patient. Ce serait remplacer une porte ouverte à tous par une porte ouverte à un service qui
-n'a rien à y faire.
+⚠️ **Le vrai piège de `DEC-6` entrant est ici** — motif complet en **T9**.
 
-**Il faut donc distinguer trois choses, pas deux :**
+**Il faut distinguer trois choses, pas deux :**
 
 | Notion | Config | Portée |
 |---|---|---|
@@ -368,12 +366,10 @@ n'a rien à y faire.
    ⚠️ **À conditionner à `!disableValidation`**, exactement comme la vérification d'`azp` l'est déjà.
    Sinon le poste de développement — où la validation est volontairement désactivée — **ne répond
    plus rien**, et personne ne comprend pourquoi.
-3. **Deux politiques nommées** : `"ServiceFacturation"` (service seul) et `"ServiceOuAmbulancier"`.
-
-**Pourquoi deux et pas une.** `field-data` est un **paquet de transfert** : aucun écran ne le
-consomme, il sera service-only. Les trois routes d'octets ont un usage humain plausible — l'ambulancier
-relit la photo qu'il vient de prendre. Les mettre en service-only casserait une fonctionnalité mobile
-pour rien.
+3. **Deux politiques nommées** : `"ServiceFacturation"` et `"ServiceOuAmbulancier"` (**T10**).
+   ⚠️ Depuis §1.2, `ServiceOuAmbulancier` devra accueillir **deux** comptes de service en plus de
+   l'ambulancier (Order, BillingGateway) pour l'image de carte : la liste d'`azp` est donc à prévoir
+   **multi-clients dès l'écriture**, pas à rallonger après coup.
 
 > 💡 **Un second garde-fou existe déjà, gratuitement** : un compte de service a un `sub` absent de
 > `PER_KEYCLOAK_MAP`, donc `CrewAccess.ResolvePersonnel` rendrait **403**. Les cinq routes
@@ -386,16 +382,23 @@ par la politique de repli. En dev : jeton ambulancier → tout marche ; jeton de
 **Risque.** **Le plus élevé des trois chantiers** : elle touche la politique globale. À déployer
 **seule**, sur le serveur de dev d'abord, avec `api/Auth/WhoAmI` et `api/JobList/…` comme témoins.
 
-## E3 — ⛔ Fermer les deux routes sans consommateur
+## E3 — ⛔ Nommer les appelants des deux routes d'octets
 
-**Préalables** : E1 à zéro sur 7 jours **et** réponse à 🔴 H1.
+*Anciennement « fermer les deux routes sans consommateur » — reformulé le 26/08, cf. §1.2.*
+
+**Préalables** : E1 conforme à l'attendu sur 7 jours **et** réponse à 🔴 H1.
 
 **Contenu.** `[AllowAnonymous]` → `[Authorize(Policy = "ServiceOuAmbulancier")]` sur
 `DocumentController.GetContent` et `MutuelleCardController.GetImage`. Mettre à jour
 `AnonymousSurfaceTests`. Remplacer les commentaires « ⛔ … se referme avec DEC-6 » par ce qui reste
 ouvert, à qui.
 
-**Fin.** La donnée de santé sort la première.
+⚠️ **Pour l'image de carte, fermer suppose que les trois appelants sachent présenter un jeton** :
+l'écran web (jeton ambulancier — d'où H1, qui devient bloquant *pour de bon*), **Order** et
+**BillingGateway** (comptes de service à créer dans leurs dépôts respectifs, comme E4.b le fait pour
+la facturation). Fermer avant eux casserait une consultation que M7 vient d'acter.
+
+**Fin.** La donnée de santé n'est plus accessible sans jeton, et chacun de ses lecteurs est nommé.
 
 ## E4 — ⛔ Fermer `field-data` et `Signature` — *cross-repo, ordre non permutable*
 
@@ -435,39 +438,39 @@ qui rouvrirait ces quatre routes à l'ambulancier, dont le dossier terrain compl
 
 ---
 
-# 6. 🔴 Décisions qui appartiennent à un humain
+# 7. 🔴 Décisions qui appartiennent à un humain
 
 | # | Décision | Bloque | Enjeu |
 |---|---|---|---|
-| **H1** | L'app web consomme-t-elle `FileUrl` / `ImageUrl`, et par `fetch` ou par **balise directe** ? | **E3** | Une balise `<img src>` ne portera **jamais** de jeton : la photo deviendrait un cadre cassé, sans erreur console, sans qu'aucun test ne le voie. Question exacte à poser via `docs/ui-web/`. **Aucune ligne de code avant la réponse.** |
+| **H1** | L'app web consomme-t-elle `FileUrl` / `ImageUrl`, et par `fetch` ou par **balise directe** ? | **E3** | ⚠️ **Devenue urgente le 26/08** : l'écran de capture de carte mutuelle est en cours d'écriture, donc la réponse existe **maintenant**, chez la personne qui l'écrit. Une balise `<img src>` ne portera **jamais** de jeton : la photo deviendrait un cadre cassé, sans erreur console, sans qu'aucun test ne le voie. **Aucune ligne de code d'E3 avant la réponse.** |
 | **H2** | Rendre `us-facturation` confidentiel, ou créer `us-facturation-svc` ? | **E4.a** | Le rendre confidentiel **casserait son flux OIDC navigateur**. Recommandation : **client distinct** — écran et compte de service ont des cycles de vie et des rayons d'explosion différents. |
 | **H3** | Créer `usvector-api` (sans rôle `realm-management`) et poser son secret. | **S5** | Purement Keycloak + `web.config`. Le code est prêt et inerte sans. |
-| **H4** | Drapeau de réouverture par variable d'environnement sur les deux routes orphelines ? | **E3** | Assurance d'un cycle de déploiement contre une machinerie permanente. **Recommandation : s'en passer** si H1 est clair. |
+| **H4** | Drapeau de réouverture par variable d'environnement sur les routes d'octets ? | **E3** | Assurance d'un cycle de déploiement contre une machinerie permanente. **Recommandation : s'en passer** si H1 est clair. |
 | **H5** | Accepter **10 s** en lecture et **15 s** en écriture. | **D1** | Arbitrage **produit** — « au bout de combien de temps l'ambulancier préfère-t-il une erreur à une attente ? » — pas une constante technique. |
 | **H6** | Accepter que la politique de repli interdise à tout compte de service d'atteindre l'API mobile. | **E2** | Interdit d'emblée un usage service-à-service futur non prévu, qui devra passer par une politique nommée explicite. **C'est voulu.** |
+| **H7** | **Order et BillingGateway consultent l'image de carte mutuelle (M7) : par quel compte ?** | **E3** | Nouveau *(26/08)*. Soit chacun son client de service, soit un client « lecteur de pièces » partagé. La réponse détermine la liste d'`azp` d'E2 et **le nombre de dépôts à modifier avant de fermer**. |
 
 ---
 
-# 7. Ce qui n'est **pas** dans ce plan
+# 8. Retiré du plan — hors périmètre
 
-- **CORS.** `Program.cs` fait `AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()`. Sujet réel,
-  adjacent à H1, et déjà noté en TODO dans le code — mais le mêler à `DEC-6` rendrait toute
-  régression indémêlable.
-- **`Directory.Packages.props`** pour Vector. Hygiène, chantier G du devplan principal.
-- **`Microsoft.Extensions.Http.Resilience`.** Introuvable dans le parc ; l'introduire ferait de Vector
-  le seul module à porter deux modèles de résilience.
-- **L'autorisation fine.** Comme le dit `Identity.Api`, une liste d'`azp` « n'est pas une autorisation
-  fine : c'est une liste d'appelants reconnus, pas une liste de droits ». Vector va un cran plus loin
-  — deux publics, deux politiques — mais reste **en deçà d'un modèle de droits**. À dire, pour que
-  personne ne croie le problème résolu.
+*Conservé pour ne pas ré-instruire ces pistes.*
+
+| Ce qui n'est pas ici | Motif |
+|---|---|
+| **CORS** — `Program.cs` fait `AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()` | Sujet réel, adjacent à H1, déjà noté en TODO dans le code — mais le mêler à `DEC-6` rendrait toute régression indémêlable. |
+| **`Directory.Packages.props`** pour Vector | Hygiène ; chantier G du devplan principal. |
+| **`Microsoft.Extensions.Http.Resilience`** | Introuvable dans le parc — **T2**. |
+| **L'autorisation fine** | Comme le dit `Identity.Api`, une liste d'`azp` « n'est pas une autorisation fine : c'est une liste d'appelants reconnus, pas une liste de droits ». Vector va un cran plus loin — deux publics, deux politiques — mais reste **en deçà d'un modèle de droits**. À dire, pour que personne ne croie le problème résolu. |
+| **Le mapping de la carte mutuelle vers une colonne de facturation** | Écarté par **M7** *(26/08)* : la carte est un document **consultable**, pas une source de colonne. Ce plan n'en traite que l'**accès** (E3, H7). |
 
 ---
 
-# 8. Suivi
+# 9. Suivi
 
 | Étape | Objet | État |
 |---|---|---|
-| D1 | Timeouts explicites (10 s / 15 s) | ⏳ |
+| D1 | Timeouts explicites (10 s / 15 s) | ⏳ · 🔴 H5 |
 | D2 | Réessai + disjoncteur Polly, fabrique publique | ⏳ |
 | D3 | Tests de résilience (4) | ⏳ |
 | S0 | Extraire `ParseAuthority` | ⏳ |
@@ -478,19 +481,20 @@ qui rouvrirait ces quatre routes à l'ambulancier, dont le dossier terrain compl
 | S5 | Activation | 🔴 H3 |
 | E1 | Sonde de surface anonyme + 7 jours de mesure | ⏳ |
 | E2 | Deux publics, deux politiques nommées | ⏳ |
-| E3 | Fermer `documents/content` et `mutuelle-card/image` | ⛔ E1 + H1 |
+| E3 | Nommer les appelants de `documents/content` et `mutuelle-card/image` | ⛔ E1 + H1 + H7 |
 | E4 | Fermer `field-data` et `Signature` | ⛔ E2 + H2 + facturation |
 | E5 | Retourner `AnonymousSurfaceTests` | ⛔ E4 |
 
 ---
 
-# 9. Renvois
+# 10. Renvois
 
 | Où | Quoi |
 |---|---|
 | [`devplan.md`](devplan.md) §3.C2 | `DEC-6`, les deux sens — **l'état fait foi là-bas** |
 | [`devplan.md`](devplan.md) §3.D | `DEC-7` — idem |
 | [`VECTOR_ORDERS_DECOUPLING_devplan.md`](VECTOR_ORDERS_DECOUPLING_devplan.md) §2 | le chantier d'origine, et les trois restes hors périmètre |
+| [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) | M7 et le contrat exposé — ce qui rend `mutuelle-card/image` non orpheline (§1.2, E3, H7) |
 | `CaSoft.Erp.USVector.Tests/AnonymousSurfaceTests.cs` | la définition exécutable d'« avoir fini » pour `DEC-6` entrant |
 
 ---
