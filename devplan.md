@@ -13,7 +13,7 @@
 > basculé et en service depuis le 2026-08-25** (§3.A).
 > **Prod** : `\\192.168.1.112\prod_api\Vector.Api` (IIS `/vector`) — trafic servi, jetons Keycloak
 > réellement validés depuis le 2026-08-02.
-> **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **133 tests verts** (2026-08-26).
+> **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **136 tests verts** (2026-08-26).
 > **Dernière mise à jour** : 2026-08-26.
 
 | | Sens |
@@ -125,12 +125,14 @@ une couche déclarative que la facturation relit et corrige.
 | Consommation réelle du paquet terrain | mesurée le 2026-08-06 par la facturation : 284 missions acquises |
 | Contexte de mission (type, attributs, paquet terrain) | 58 tests ; **les trois refus constatés en production** le 2026-08-24 ; bascule armée le 2026-08-25 |
 | Verrou par valeur + motif au terrain | Vector `655020a` + Orders `2f7218a`, **déployés en production le 2026-08-26** — vérification terrain à faire (§3.A3) |
-| Suite complète | **133 tests verts** (2026-08-26) · Orders : 840 |
+| Suite complète | **136 tests verts** (2026-08-26) · Orders : 840 |
 
 ## 1.8 ⚠️ Livré mais pas encore exploité
 
-- **La carte mutuelle n'est jamais remplie en production** (table vide au 23/08/2026) : la chaîne
-  serveur fonctionne, mais aucune photo n'arrive. Ce qui coince est en aval, pas dans l'API (§3.F1).
+- **La carte mutuelle n'est jamais remplie en production** (table vide au 23/08/2026). La cause est
+  établie depuis le 2026-08-26 et **elle était dans l'API** : l'identifiant du bénéficiaire n'était
+  servi nulle part, donc le front ne pouvait pas appeler. Corrigé ; reste l'écran web, en cours
+  (§3.F1).
 - **Le kilométrage n'est pas transmis** avec le dossier terrain : la facturation attend ce champ
   pour activer son contrôle (§3.E1).
 - **Le repère de fraîcheur du paquet** (`updatedAt`) est servi mais aucun consommateur ne s'en sert :
@@ -553,10 +555,20 @@ théorique. **À trancher** : le faire poser par la facturation à la publicatio
 
 ### F1 — ⏳ Carte mutuelle : débloquer l'adoption *(avant tout le reste)*
 
-**Rien à coder côté API.** Confirmer avec le dev web que l'écran ambulancier appelle bien la capture
-(multipart) et le `PATCH` de saisie, puis **mesurer le remplissage en production**. C'est le seul
-point qui débloque de la valeur immédiate — l'extraction automatique n'a aucun intérêt tant qu'aucune
-photo n'arrive. Détail : [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) §3.1.
+Le plan disait **« rien à coder côté API »**. C'était faux, et c'est ce qui a tenu la table vide
+pendant deux mois : les routes de la carte sont indexées par **bénéficiaire** (elle suit le patient),
+l'écran qui capture est celui d'une **mission**, et **aucun endpoint mobile ne rendait
+l'identifiant** — le front ne pouvait pas construire l'URL. ✅ **`beneficiaryId` est servi dans le
+bloc patient du détail mission depuis le 2026-08-26**, `null` quand la mission n'en résout aucun.
+
+**Reste** : l'écran web (en cours), puis **mesurer le remplissage en production**. L'extraction
+automatique n'a aucun intérêt tant qu'aucune photo n'arrive.
+
+⚠️ **La carte n'alimente aucune colonne du fichier de facturation** (M7) : c'est un **document
+consultable** par Order et BillingGateway, qu'un opérateur lit et interprète. `C54` n'est donc pas
+sa destination — l'y mapper contredirait « jamais d'écriture aveugle en facturation » (M5).
+
+Détail et contrat : [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) §3.1 et §5.
 
 ### F2 — ⏳ Carte mutuelle : extraction automatique (P3)
 

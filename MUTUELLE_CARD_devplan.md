@@ -25,13 +25,16 @@ mission ; l'image elle-même est servie à la demande. Le module de facturation 
 *Livré le 2026-06-15 (P1 capture/stockage + P2 restitution et saisie manuelle), 16 tests. Le stockage
 est en base Vector ; le pivot vers la mutuelle du référentiel reste le **code AMC**.*
 
-### ⚠️ Livré mais pas encore utilisé
+### ⚠️ Livré, et la cause du non-usage est identifiée
 
 **La table est vide en production (0 ligne au 23/08/2026)** — constat du module de facturation, pour
-qui le bloc « mutuelle » du dossier terrain ne remonte donc rien. La chaîne serveur fonctionne ; ce
-qui manque est en aval : **vérifier que l'écran mobile expose réellement la capture et la saisie**,
-et que les ambulanciers s'en servent. Tant que la table reste vide, la colonne mutuelle du fichier
-de facturation restera vide elle aussi.
+qui le bloc « mutuelle » du dossier terrain ne remonte donc rien.
+
+**Ce n'était pas un défaut d'adoption** *(établi le 2026-08-26)*. Les routes sont indexées par
+**bénéficiaire** (M4), l'écran qui capture est celui d'une **mission**, et **aucun endpoint mobile ne
+rendait l'identifiant du bénéficiaire** : le front ne pouvait pas construire l'URL. Le bloc patient
+du détail mission porte désormais `beneficiaryId` — ajout additif (D14), `null` quand la mission n'en
+résout aucun, pour que le bouton de capture disparaisse au lieu de créer une carte orpheline.
 
 ---
 
@@ -45,6 +48,7 @@ de facturation restera vide elle aussi.
 | M4 | **Clé = le bénéficiaire**, pas la mission — la carte suit le patient. Historisation assumée. |
 | M5 | **OCR = LLM vision (Claude) + validation humaine.** Jamais d'écriture aveugle en facturation. |
 | M6 | **RGPD** : MVP simple d'abord, durcissement en phase suivante (dette assumée, P4). |
+| **M7** | **La carte est un document *consultable*, pas une source de colonne** *(2026-08-26)*. Elle **n'alimente pas `C54`** du fichier AidesNSoft. L'image est stockée à un emplacement accessible aux autres modules — **Order** et **BillingGateway** la consultent —, et c'est un opérateur qui lit et décide. Mapper automatiquement un code AMC extrait d'une photo vers une colonne de facturation contredirait M5 : jamais d'écriture aveugle en facturation. |
 
 ---
 
@@ -52,10 +56,20 @@ de facturation restera vide elle aussi.
 
 ### 3.1 ⏳ Adoption terrain — préalable à tout le reste
 
-Rien à coder côté API. À faire : confirmer avec le dev web que l'écran ambulancier appelle bien
-`POST /api/beneficiaries/{beneficiaryId}/mutuelle-card` (multipart) et le `PATCH` de saisie, puis
-mesurer le remplissage de `MOB_MUTUELLE_CARD` en production. **C'est le seul point qui débloque de
-la valeur immédiate** : l'OCR (§3.2) n'a aucun intérêt tant qu'aucune photo n'arrive.
+✅ **Le blocage côté API est levé** (2026-08-26) : `beneficiaryId` est servi dans le bloc patient du
+détail mission. Le plan disait « rien à coder côté API » — c'était faux, et c'est ce qui a tenu la
+table vide pendant deux mois.
+
+**Reste** : l'écran web (en cours), puis **mesurer le remplissage de `MOB_MUTUELLE_CARD` en
+production**. L'OCR (§3.2) n'a aucun intérêt tant qu'aucune photo n'arrive.
+
+**Trois points pour le dev web :**
+- validation à l'upload — `image/*` obligatoire, **8 Mo maximum**, sinon `400` avec le motif ; une
+  photo de smartphone brute peut dépasser, prévoir une compression côté client ;
+- `imageUrl` est un **chemin relatif**, à composer avec la base de l'API ;
+- toutes les routes exigent le jeton Keycloak **sauf l'image**, ouverte — c'est ce qui permet aux
+  autres modules de la consulter sans jeton (M7), et c'est la porte la plus sensible de `DEC-6`
+  puisqu'il s'agit d'une donnée de santé.
 
 ### 3.2 ⏳ P3 — Extraction automatique (Claude vision)
 

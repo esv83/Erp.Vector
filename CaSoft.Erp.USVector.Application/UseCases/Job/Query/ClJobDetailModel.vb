@@ -40,6 +40,28 @@ Public Class ClJobDetailModel
     Public Property DropoffDisplay As ClLocationDisplayDto
 
     Public Class ClPatientDto
+
+        ''' <summary>
+        ''' Identifiant du bénéficiaire côté ERP. <b>Nothing</b> quand la mission n'en résout aucun.
+        ''' </summary>
+        ''' <remarks>
+        ''' <para>
+        ''' Ajout additif (D14). Il manquait, et ce manque bloquait un écran entier : la carte
+        ''' mutuelle s'attache au <b>patient</b> (décision M4 — elle le suit d'un transport à
+        ''' l'autre), donc ses routes sont indexées par bénéficiaire, alors que l'écran qui la
+        ''' capture est celui d'une <b>mission</b>. Sans cet identifiant, le front ne pouvait pas
+        ''' construire l'URL de <c>POST /api/beneficiaries/{id}/mutuelle-card</c> — ce qui explique
+        ''' très probablement que <c>MOB_MUTUELLE_CARD</c> soit restée vide depuis juin, là où l'on
+        ''' concluait à un défaut d'adoption.
+        ''' </para>
+        ''' <para>
+        ''' <b>Nullable, et pas <c>Guid.Empty</c>.</b> Une mission dont le bénéficiaire ne se résout
+        ''' pas doit faire <b>disparaître</b> le bouton de capture, pas produire une carte orpheline
+        ''' rattachée à un identifiant nul que plus rien ne saurait relier à un patient.
+        ''' </para>
+        ''' </remarks>
+        Public Property BeneficiaryId As Guid?
+
         Public Property CompleteName As String
         Public Property DDN As String
         Public Property Age As String

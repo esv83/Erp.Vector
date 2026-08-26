@@ -14,6 +14,12 @@ Public Class ClJobDetailAdapter
         End If
 
         With Me
+            ' Guid.Empty = aucun bénéficiaire résolu : on sert Nothing plutôt que l'identifiant nul,
+            ' pour que le front sache masquer ce qui s'attache au patient (carte mutuelle) au lieu
+            ' d'appeler avec une clé qui ne désigne personne.
+            .Beneficiary.BeneficiaryId = If(job.Beneficiary.Id = Guid.Empty,
+                                            Nothing,
+                                            CType(job.Beneficiary.Id, Guid?))
             .Beneficiary.CompleteName = job.Beneficiary.LastName + " " + job.Beneficiary.Name
             .Beneficiary.Phones = job.Beneficiary.Phones
             .TransportMode = GetTransportModeDisplay(job.TransportMode.Value)
