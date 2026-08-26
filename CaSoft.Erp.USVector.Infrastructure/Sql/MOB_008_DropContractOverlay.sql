@@ -35,6 +35,18 @@
 --   3. la publication qui porte ce retrait est en service depuis assez longtemps pour
 --      qu'un retour arrière ne soit plus envisagé.
 --
+-- ⚠️ SECOND PRÉALABLE, distinct du premier et tout aussi bloquant
+-- ----------------------------------------------------------------
+-- Le paquet terrain (api/missions/{id}/field-data), que la facturation tire, compose son
+-- bloc « attributes » depuis CE magasin — via FieldAttributesReader, et indépendamment des
+-- drapeaux. Jouer ce script sans avoir traité ce bloc casse le paquet, donc le transfert
+-- vers la facturation.
+--
+-- Ce bloc sert l'historique des missions saisies AVANT la bascule du 2026-08-25 : la
+-- facturation lit les valeurs d'Order et les fait primer, celles-ci comblent les trous.
+-- Le retirer est une décision de calendrier — jusqu'à quand cet historique doit-il rester
+-- servi ? — à prendre avec le module de facturation, pas ici.
+
 -- Ordre des DROP : dicté par les clés étrangères de MOB_002 (enfants d'abord).
 --
 -- Exécution (compte db_owner — ErpAccount n'a pas DROP TABLE) :

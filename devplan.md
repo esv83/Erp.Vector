@@ -364,12 +364,19 @@ facturation, qui lit les valeurs chez Order.
 Le script de suppression est écrit et **volontairement non joué** :
 [`MOB_008_DropContractOverlay.sql`](CaSoft.Erp.USVector.Infrastructure/Sql/MOB_008_DropContractOverlay.sql).
 
-⛔ **Ce qui bloque n'est pas la donnée, c'est le code.** Ces tables *sont* le chemin de secours de la
-bascule : tant qu'on peut revenir en arrière par configuration, les supprimer transformerait ce
-retour arrière en panne.
+⛔ **Deux verrous, pas un — et le second m'avait échappé.**
 
-**Ce qu'il reste à faire** : rien ici. A6 s'exécute le jour où A1 et A2 retirent leur double chemin —
-donc le jour où le dev web répond.
+1. **Le chemin de désarmement.** Ces tables *sont* le chemin d'avant : tant qu'on peut revenir en
+   arrière par configuration, les supprimer transformerait ce retour arrière en panne.
+2. **Le paquet terrain.** `FieldAttributesReader` (A4) compose le bloc `attributes` depuis ce même
+   magasin, **indépendamment des drapeaux** — vérifié le 2026-08-27 en tirant le paquet en
+   production, qui sert bien `ContractId: 1 / "Transport standard"`, ids du catalogue Vector. Jouer
+   le `DROP` casserait donc le transfert vers la facturation.
+
+**Ce qu'il reste à faire** : le premier verrou tombe avec le retrait des drapeaux d'A1/A2. Le second
+n'est pas technique — c'est une question de calendrier à poser à la facturation : *jusqu'à quand
+l'historique d'avant le 2026-08-25 doit-il rester servi ?* Elle lit déjà les valeurs d'Order et les
+fait primer ; ce bloc ne comble que les trous des missions antérieures.
 
 ---
 
