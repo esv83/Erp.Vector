@@ -8,13 +8,44 @@
 > fin. Une fonctionnalité livrée quitte §3 et enrichit §1 ; une piste abandonnée va au **§6** avec son
 > motif, pour ne pas être ré-instruite.
 >
-> **Statut** : 🟡 en service, chantiers en cours — boucle ambulancier livrée (hors écran de
-> rattachement Keycloak), chaîne terrain→facturation livrée et consommée, **référentiel de contexte
-> basculé et en service depuis le 2026-08-25** (§3.A).
+> **Statut** : 🟡 en service, chantiers en cours.
+>
+> **Ce qui est livré et tourne en production.** La boucle ambulancier complète — login Keycloak,
+> plan de travail, avancement des missions, dossier terrain — à l'exception du rattachement du
+> compte, resté un `INSERT` manuel (§3.C1). La chaîne terrain → facturation, livrée **et
+> consommée** : 284 missions acquises le 2026-08-06. Le référentiel de contexte, basculé côté Order
+> le 2026-08-25 et à **chemin unique** depuis le 2026-08-27 — le second chemin et ses drapeaux sont
+> retirés (§3.A1). Le verrou par valeur et son motif affichable, déployés le 2026-08-26 (§3.A3). La
+> carte mutuelle : écran de capture en production depuis le 2026-08-26, et deux routes de
+> consultation ouvertes à Order et à la facturation (§3.F1).
+>
+> **Reste à faire — et ce que cela attend.** Presque rien de ce qui suit n'est du code Vector
+> arrêté faute de temps : c'est ce que le module attend d'ailleurs, et de qui.
+>
+> - ⚠️ **Le dev web** — afficher le motif des refus. L'API le renvoie depuis le 2026-08-26 ; tant
+>   que l'UI l'avale, l'ambulancier voit sa saisie disparaître sans explication. **Dernier maillon
+>   de la bascule**, et il n'est pas dans ce dépôt (§1.8, §3.A3).
+> - ⛔ **Le paramétrage métier, côté Orders** — la matrice d'applicabilité des types (§3.B9) et les
+>   attributs définis mais rattachés à aucune mission (§3.B10) : le commentaire libre, les
+>   téléphones et les e-mails ont disparu du terrain. Les deux seuls points qui **dégradent la
+>   saisie aujourd'hui**.
+> - ⏳ **Du code dans `Erp.Order`** — le repli sur le snapshot, sans quoi ~3 883 étapes de mission
+>   s'affichent vides (§3.B2), et la chaîne équipage du 2ᵉ membre, où sur un équipage à
+>   deux un seul accède à ses missions (diagnostic prêt côté Vector : §3.B3, §3.C3).
+> - ⏳ **La facturation** — jusqu'à quand servir l'historique d'avant la bascule, seul verrou qui
+>   reste sur `MOB_008` (§3.A6) ; le kilométrage, qu'elle attend pour armer son contrôle (§3.E1) ;
+>   et le sort du palier `Billed`, aujourd'hui sans écrivain (§3.E4).
+> - ⛔ **Une décision interne** — où vit l'écran de rattachement Keycloak (§3.C1). Seul maillon
+>   manuel de la chaîne, et le seul dont l'oubli prive un ambulancier de toutes ses missions.
+>
+> **Ce qui n'attend personne** et s'attaque aujourd'hui, dans l'ordre qu'on veut : `DEC-6` (§3.C2),
+> `DEC-7` (§3.D), les horodatages (§3.E2), la mesure du remplissage de la carte mutuelle (§3.F1),
+> les trois chantiers hérités (§3.F3) et la dette (§3.G).
+>
 > **Prod** : `\\192.168.1.112\prod_api\Vector.Api` (IIS `/vector`) — trafic servi, jetons Keycloak
 > réellement validés depuis le 2026-08-02.
-> **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **140 tests verts** (2026-08-26).
-> **Dernière mise à jour** : 2026-08-26.
+> **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **118 tests verts** (2026-08-27).
+> **Dernière mise à jour** : 2026-08-27.
 
 | | Sens |
 |---|---|
@@ -125,7 +156,7 @@ une couche déclarative que la facturation relit et corrige.
 | Consommation réelle du paquet terrain | mesurée le 2026-08-06 par la facturation : 284 missions acquises |
 | Contexte de mission (type, attributs, paquet terrain) | 58 tests ; **les trois refus constatés en production** le 2026-08-24 ; bascule armée le 2026-08-25 |
 | Verrou par valeur + motif au terrain | Vector `655020a` + Orders `2f7218a`, **déployés en production le 2026-08-26** — vérification terrain à faire (§3.A3) |
-| Suite complète | **140 tests verts** (2026-08-26) · Orders : 840 |
+| Suite complète | **118 tests verts** (2026-08-27) · Orders : 840 |
 
 ## 1.8 ⚠️ Livré mais pas encore exploité
 
