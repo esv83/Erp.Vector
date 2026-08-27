@@ -16,6 +16,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Éléments de solution", "Éléments de solution", "{9C8CB701-102D-CF49-A3E0-89AC09D42C2C}"
 	ProjectSection(SolutionItems) = preProject
 		devplan.md = devplan.md
+		DEVPLAN_2.md = DEVPLAN_2.md
 	EndProjectSection
 EndProject
 Project("{778DAE3C-4631-46EA-AA77-85C1314464D9}") = "CaSoft.Erp.USVector.Framework", "CaSoft.Erp.USVector.Framework\CaSoft.Erp.USVector.Framework.vbproj", "{F5FDCBFC-2C62-4D9A-A281-D8C09B56D942}"
