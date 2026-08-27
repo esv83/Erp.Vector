@@ -343,6 +343,11 @@ if (keycloakEnabled)
     app.UseAuthorization();
 }
 
+// DEC-6 · E1 — sonde de la surface anonyme (DEVPLAN_2 §6). Enregistrée APRÈS l'authentification :
+// c'est ce qui permet de distinguer un appel nu d'un appel déjà porteur d'un jeton (azp). Lecture
+// seule, aucune incidence sur la réponse ; journal dédié « Vector.SurfaceAnonyme » (nlog.config).
+app.UseMiddleware<AnonymousSurfaceProbe>();
+
 app.MapControllers();
 
 app.Run();

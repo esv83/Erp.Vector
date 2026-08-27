@@ -44,7 +44,7 @@
 >
 > **Prod** : `\\192.168.1.112\prod_api\Vector.Api` (IIS `/vector`) — trafic servi, jetons Keycloak
 > réellement validés depuis le 2026-08-02.
-> **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **118 tests verts** (2026-08-27).
+> **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **128 tests verts** (2026-08-27).
 > **Dernière mise à jour** : 2026-08-27.
 
 | | Sens |
@@ -156,7 +156,7 @@ une couche déclarative que la facturation relit et corrige.
 | Consommation réelle du paquet terrain | mesurée le 2026-08-06 par la facturation : 284 missions acquises |
 | Contexte de mission (type, attributs, paquet terrain) | 58 tests ; **les trois refus constatés en production** le 2026-08-24 ; bascule armée le 2026-08-25 |
 | Verrou par valeur + motif au terrain | Vector `655020a` + Orders `2f7218a`, **déployés en production le 2026-08-26** — vérification terrain à faire (§3.A3) |
-| Suite complète | **118 tests verts** (2026-08-27) · Orders : 840 |
+| Suite complète | **128 tests verts** (2026-08-27) · Orders : 840 |
 
 ## 1.8 ⚠️ Livré mais pas encore exploité
 
@@ -533,6 +533,13 @@ patient par une balise `<img src>`, qui **ne portera jamais de jeton**.
 ⚠️ Celles-là **ne se referment pas avec `DEC-6`** : donner un compte de service à Order n'y changerait
 rien, puisque c'est un navigateur qui affiche. Elles attendent que ces écrans passent à un `fetch`
 authentifié — décision `H1` de [`DEVPLAN_2.md`](DEVPLAN_2.md).
+
+**Première étape de `DEC-6` livrée le 2026-08-27** — `E1`, la mesure. Une sonde journalise qui appelle
+ces six routes (action, IP, agent, présence d'un jeton) dans son propre fichier, et un test lie ce
+qu'elle observe à la surface anonyme déclarée ici : un fichier vide voudra donc bien dire « personne
+n'appelle », et non « la sonde regardait ailleurs ». Elle ne ferme rien — elle rend décidable le fait
+de fermer. **Sept jours de mesure à partir du déploiement**, après quoi `E3` (fermer
+`documents/content`, la seule route sans consommateur identifié) devient instruit.
 
 ⚠️ **Garde-fou en place** : `AnonymousSurfaceTests` fige la liste exacte de ce qui répond sans jeton.
 Toute route anonyme ajoutée fait échouer la suite — une exception doit être une décision, pas un

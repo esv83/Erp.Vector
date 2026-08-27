@@ -9,11 +9,12 @@
 > ordre, et comment savoir que c'est fini. Les trois autres restes du §2 — `DET-4`, `DET-3`,
 > option 4b — ne sont **pas** dans ce plan et restent suivis au devplan principal.
 >
-> **Statut** : ⏳ **aucune étape livrée** — le plan est écrit, le code ne l'est pas. Rien ici n'est
-> commencé, et rien n'y bloque hors décisions humaines (§6).
-> **Branche** : `feat/decouplage-dec6-dec7` — ⚠️ elle porte aujourd'hui **autre chose** que ce plan
-> (correctifs du contexte de mission et carte mutuelle, §1.2). Le premier commit `DEC-` reste à venir.
-> **Créé le** : 2026-08-25 · **Dernière mise à jour** : 2026-08-26.
+> **Statut** : 🟡 **une étape livrée sur quatorze** — `E1`, la sonde de surface anonyme (§6.E1) :
+> le code est en place et testé, mais la mesure ne court qu'à partir du déploiement. Les treize
+> autres sont à l'état où le plan les a laissées, et rien n'y bloque hors décisions humaines (§7).
+> **Branche** : `feat/decouplage-dec6-dec7` — elle porte **aussi** les correctifs du contexte de
+> mission et de la carte mutuelle (§1.2), antérieurs à ce plan.
+> **Créé le** : 2026-08-25 · **Dernière mise à jour** : 2026-08-27.
 
 | | Sens |
 |---|---|
@@ -81,10 +82,10 @@ jour où ces écrans passeront à un `fetch` authentifié.
 > doit revérifier le motif au moment de la fermer — c'est ce que fait E1, et c'est pourquoi il reste
 > le premier de la séquence.
 
-⚠️ **La branche porte autre chose que ce plan.** `feat/decouplage-dec6-dec7` contient à ce jour le
-correctif du verrou de contexte, la remontée du motif de refus au mobile, la mise à jour des plans et
-le `beneficiaryId`. Aucun commit `DEC-`. Qui reprend la branche ne doit pas en déduire que le chantier
-est entamé.
+**La branche porte aussi autre chose que ce plan.** `feat/decouplage-dec6-dec7` contient le correctif
+du verrou de contexte, la remontée du motif de refus au mobile, la mise à jour des plans et le
+`beneficiaryId`. Depuis le 2026-08-27 elle porte **également** le premier commit `DEC-` : la sonde
+d'`E1`. Le reste du chantier n'est pas entamé.
 
 ---
 
@@ -339,7 +340,7 @@ les 5 min) — **pas** plusieurs milliers. C'est le test réel du cache.
 > `AnonymousSurfaceTests` les compte **à part**, dans un tableau distinct, pour que personne ne les
 > croie couvertes par la séquence E.
 
-## E1 — ⏳ Mesurer, avant de conclure
+## E1 — 🟢 Mesurer, avant de conclure — *sonde livrée, mesure à lancer*
 
 **Deux sources, la seconde seulement se code.**
 
@@ -347,11 +348,23 @@ les 5 min) — **pas** plusieurs milliers. C'est le test réel du cache.
 `cs-uri-stem`, `cs(User-Agent)` : filtrer les quatre chemins sur 30 jours, grouper par IP + agent.
 C'est la vérité sans écrire une ligne.
 
-**(b) Sonde applicative.** `Api/Infrastructure/AnonymousSurfaceProbe.cs` : sur **ces quatre chemins
-uniquement**, journaliser sous un logger dédié `Vector.SurfaceAnonyme` — méthode, chemin, IP,
-`User-Agent`, `Referer`, présence d'un `Authorization`, `azp` s'il y en a un. Enregistré **après**
-`UseAuthentication`/`UseAuthorization` pour que l'identité soit renseignée. Une règle NLog dédiée
-route ce logger vers son fichier, pour compter à la ligne.
+**(b) Sonde applicative — ✅ livrée le 2026-08-27.** `Api/Infrastructure/AnonymousSurfaceProbe.cs`,
+enregistrée **après** `UseAuthentication`/`UseAuthorization` — sans quoi l'`azp` serait toujours vide
+et la mesure ne saurait pas distinguer un appel nu d'un appel déjà porteur d'un jeton. Journal dédié
+`Vector.SurfaceAnonyme`, routé par `nlog.config` vers `logs/usvector-surface-anonyme-<date>.log`
+(rétention 90 j, `final` pour ne pas polluer le journal applicatif) : une ligne par appel — action,
+méthode, chemin, statut, IP, `User-Agent`, `Referer`, présence d'un `Authorization`, `azp`.
+
+⚠️ **Elle observe six routes, pas quatre.** Le plan disait « ces quatre chemins uniquement » ; depuis
+§1.2, les deux routes des écrans amont existent — et ce sont précisément celles dont la réponse a
+changé en un jour. Elles ne se referment pas avec `DEC-6`, mais savoir qui les tire a la même valeur.
+
+**Comment elle sait quoi observer.** Elle lit `[AllowAnonymous]` dans les métadonnées de l'endpoint et
+écarte les deux ouvertures de diagnostic : une route anonyme ajoutée demain est donc mesurée sans que
+personne y pense. `AnonymousSurfaceProbeTests` (10 tests) fige la contrepartie — la surface observée
+est **exactement** celle qu'`AnonymousSurfaceTests` déclare justifiée, la ligne part bien, elle part
+dans le journal dédié, et elle survit à une exception en aval. ⚠️ Le vide de ce fichier vaut
+conclusion : il doit être impossible qu'il soit vide **parce que la sonde regardait ailleurs**.
 
 **Fin.** Après **7 jours** : pour chaque route, la liste des IP et des agents. Attendu — `field-data`
 et `Signature` vus depuis l'IP de la facturation ; `documents/content` jamais vu ; **`mutuelle-card`
@@ -359,6 +372,9 @@ vu depuis les postes web** dès que l'écran de capture est en ligne. Si l'atten
 **E3 s'arrête** et on repart de la mesure.
 
 **Risque.** Nul (lecture seule). Volume négligeable.
+
+**Ce qui reste, et ce n'est pas du code** : déployer — le compteur ne démarre pas avant —, demander
+les journaux IIS des 30 derniers jours, puis laisser courir **7 jours**.
 
 ## E2 — ⏳ Deux publics sur la même API — *l'étape la plus risquée*
 
@@ -495,7 +511,7 @@ qui rouvrirait ces quatre routes à l'ambulancier, dont le dossier terrain compl
 | S3 | Rejeu unique sur 401 | ⏳ |
 | S4 | Garde-fou de démarrage | ⏳ |
 | S5 | Activation | 🔴 H3 |
-| E1 | Sonde de surface anonyme + 7 jours de mesure | ⏳ |
+| E1 | Sonde de surface anonyme + 7 jours de mesure | 🟢 sonde · ⏳ mesure |
 | E2 | Deux publics, deux politiques nommées | ⏳ |
 | E3 | Fermer `documents/content` — la carte mutuelle en est sortie (H1) | ⛔ E1 |
 | E4 | Fermer `field-data` et `Signature` | ⛔ E2 + H2 + facturation |
