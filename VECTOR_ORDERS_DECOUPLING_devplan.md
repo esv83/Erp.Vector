@@ -33,7 +33,8 @@ dans `git log`.*
 ## 2. Ce qui reste
 
 > 📌 **`DEC-6` et `DEC-7` ont leur plan d'exécution dédié** :
-> [`DEVPLAN_2.md`](DEVPLAN_2.md) — étapes codables, ordre de livraison et décisions à trancher.
+> [`devplan.md`](devplan.md) §3.C2 et §3.D — étapes codables, ordre de livraison et décisions
+> à trancher. *(Le plan d'exécution séparé `DEVPLAN_2.md` y a été fusionné le 2026-08-27.)*
 > Les trois autres restes ci-dessous (`DET-4`, `DET-3`, option 4b) n'y sont pas et restent suivis
 > au devplan principal.
 

@@ -494,13 +494,16 @@ d'écriture directe en base), afficher les garde-fous (compte déjà lié, perso
 ⚠️ Tant que les trois emplacements du rattachement coexistent, ils divergeront — et l'écart se verra
 le jour où un ambulancier ne recevra plus ses missions.
 
-### C2 — ⏳ Authentification de service à service (`DEC-6`) — *les deux sens*
+### C2 — 🟡 Authentification de service à service (`DEC-6`) — *les deux sens*
 
 **Sortant.** `Orders.Api` est appelée **sans jeton** : aucun en-tête `Authorization` sur les deux
-clients HTTP. Cela tient tant qu'Orders.Api n'est pas protégée. Le jour où elle l'est, il faut un
-**client credentials Keycloak** (compte de service dédié à Vector) avec cache et renouvellement, sur
-le modèle du module Identity. **Rien ne bloque, et c'est à anticiper** : le symptôme sera une série de
-401 sur la joblist, en production, sans autre indice.
+clients HTTP. Cela tient tant qu'Orders.Api n'est pas protégée — vérifié le 2026-08-27, elle ne l'est
+toujours pas (ni `AddJwtBearer`, ni section `Keycloak` dans son `Program.cs`). Un en-tête posé vers
+Orders y sera donc **ignoré, pas rejeté** : toute la série sortante est livrable **sans coordination**
+et sans risque. Le jour où Orders se ferme, il faut un **client credentials Keycloak** (compte de
+service dédié à Vector) avec cache et renouvellement, sur le modèle du module Identity. **Rien ne
+bloque, et c'est à anticiper** : le symptôme sera une série de 401 sur la joblist, en production, sans
+autre indice.
 
 **Entrant — c'est la moitié qui presse.** L'API a été **fermée par défaut le 2026-08-25** : jusque-là
 aucun contrôleur ne portait d'attribut d'autorisation, si bien que **seuls les cinq endpoints passant
@@ -532,18 +535,250 @@ patient par une balise `<img src>`, qui **ne portera jamais de jeton**.
 
 ⚠️ Celles-là **ne se referment pas avec `DEC-6`** : donner un compte de service à Order n'y changerait
 rien, puisque c'est un navigateur qui affiche. Elles attendent que ces écrans passent à un `fetch`
-authentifié — décision `H1` de [`DEVPLAN_2.md`](DEVPLAN_2.md).
+authentifié — `H1`, tranchée le 26/08 en faveur de la balise.
 
-**Première étape de `DEC-6` livrée le 2026-08-27** — `E1`, la mesure. Une sonde journalise qui appelle
-ces six routes (action, IP, agent, présence d'un jeton) dans son propre fichier, et un test lie ce
-qu'elle observe à la surface anonyme déclarée ici : un fichier vide voudra donc bien dire « personne
-n'appelle », et non « la sonde regardait ailleurs ». Elle ne ferme rien — elle rend décidable le fait
-de fermer. **Sept jours de mesure à partir du déploiement**, après quoi `E3` (fermer
-`documents/content`, la seule route sans consommateur identifié) devient instruit.
+⚠️ **Garde-fou en place** : `AnonymousSurfaceTests` fige la liste exacte de ce qui répond sans jeton,
+**en deux groupes** — les quatre qui se referment, les deux qui restent. Toute route anonyme ajoutée
+fait échouer la suite : une exception doit être une décision, pas un oubli.
 
-⚠️ **Garde-fou en place** : `AnonymousSurfaceTests` fige la liste exacte de ce qui répond sans jeton.
-Toute route anonyme ajoutée fait échouer la suite — une exception doit être une décision, pas un
-oubli. Détail des étapes : [`DEVPLAN_2.md`](DEVPLAN_2.md).
+> 🪤 **La leçon de ce chantier, et elle vaut au-delà.** Deux routes avaient été fermées sur le motif
+> « aucun consommateur prouvé ». Le motif a tenu **un jour** : le lendemain, l'écran de capture passait
+> en production et deux navigateurs tiraient l'image. « Aucun consommateur » est un constat **daté**,
+> pas une propriété — toute étape qui ferme une porte sur ce motif doit **revérifier le motif au moment
+> de fermer**. C'est ce que fait `DEC6-E1`, et c'est pourquoi il est le premier.
+
+> ⚠️ **Deux séries d'étapes, `S` et `E`, toutes deux préfixées `DEC6-`.** `DEC6-S0…S5` = le sortant,
+> `DEC6-E1…E5` = l'entrant. Le préfixe n'est pas décoratif : sans lui, `E1` désignerait à la fois la
+> sonde de surface et le kilométrage du chapitre E. Ces références vivent dans les commits
+> (`DEC-6 E1`) — on les garde et on les qualifie, plutôt que de les renuméroter.
+
+**Ordre de livraison.** Les deux séries sont indépendantes l'une de l'autre, et de `DEC-7`.
+
+```
+DEC6-S0 → S1 → S2 → S3 → S4 → [Keycloak] → S5        aucune dépendance externe
+DEC6-E1 → [mesure 7 j] + [réponse dev web] → E2 → E3
+                       E2 → [Keycloak] → [facturation] → E4 → E5
+```
+
+Le seul couplage réel : **`E2` avant `E3` et `E4`**. ⚠️ Le chemin critique de la série `E` est du
+**temps calendaire**, pas du temps de développement — d'où `E1` en premier, qui démarre le compteur.
+
+#### Décisions actées des deux chantiers (`T1`…`T11`) — ne pas les rejouer
+
+*`T2`, `T3`, `T4` concernent `DEC-7` (§3.D) ; les huit autres, `DEC-6`.*
+
+| # | Décision |
+|---|---|
+| **T1** | **`DelegatingHandler`, et ce sera le premier du parc.** Trois raisons indépendantes : *(a)* les deux clients HTTP restent **purs**, donc testables en trois lignes — y injecter un fournisseur de jeton forcerait quatre harnais existants à stuber un jeton pour tester du parsing JSON ; *(b)* le **rejeu sur 401** n'est faisable que là, il faut voir la réponse — depuis les sites d'appel il faudrait le dupliquer dans 14 méthodes ; *(c)* l'**ordre avec Polly devient exprimable** : enregistré *après* les politiques, le handler d'auth est le plus **interne**, donc chaque tentative relit le jeton en cache. Le contre-argument (« aucun `DelegatingHandler` dans le parc ») est réel mais ne pèse pas : 40 lignes, locales à un enregistrement. |
+| **T2** | **Polly, pas `Microsoft.Extensions.Http.Resilience`.** Ce dernier est introuvable dans tout le parc ; l'introduire ferait de Vector le seul module à porter **deux** modèles de résilience. |
+| **T3** | **Fabriques de politiques publiques**, là où celles de la facturation sont privées. C'est le seul moyen de les tester (`DEC7-3`). Écart assumé au modèle maison, pour la raison qui manquait au modèle maison. |
+| **T4** | **Recul 200 ms / 600 ms, pas 2/4/8 s.** Sous un budget de 10 s, un recul de 2+4+8 = 14 s ne produirait **jamais** la troisième tentative. Écrire un réessai qui ne peut pas s'exécuter, c'est fabriquer une illusion de robustesse. Gigue **±50 %**, pour ne pas synchroniser une flotte de mobiles sur le même redémarrage d'Orders. |
+| **T5** | **Le fournisseur de jeton a son propre `HttpClient`**, jamais celui d'Orders — sinon le jeton passerait par le disjoncteur d'Orders, et **une panne d'Orders empêcherait d'obtenir un jeton**. |
+| **T6** | **Le compte de service ne mutualise rien avec `usvector-diag`.** Deux clients Keycloak distincts : le diag porte `realm-management/view-users`, le compte d'API n'en a pas besoin et **ne doit pas les avoir**. Deux durées de vie (quelques fois par mois à la main / toutes les 5 min sous concurrence) et deux rayons d'explosion (une page de diagnostic / la joblist de toute la flotte). On recopie 15 lignes plutôt que de coupler un outil de dev au chemin chaud de production. |
+| **T7** | **Échec d'obtention de jeton = Warning + `null`, jamais une exception.** L'appel part sans en-tête et prendra un 401 le jour où Orders sera protégée — symptôme lisible, plutôt qu'un 500 fabriqué par Vector. |
+| **T8** | **Le handler d'auth est enregistré inconditionnellement, dans tous les environnements.** Le conditionner à `IsConfigured` créerait un câblage qui n'existe qu'en production, donc **jamais exercé avant d'être indispensable**. Non configuré ⇒ trafic **octet pour octet** celui d'aujourd'hui. |
+| **T9** | **Trois notions, pas deux** : jetons *acceptés* à la porte, client *ambulancier* (politique de repli → toute l'API mobile), clients *de service* (politiques nommées → quatre routes et rien d'autre). Copier telle quelle la liste d'`azp` d'`Erp.Identity` ouvrirait **toute l'API mobile** au compte de la facturation — ce serait remplacer une porte ouverte à tous par une porte ouverte à un service qui n'a rien à y faire. |
+| **T10** | **Deux politiques nommées, pas une.** `field-data` est un paquet de transfert qu'aucun écran ne consomme → service-only. Les routes d'octets ont un usage humain plausible — l'ambulancier relit la photo qu'il vient de prendre → `ServiceOuAmbulancier`. Les mettre toutes en service-only casserait une fonctionnalité mobile pour rien. |
+| **T11** | **Le point de jeton est dérivé de `Keycloak:Authority`, pas découvert par OIDC.** Vector valide déjà le format de l'Authority au démarrage, la découverte ajouterait un aller-retour sur le chemin chaud, et `/protocol/openid-connect/token` est déjà écrit en dur à `KeycloakAdminClient.cs:49` — on aligne au lieu de créer une incohérence. |
+
+#### `DEC6-S0` — ⏳ Extraire `ParseAuthority`, et **ne pas** refactorer le reste
+
+`Infrastructure/Security/KeycloakAuthority.cs` : le corps exact de `KeycloakAdminClient.cs:67-74`,
+commentaire compris ; le privé disparaît. On réutilise la **forme** du POST (`l.47-64`) et la **forme**
+de la garde `IsConfigured` (`l.25-29`), sentinelle `__SET_VIA_ENV__` comprise — **recopiées, pas
+partagées** (`T6`). **Fin** : suite verte, aucun changement de comportement. **Risque** : nul.
+
+#### `DEC6-S1` — ⏳ `KeycloakServiceTokenProvider` : cache, marge, sérialisation
+
+Singleton — le cache doit survivre à la requête — avec **son propre `HttpClient`** (`T5`). Surface :
+`GetTokenAsync(ct)` (rend `null` si non configuré ou en échec, `T7`), `Invalidate()`, `IsConfigured`.
+Transposition de `ClMagasinJetonsUtilisateur` (facturation) de `refresh_token` vers
+`client_credentials`, **en plus simple** : un seul jeton, donc pas de dictionnaire, pas de purge, pas
+de rotation. Ce qu'on garde tel quel :
+
+- **marge de 30 s** avant expiration — un jeton qui expire en vol donne un 401 ;
+- **`SemaphoreSlim(1,1)` + double vérification** après acquisition — sans lui, 40 requêtes mobiles au
+  démarrage déclenchent 40 POST vers Keycloak ;
+- **`expires_in` → expiration absolue**, repli à 60 s si absente ou ≤ 0 ;
+- **`[JsonPropertyName("access_token")]`** explicite — `JsonSerializerDefaults.Web` ne ramène pas
+  `access_token` en camelCase.
+
+Configuration : `Keycloak:ServiceAccount` = `{ Enabled: false, ClientId: "usvector-api",
+ClientSecret: "__SET_VIA_ENV__" }`.
+
+**Fin** : tests avec horloge injectable (`Func<DateTimeOffset>`, sinon c'est un `Task.Delay`) — non
+configuré → `null` et **zéro** appel HTTP · 10 appels concurrents → **un seul** POST · `expires_in: 60`
++ 35 s → **second** POST · `Invalidate()` → POST suivant. **Risque** : nul, rien ne le consomme encore.
+
+#### `DEC6-S2` — ⏳ `ErpApiAuthHandler`, branché et **inerte**
+
+Si `request.Headers.Authorization` est nul, demander un jeton ; sinon, ne rien écraser. Enregistré sur
+les deux clients **après** les `AddPolicyHandler`, donc le plus interne (`T1`, raison *(c)*). Inertie
+assumée : `T8`. ⚠️ Le test `if (Authorization is null)` n'est pas décoratif — aucun appelant ne pose
+d'en-tête aujourd'hui, et l'écrasement silencieux est un piège classique.
+
+**Une ligne au démarrage, et c'est la moitié de la valeur de l'étape** : « appels SANS jeton de service
+(`Keycloak:ServiceAccount` désactivé ou non configuré) », ou « appels AVEC jeton de service (client
+`usvector-api`) ». Le symptôme redouté — une série de 401 sur la joblist, en production, sans autre
+indice — devient **une ligne au démarrage**.
+
+**Fin** : non configuré, aucun en-tête ; configuré, en-tête présent **et présent aussi sur la 2ᵉ
+tentative** d'un réessai — c'est le test qui vérifie l'ordre d'enregistrement.
+
+#### `DEC6-S3` — ⏳ Rejeu unique sur 401
+
+Si la réponse est 401 **et** qu'un jeton avait été posé : `Invalidate()`, reprendre un jeton, renvoyer
+**une seule fois** (drapeau local, pas de boucle). Séparé de `S2` pour pouvoir être abandonné sans rien
+perdre. **Fin** : stub 401→200 → deux appels, deux jetons demandés, réponse 200 ; stub 401 systématique
+→ **exactement deux** appels. *(Le second test existe pour la boucle infinie.)*
+
+#### `DEC6-S4` — ⏳ Garde-fou de démarrage, sur le modèle `KC-1`
+
+`Enabled = true` **et** non configuré ⇒ **refus de démarrer**, message nommant
+`Keycloak__ServiceAccount__ClientSecret`. **Pourquoi** : `appsettings.Production.json` documente déjà
+l'incident — `Keycloak:Enabled` retombé à `false` par perte des variables du `web.config`, et « claim
+sub absent » pendant des heures. Le secret du compte de service vit **au même endroit et se perd de la
+même façon** ; sans garde, l'API devient **silencieusement anonyme** vers Orders.
+
+#### `DEC6-S5` — 🔴 Activation *(action humaine — `H3`)*
+
+Créer `usvector-api` dans le realm, client confidentiel, *Service accounts enabled*, **sans rôle
+`realm-management`** (`T6`). Poser le secret dans le `web.config`, et basculer `Enabled` **par variable
+d'environnement** — ⚠️ **pas** dans `appsettings.Production.json`, shippé par `dotnet publish` et donc
+effacé au déploiement suivant (§5.2, piège déjà rencontré ce mois-ci).
+
+**Fin, mesurable et seulement en production** : le log de démarrage dit « AVEC jeton », et le nombre de
+POST vers le point de jeton Keycloak sur une heure de trafic est de l'ordre de **12** (un toutes les
+5 min) — **pas** plusieurs milliers. C'est le test réel du cache.
+
+#### `DEC6-E1` — 🟢 Mesurer, avant de conclure — *sonde livrée le 2026-08-27, mesure à lancer*
+
+**Deux sources, la seconde seulement se code.**
+
+**(a) Journaux IIS du serveur — gratuits, à demander.** Les journaux W3C portent `c-ip`, `cs-uri-stem`,
+`cs(User-Agent)` : filtrer les six chemins sur 30 jours, grouper par IP + agent. C'est la vérité sans
+écrire une ligne, et la seule source qui porte sur le **passé**.
+
+**(b) Sonde applicative — ✅ livrée.** `Api/Infrastructure/AnonymousSurfaceProbe.cs`, enregistrée
+**après** `UseAuthentication`/`UseAuthorization` — sans quoi l'`azp` serait toujours vide et la mesure
+ne saurait pas distinguer un appel nu d'un appel déjà porteur d'un jeton. Journal dédié
+`Vector.SurfaceAnonyme`, routé par `nlog.config` vers `logs/usvector-surface-anonyme-<date>.log`
+(rétention 90 j, `final` pour ne pas noyer le journal applicatif) : une ligne par appel — action,
+méthode, chemin, statut, IP, `User-Agent`, `Referer`, présence d'un `Authorization`, `azp`.
+
+⚠️ **Elle observe six routes, pas quatre.** Le plan d'exécution disait « ces quatre chemins
+uniquement » ; les deux routes des écrans amont sont arrivées depuis, et ce sont précisément celles
+dont la réponse a changé en un jour. Elles ne se referment pas avec `DEC-6`, mais savoir qui les tire a
+la même valeur.
+
+**Comment elle sait quoi observer.** Elle lit `[AllowAnonymous]` dans les métadonnées de l'endpoint et
+écarte les deux ouvertures de diagnostic : une route anonyme ajoutée demain est mesurée sans que
+personne y pense. `AnonymousSurfaceProbeTests` (10 tests) fige la contrepartie — la surface observée est
+**exactement** celle qu'`AnonymousSurfaceTests` déclare justifiée, la ligne part bien, elle part dans le
+journal dédié, et elle survit à une exception en aval. ⚠️ **Le vide de ce fichier vaut conclusion** : il
+doit être impossible qu'il soit vide **parce que la sonde regardait ailleurs**.
+
+**Ce qui reste, et ce n'est pas du code** : déployer — le compteur ne démarre pas avant —, demander les
+journaux IIS des 30 derniers jours, puis laisser courir **7 jours**.
+
+**Fin.** Pour chaque route, la liste des IP et des agents. Attendu — `field-data` et `Signature` vus
+depuis l'IP de la facturation ; `documents/content` **jamais** vu ; `mutuelle-card` vu depuis les postes
+web. Si l'attendu n'est pas vérifié, **`E3` s'arrête** et on repart de la mesure.
+
+#### `DEC6-E2` — ⏳ Deux publics sur la même API — *l'étape la plus risquée*
+
+⚠️ **Le vrai piège de `DEC-6` entrant est ici** — motif complet en `T9`. Il faut distinguer **trois**
+choses, pas deux :
+
+| Notion | Config | Portée |
+|---|---|---|
+| Jetons **acceptés** par le pipeline | `Keycloak:Audience` ∪ `Keycloak:ServiceAzp[]` | le jeton n'est pas rejeté à la porte |
+| Client **ambulancier** | `Keycloak:Audience` (`us-ambulance`) | politique de repli → **toute l'API mobile** |
+| Clients **de service** | `Keycloak:ServiceAzp[]` (nouveau) | politiques nommées → **les quatre routes, et rien d'autre** |
+
+1. L'`azp` attendu (`Program.cs:105-124`) devient un `HashSet<string>(Ordinal)`, comme
+   `Identity.Api/Program.cs:68-75`. **Le dépôt du motif dans `HttpContext.Items` est conservé** — il
+   alimente les messages de `CrewAccess` et vaut mieux qu'un `ctx.Fail` nu.
+2. **Politique de repli resserrée** : `RequireAuthenticatedUser()` **+** `azp == Audience`.
+   ⚠️ **À conditionner à `!disableValidation`**, exactement comme la vérification d'`azp` l'est déjà —
+   sinon le poste de développement, où la validation est volontairement désactivée, **ne répond plus
+   rien**, et personne ne comprend pourquoi.
+3. **Deux politiques nommées** : `"ServiceFacturation"` et `"ServiceOuAmbulancier"` (`T10`). La liste
+   d'`azp` est à prévoir **multi-clients dès l'écriture**, pas à rallonger après coup.
+
+> 💡 **Un second garde-fou existe déjà, gratuitement** : un compte de service a un `sub` absent de
+> `PER_KEYCLOAK_MAP`, donc `CrewAccess.ResolvePersonnel` rendrait **403**. Les cinq routes crew-scopées
+> sont **doublement** fermées — par construction, pas par vigilance.
+
+**Fin.** Étape **purement additive** : aucune route ne référence encore les nouvelles politiques. Seul
+changement observable — un jeton de service n'est plus rejeté à la porte, mais reste refusé partout par
+la politique de repli. En dev : jeton ambulancier → tout marche ; jeton de service → 403 partout.
+**Risque** : **le plus élevé des trois séries**, elle touche la politique globale. À déployer **seule**,
+sur le serveur de dev d'abord, avec `api/Auth/WhoAmI` et `api/JobList/…` comme témoins.
+
+#### `DEC6-E3` — ⛔ Fermer `documents/content` — *une seule route*
+
+**Préalable** : `E1` à zéro sur 7 jours pour `documents/content`.
+
+`[AllowAnonymous]` → `[Authorize(Policy = "ServiceOuAmbulancier")]` sur `DocumentController.GetContent`.
+Mettre à jour `AnonymousSurfaceTests`, et remplacer le commentaire « se referme avec DEC-6 » par ce qui
+reste ouvert, et à qui.
+
+⚠️ **Ne pas y rajouter la carte mutuelle par symétrie.** Ses deux routes sont ouvertes **par décision**,
+pas par défaut d'authentification. Les fermer ici casserait les écrans d'Order et de la facturation le
+jour du déploiement, sans erreur console et sans qu'aucun test ne le voie.
+
+**Fin** : les octets d'un document ne sont plus accessibles sans jeton.
+
+#### `DEC6-E4` — ⛔ Fermer `field-data` et `Signature` — *cross-repo, ordre non permutable*
+
+**E4.a — Keycloak (`H2`).** `us-facturation` est déclaré **public** (pas de secret, PKCE) : il ne peut
+**pas** faire de `client_credentials`.
+
+**E4.b — Côté facturation (autre dépôt).** Transposer `S1`+`S2` en VB, branchés sur les **deux seules**
+inscriptions Vector (`ModBillingGatewayInfraExtension.vb:185-204`) — **pas** sur les clients Orders, qui
+appellent une API non protégée. Même politique d'inertie. *Hors périmètre de ce dépôt, mais conditionne
+`E4.c` : mérite sa propre entrée au devplan de la facturation.*
+
+**E4.c — Côté Vector.** `FieldDataController.Get` → `"ServiceFacturation"` ;
+`SignatureController.GetSignature` → `"ServiceOuAmbulancier"`. Et **supprimer l'appel à
+`ClAutorizationCommand.AutorizeJob`** (`SignatureController.cs:23`) : cette méthode **retourne `true` en
+toutes circonstances**, son corps est commenté — une garde décorative que la vraie politique remplace.
+Supprimer le fichier s'il n'a plus d'appelant.
+
+**Fin.** Sur le dev : une publication complète de la facturation réussit **avec** le compte de service ;
+la même **sans** secret rend 401 sur `field-data`, et son journal le nomme. Puis la sonde `E1` montre
+**zéro** appel sans `Authorization`.
+
+**Risque.** **Élevé et concentré** — c'est la chaîne vers la facturation. Vector fermé avant que la
+facturation sache présenter un jeton, et **la publication du jour tombe**. Sur les deux serveurs, **la
+facturation se déploie et se vérifie avant Vector**.
+
+#### `DEC6-E5` — ⛔ Retourner le garde-fou
+
+Le groupe « faute de `DEC-6` » d'`AnonymousSurfaceTests` retombe à **zéro**, et le commentaire est
+réécrit : ces quatre ouvertures ne sont plus « temporaires », elles sont **fermées**, avec la date.
+
+Et `Les_ouvertures_pour_la_facturation_sont_au_nombre_de_quatre` **n'est pas supprimé — il est
+retourné** : un test qui vérifie par réflexion que ces quatre actions portent bien une politique
+**nommée**. Supprimer le test laisserait la politique de repli seule gardienne : elle protège contre
+l'oubli d'attribut, **pas** contre le remplacement d'une politique nommée par un `[Authorize]` nu — qui
+rouvrirait ces quatre routes à l'ambulancier, dont le dossier terrain complet.
+
+#### 🔴 Ce qui appartient à un humain
+
+| # | Décision | Bloque | Enjeu |
+|---|---|---|---|
+| **H2** | Rendre `us-facturation` confidentiel, ou créer `us-facturation-svc` ? | `E4.a` | Le rendre confidentiel **casserait son flux OIDC navigateur**. Recommandation : **client distinct** — un écran et un compte de service ont des cycles de vie et des rayons d'explosion différents. |
+| **H3** | Créer `usvector-api` (sans rôle `realm-management`) et poser son secret. | `S5` | Purement Keycloak + `web.config`. Le code est prêt, et inerte sans. |
+| **H4** | Drapeau de réouverture par variable d'environnement sur `documents/content` ? | `E3` | L'assurance d'un cycle de déploiement, contre une machinerie permanente. **Recommandation : s'en passer** — la route n'a aucun consommateur identifié. |
+| **H6** | Accepter que la politique de repli interdise à tout compte de service d'atteindre l'API mobile. | `E2` | Interdit d'emblée un usage service-à-service futur non prévu, qui devra passer par une politique nommée explicite. **C'est voulu.** |
+| ~~**H1**~~ | ~~`fetch` ou balise directe pour l'image ?~~ | — | ✅ **Tranchée le 26/08 : balise `<img src>`**, pour l'écran ambulancier comme pour ceux d'Order et de la facturation. Conséquence assumée : les deux routes de carte mutuelle **restent ouvertes**. |
+| ~~**H7**~~ | ~~Par quel compte Order et la facturation consultent-ils l'image ?~~ | — | ✅ **Sans objet depuis `H1`** : leurs écrans affichent par balise, donc **aucun compte**. La question renaîtra le jour où l'on voudra fermer ces deux routes. |
+
+⚠️ **Ce que `DEC-6` n'est pas.** Deux publics et deux politiques nommées restent **en deçà d'un modèle
+de droits** : comme le dit `Identity.Api`, une liste d'`azp` « n'est pas une autorisation fine, c'est
+une liste d'appelants reconnus ». À dire, pour que personne ne croie le problème résolu.
 
 ### C3 — ⏳ Trancher le 404 du second membre d'équipage
 
@@ -562,10 +797,107 @@ Les deux clients HTTP sont enregistrés avec la seule `BaseAddress` : **pas de t
 (donc 100 s par défaut, ce qui fait pendre une requête mobile), **pas de retry ni de disjoncteur** sur
 le chemin de **lecture**. L'écriture est couverte (file de projection + worker avec retry).
 
-**Contenu** : timeout court et explicite sur les deux clients, puis `AddStandardResilienceHandler`
-(ou Polly), **en gardant** le comportement de lecture actuel qui tolère un 404 (liste vide plutôt
-qu'erreur). **Fin** : aucun appel sortant ne peut pendre au-delà du timeout choisi.
-Détail des étapes : [`DEVPLAN_2.md`](DEVPLAN_2.md).
+Trois étapes, dans l'ordre, **sans aucune dépendance externe** : `DEC7-1` → `DEC7-2` → `DEC7-3`. Une
+seule question n'appartient pas au code — les budgets de temps, 🔴 `H5`. Les décisions déjà actées qui
+les concernent sont `T2`, `T3` et `T4` (§3.C2).
+
+> ⚠️ **`DEC7-n`, et non `Dn`.** `D1`…`D16` désignent déjà les **décisions structurantes** du §2. Même
+> document, deux séries : on préfixe plutôt que de laisser « D1 » vouloir dire deux choses.
+
+### `DEC7-1` — ⏳ Timeouts explicites *(🔴 `H5`)*
+
+Une classe `OrdersApiOptions` (`BaseUrl`, `ReadTimeoutSeconds`, `WriteTimeoutSeconds`, `RetryCount`,
+`CircuitBreakerThreshold`, `CircuitBreakerSeconds`) : POCO peuplé à la main, `AddSingleton`, pas
+d'`IOptions`. On y déplace `OrdersBaseUri` (`Program.cs:170-175`) **en gardant son commentaire** sur le
+`/` final — ce piège a déjà coûté une panne. Puis `c.Timeout` sur les deux `AddHttpClient`
+(`Program.cs:179-184`).
+
+**Les valeurs, et pourquoi ce ne sont pas celles de la facturation.** BillingGateway travaille par lot,
+la nuit : 30 s de budget y sont raisonnables. **Ici, un ambulancier attend devant son écran.**
+
+| Client | Budget | Pourquoi |
+|---|---|---|
+| `IErpReadApiClient` | **10 s** | chemin chaud mobile (joblist, détail mission) — 100 s aujourd'hui |
+| `IErpWriteApiClient` | **15 s** | mixte : la sélection du type et la saisie sont sur le chemin humain ; la projection est derrière l'outbox |
+
+⚠️ **Ne pas allonger le budget d'écriture pour l'outbox** : il a déjà son propre recul 2→60 s
+(`OperationalOutboxDispatcher.cs:87-89`), et une tentative avortée est remise en file. Le long horizon
+est déjà à sa place.
+
+⚠️ **Changement de type d'exception** : un dépassement de `HttpClient.Timeout` lève
+`TaskCanceledException`, **pas** `HttpRequestException`. Les deux sites concernés attrapent `Exception`
+(`ContextOrderCatalogService.cs:43`, `OperationalOutboxDispatcher.cs:86`) — ils absorbent le nouveau
+type sans modification. **Aucun `catch (HttpRequestException)` n'existe dans le dépôt** : vérifié.
+C'est la vérification à refaire si quelqu'un en ajoute un.
+
+**Fin.** Orders rendue injoignable : `GET api/JobList/…` échoue en ~10 s au lieu de ~100 s. Au
+chronomètre, sans instrumentation.
+
+**Risque.** Un appel Orders légitimement lent (> 10 s) deviendrait une erreur. Aucun appel unitaire
+connu ne s'en approche — les 14,7 s mesurées côté facturation sont un **cumul de 284 appels**, pas un
+appel. À valider sur le serveur de dev avant la prod.
+
+### `DEC7-2` — ⏳ Réessai et disjoncteur (Polly), en **fabrique publique**
+
+**Paquet** : `Microsoft.Extensions.Http.Polly` **8.0.10** dans
+`CaSoft.Erp.USVector.Infrastructure.csproj` — tout y est déjà pinné en 8.0.10 (`T2`).
+
+`Infrastructure/ErpApi/OrdersApiResilience.cs`, deux fabriques **publiques** (`T3`) —
+`RetryPolicy(options)` et `CircuitBreakerPolicy(options)`, au-dessus de
+`HttpPolicyExtensions.HandleTransientHttpError()`. Recul selon `T4`.
+
+**Ordre** : `.AddPolicyHandler(retry).AddPolicyHandler(breaker)` — réessai à l'extérieur, disjoncteur à
+l'intérieur, comme la facturation. Cet ordre fait compter au disjoncteur **chaque tentative**, donc il
+s'ouvre plus vite quand Orders est réellement tombée.
+
+**Le vrai gain est pour l'outbox** : le dispatcher traite jusqu'à 50 entrées **séquentiellement**.
+Orders tombée sans disjoncteur : 50 × (timeout + réessais). Avec : les 5 premières échouent, les 45
+suivantes échouent instantanément, le cycle se termine et l'outbox repousse.
+
+**Ce qui ne doit pas casser :**
+
+- **La tolérance au 404** (`ListCrewIdsAsync:69`, `ResolvePersonnelIdByKeycloakAsync:83`,
+  `GetOrNullAsync:106`). `HandleTransientHttpError()` couvre 5xx, 408 et `HttpRequestException` — **404
+  n'en fait pas partie**, la réponse traverse intacte.
+  🚫 **La faute à ne pas commettre** : ajouter `.OrResult(r => !r.IsSuccessStatusCode)` « pour être
+  complet ». Chaque 404 deviendrait 3 appels puis un échec, et la joblist d'un ambulancier **sans
+  équipage** tomberait en erreur. **À écrire en commentaire dans le code.**
+- **Les refus métier de l'écriture** (409/400/404 traduits en issues) sont des 4xx : non transitoires,
+  non réessayés, non comptés par le disjoncteur. Un champ verrouillé reste un champ verrouillé.
+- **Les dégradations existantes** attrapent `Exception` : `BrokenCircuitException` y est absorbée.
+
+**Réessai sur PUT/PATCH : sûr, et à écrire.** Les quatre écritures sont **idempotentes par
+construction** — la projection envoie l'état complet (pas un delta), les deux `PATCH` posent des
+valeurs. Rejouer après une coupure survenue *après* traitement serveur ne double rien.
+⚠️ **À vérifier par un test, pas par raisonnement** : Polly renvoie **la même instance** de
+`HttpRequestMessage`. Le renvoi d'un corps `JsonContent` déjà consommé fonctionne depuis .NET Core 3.0,
+mais c'est exactement le genre d'affirmation qui se révèle fausse en production (test 4 de `DEC7-3`).
+
+**Fin.** Orders injoignable : les logs montrent 3 tentatives par appel, puis — après 5 échecs — des
+rejets immédiats pendant 30 s. Et la joblist d'un ambulancier sans équipage rend toujours une **liste
+vide** tant qu'Orders est debout.
+
+### `DEC7-3` — ⏳ Les tests que la fabrique publique rend possibles
+
+`OrdersApiResilienceTests.cs` : monter le pipeline à la main
+(`new HttpClient(new PolicyHttpMessageHandler(OrdersApiResilience.RetryPolicy(opts)) { InnerHandler = … })`),
+avec un `StubHandler` dérivé de celui de `ContextOrderAttributeTests` qui **compte les tentatives** et
+rend une séquence (503, 503, 200). Recul de 1 ms en test, sinon la suite s'allonge.
+
+Quatre tests, quatre affirmations que le code seul ne prouve pas :
+
+| Test | Ce qu'il protège |
+|---|---|
+| `Un_503_est_reessaye_et_finit_par_passer` | 3 appels, 1 succès |
+| `Un_404_n_est_pas_reessaye` | **1 seul** appel ; la liste vide survit. *Protège la tolérance au 404 contre le refactor de demain.* |
+| `Un_409_de_refus_metier_n_est_pas_reessaye` | 1 appel, `FieldLocked` rendu. *Protège la distinction refus / panne.* |
+| `Un_PATCH_reessaye_renvoie_bien_son_corps` | le corps de la 2ᵉ tentative est identique et non vide |
+
+**Fin.** Suite verte, aucun test existant modifié. **Risque** : nul.
+
+> 🔴 **`H5` — arbitrage produit, pas constante technique.** Accepter **10 s** en lecture et **15 s** en
+> écriture, c'est répondre à : *au bout de combien de temps l'ambulancier préfère-t-il une erreur à une
+> attente ?* Tant que la question n'est pas tranchée, `DEC7-1` reste écrit mais pas déployé.
 
 ---
 
@@ -909,6 +1241,9 @@ sens inverse laisse Vector servir les anciennes règles, sans casse mais sans ef
 | **Lot Certification TRF-12..15 tel que planifié**, dont la **restitution de la carte mutuelle** | La réalité est un partage Certification / facturation, largement livré (§3.E) ; le bloc mutuelle est tiré via le paquet terrain. |
 | **Arbitrages tranchés** : 4a vs 4b (découplage) · 2a/2b/2c (champs mutuelle) · « défaut = premier contexte actif » | Respectivement **4a**, **2b**, et **supprimé** (« non renseigné » est un état valide). |
 | **Extension de l'écran Siège `UcEmployeeKeycloakAccount`** comme hôte du mapping Keycloak | Le module Siège n'existe plus que dans `Archives/` et la correspondance passe à Identity (§3.C1). |
+| **CORS** — `Program.cs` fait `AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()` | Sujet réel, adjacent aux écrans qui affichent la carte mutuelle, et déjà noté en TODO dans le code — mais le mêler à `DEC-6` rendrait toute régression indémêlable. |
+| **`Microsoft.Extensions.Http.Resilience`** pour `DEC-7` | Introuvable dans tout le parc : l'introduire ferait de Vector le seul module à porter **deux** modèles de résilience (`T2`, §3.C2). |
+| **`DEVPLAN_2.md`**, plan d'exécution séparé de `DEC-6` et `DEC-7` | **Fusionné ici le 2026-08-27** (§3.C2 et §3.D), puis sorti du dépôt. Deux documents pour un même chantier, c'étaient deux états : celui du plan principal, et celui du plan d'exécution — et le second a menti pendant un jour (« aucune étape livrée » alors que `DEC6-E1` l'était). Un seul plan porte l'état. |
 | **Historique de portage legacy** (divergences framework, namespaces, warnings) et **dettes C4, C5, C6, KC-1, DEP-2, DET-1, DET-2, DET-3** | Portage terminé, dettes résolues et vérifiées ; l'information vit dans `git log`. |
 
 ---
@@ -920,7 +1255,6 @@ sens inverse laisse Vector servir les anciennes règles, sans casse mais sans ef
 | [`AppMobile_specifications.md`](AppMobile_specifications.md) | Spec fonctionnelle | Le besoin et le vocabulaire (plan de travail, statuts terrain, isolation par équipage, séparation officiel↔terrain) |
 | [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) | Devplan | Carte mutuelle : capture, restitution, OCR (§3.F1-F2) |
 | [`VECTOR_ORDERS_DECOUPLING_devplan.md`](VECTOR_ORDERS_DECOUPLING_devplan.md) | Devplan | Découplage HTTP : contrat consommé, auth de service, résilience (§3.C2, §3.D) |
-| [`DEVPLAN_2.md`](DEVPLAN_2.md) | Plan d'exécution | **Le détail de `DEC-6` et `DEC-7`** : étapes codables, ordre de livraison, décisions à trancher (§3.C2, §3.D) |
 | [`PROJECTION_TERRAIN_devplan.md`](PROJECTION_TERRAIN_devplan.md) | Devplan | Projection du terrain vers Order — ce que `field-data` cesserait de composer (§3.A4, §3.E3) |
 | [`refactor_result_pattern.md`](refactor_result_pattern.md) | Devplan refactoring | Result pattern, vague 2 (§3.G1) |
 | [`plan_correctif_vector_fallback_snapshot.md`](plan_correctif_vector_fallback_snapshot.md) | Plan correctif | Repli sur le snapshot `ORD_ORDER` — **à coder dans `Erp.Order`** (§3.B2) |

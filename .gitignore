@@ -26,3 +26,6 @@ Thumbs.db
 
 # Logs générés par un run local de l'API (n'importe quel dossier logs/)
 logs/
+
+# Archive de redaction : plan d'execution DEC-6/DEC-7, fusionne dans devplan.md le 2026-08-27
+devplan_obsolete.md
