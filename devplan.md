@@ -194,9 +194,10 @@ bascule est en service en production depuis le 2026-08-25** : la sélection du t
 questionnaire d'attributs (A2) viennent d'Order, le paquet terrain a suivi (A4), et le code qu'elle
 remplaçait a été retiré (A5).
 
-**Ce qui reste tient en une phrase.** La bascule est encore réversible par configuration, et on ne
-retire ce filet qu'une fois le dev web confirmé capable d'absorber les nouveaux refus. Sa réponse
-débloque A3 et A6 ; rien d'autre n'attend.
+**Ce qui reste tient en une phrase.** Le filet de configuration n'existe plus : le second chemin est
+retiré depuis le 2026-08-27 (A1), et un incident se corrige désormais par un redéploiement. Restent
+la réponse du dev web, qui débloque l'affichage des refus (A3), et une question de calendrier à la
+facturation (A6) ; rien d'autre n'attend.
 Notes envoyées : [le contrat](note_web_alexandre_context_mission_dto.md) (25/08) ·
 [la demande de confirmation](note_web_alexandre_context_mission_confirmation.md) (26/08).
 
@@ -805,7 +806,6 @@ base — et un déploiement dont le code n'est pas commité devient visible au l
 **Clés lues** : `ConnectionStrings:MobileDb` (`OrdersDb` inutilisé depuis le découplage) ·
 `OrdersApi:BaseUrl` · `AddressApi:BaseUrl` ·
 `Keycloak:{Enabled, Authority, Audience, DisableValidation, RequireHttpsMetadata, AdminClientId, AdminClientSecret}` ·
-`ContextOrder:{UseOrderCatalog, UseOrderAttributes}` (armés en prod, §3.A1) ·
 `Diagnostics:Enabled` · `MobileIdentityCache:{PersonnelMinutes=30, ActiveCrewsMinutes=15}` · secrets
 GpsGate/Sirus `__SET_VIA_ENV__`.
 

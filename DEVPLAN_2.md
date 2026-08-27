@@ -131,10 +131,12 @@ E1 → [mesure 7 j] + [réponse dev web] → E2 → E3
 ## D1 — ⏳ Timeouts explicites
 
 **Contenu.** Une classe `OrdersApiOptions` (`BaseUrl`, `ReadTimeoutSeconds`, `WriteTimeoutSeconds`,
-`RetryCount`, `CircuitBreakerThreshold`, `CircuitBreakerSeconds`), sur le modèle exact de
-`ContextOrderOptions` — POCO peuplé à la main, `AddSingleton`, pas d'`IOptions`. On y déplace
-`OrdersBaseUri` (`Program.cs:170-175`) **en gardant son commentaire** sur le `/` final : ce piège a
-déjà coûté une panne. Puis `c.Timeout` sur les deux `AddHttpClient` (`Program.cs:179-184`).
+`RetryCount`, `CircuitBreakerThreshold`, `CircuitBreakerSeconds`) : POCO peuplé à la main,
+`AddSingleton`, pas d'`IOptions`. ⚠️ Le modèle cité jusqu'ici, `ContextOrderOptions`, **n'existe
+plus** — retiré le 2026-08-27 avec le second chemin de la bascule (devplan §3.A1) ; la forme
+tient toujours, la référence est morte. On y déplace `OrdersBaseUri` (`Program.cs:170-175`) **en
+gardant son commentaire** sur le `/` final : ce piège a déjà coûté une panne. Puis `c.Timeout` sur
+les deux `AddHttpClient` (`Program.cs:179-184`).
 
 **Valeurs, et pourquoi elles ne sont pas celles de la facturation.** BillingGateway travaille par
 lot, la nuit : 30 s de budget y sont raisonnables. **Ici un ambulancier attend devant son écran.**
@@ -149,9 +151,9 @@ lot, la nuit : 30 s de budget y sont raisonnables. **Ici un ambulancier attend d
 horizon est déjà à sa place.
 
 ⚠️ **Changement de type d'exception** : un dépassement de `HttpClient.Timeout` lève
-`TaskCanceledException`, **pas** `HttpRequestException`. Les trois sites concernés attrapent
-`Exception` (`ContextOrderCatalogService.cs:43`, `OrderEffectiveContractTypeResolver.cs:50`,
-`OperationalOutboxDispatcher.cs:83`) — ils absorbent le nouveau type sans modification. **Aucun
+`TaskCanceledException`, **pas** `HttpRequestException`. Les deux sites concernés attrapent
+`Exception` (`ContextOrderCatalogService.cs:43`, `OperationalOutboxDispatcher.cs:86`) — ils
+absorbent le nouveau type sans modification. **Aucun
 `catch (HttpRequestException)` n'existe dans le dépôt** : vérifié. C'est la vérification à refaire si
 quelqu'un en ajoute un.
 
