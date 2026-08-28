@@ -38,14 +38,37 @@
 > - ⛔ **Une décision interne** — où vit l'écran de rattachement Keycloak (§3.C1). Seul maillon
 >   manuel de la chaîne, et le seul dont l'oubli prive un ambulancier de toutes ses missions.
 >
-> **Ce qui n'attend personne** et s'attaque aujourd'hui, dans l'ordre qu'on veut : `DEC-6` (§3.C2),
-> `DEC-7` (§3.D), les horodatages (§3.E2), la mesure du remplissage de la carte mutuelle (§3.F1),
-> les trois chantiers hérités (§3.F3) et la dette (§3.G).
+> **Ce qui n'attend personne** et s'attaque aujourd'hui, dans l'ordre qu'on veut : le sortant de
+> `DEC-6` (§3.C2, `DEC6-S0..S4`), `DEC-7` (§3.D), les horodatages (§3.E2), les trois chantiers
+> hérités (§3.F3) et la dette (§3.G) — à commencer par **`G9`**, qui bloque la mesure de
+> `DEC6-E1`. Les deux comptages qui restent, eux, demandent un accès serveur : voir le point de
+> reprise ci-dessus.
 >
 > **Prod** : `\\192.168.1.112\prod_api\Vector.Api` (IIS `/vector`) — trafic servi, jetons Keycloak
 > réellement validés depuis le 2026-08-02.
 > **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **128 tests verts** (2026-08-27).
-> **Dernière mise à jour** : 2026-08-27.
+> **Dernière mise à jour** : 2026-08-28.
+
+> **🔖 Point de reprise — 2026-08-28.** Deux fils ouverts, indépendants l'un de l'autre, aucun des
+> deux n'est du code à écrire. Ils demandent tous deux un accès que le poste de développement n'a pas.
+>
+> 1. **Le remplissage de la carte mutuelle en production** (§3.F1, §1.8) — la table `MOB_MUTUELLE_CARD`
+>    est vide depuis juin, la cause était dans l'API, elle est corrigée, et l'écran est en service
+>    depuis le 26/08. Reste à compter. `SELECT COUNT(*), COUNT(DISTINCT MMC_BENEFICIARY_ID),
+>    MIN(MMC_CAPTURED_AT), MAX(MMC_CAPTURED_AT) FROM dbo.MOB_MUTUELLE_CARD` sur
+>    `192.168.1.109,1440 / BD_ERP_MOBILE_APP`. ⚠️ Le mot de passe n'est pas dans le dépôt
+>    (`__SET_VIA_ENV__`) : il vit dans le `web.config` du serveur (§5.2). **Une capture datée du 26/08
+>    ou après** prouve que la chaîne est débloquée et ouvre `F2` ; zéro veut dire que le blocage était
+>    ailleurs — et surtout **pas** qu'il faut reconclure à un défaut d'adoption, l'erreur qui a coûté
+>    deux mois.
+> 2. **`G9` — la production ne journalise plus depuis le 24/08**, découvert en cherchant le premier
+>    point. Trois vérifications, sur le serveur, dans l'ordre : espace disque · journal interne de
+>    NLog dans le `%TEMP%` **du pool d'applications** · droits d'écriture sur `…\Vector.Api\logs`.
+>    C'est **bloquant pour `DEC6-E1`** : la sonde écrirait dans le vide, et le vide vaut conclusion.
+>
+> Le code, lui, est à jour et poussé — la sonde `DEC6-E1` est écrite, testée et commitée, mais **non
+> déployée** ; c'est volontaire, tant que `G9` tient. Prochain geste de code une fois `G9` levée :
+> déployer, écrire une ligne volontairement, la relire — puis seulement lancer les 7 jours.
 
 | | Sens |
 |---|---|
@@ -681,6 +704,12 @@ doit être impossible qu'il soit vide **parce que la sonde regardait ailleurs**.
 **Ce qui reste, et ce n'est pas du code** : déployer — le compteur ne démarre pas avant —, demander les
 journaux IIS des 30 derniers jours, puis laisser courir **7 jours**.
 
+⛔ **Préalable découvert le 2026-08-28, et il bloque la mesure : la production n'écrit plus aucun
+journal depuis le 24/08** (§3.G9). La sonde emprunte le même tuyau — déployée en l'état, elle
+produirait un fichier vide, c'est-à-dire la conclusion « personne n'appelle », c'est-à-dire la
+fermeture d'une route sur une mesure qui n'a jamais eu lieu. **Rien ne démarre avant que `G9` soit
+levée**, et le premier geste après l'être sera d'écrire une ligne volontairement pour la relire.
+
 **Fin.** Pour chaque route, la liste des IP et des agents. Attendu — `field-data` et `Signature` vus
 depuis l'IP de la facturation ; `documents/content` **jamais** vu ; `mutuelle-card` vu depuis les postes
 web. Si l'attendu n'est pas vérifié, **`E3` s'arrête** et on repart de la mesure.
@@ -1117,6 +1146,49 @@ publient pas non plus sans authentification.
 
 **Fin** : pour chaque module en service, une requête suffit à dire quel commit tourne et sur quelle
 base — et un déploiement dont le code n'est pas commité devient visible au lieu d'être découvert.
+
+### G9 — ⛔ **La production n'écrit plus aucun journal depuis le 2026-08-24** — *à diagnostiquer avant `DEC6-E1`*
+
+**Constaté le 2026-08-28** en cherchant tout autre chose. Dans
+`\\192.168.1.112\prod_api\Vector.Api\logs\`, le fichier le plus récent — tous types confondus — date du
+**24/08 à 02:17** (`stdout_20260823050844_7680.log`) ; le dernier journal NLog est
+`usvector-api-2026-08-24.log`, 93 Ko, arrêté à **00:36**.
+
+**Quatre jours de trafic de production sans une ligne**, alors que les binaires du dossier datent du
+**27/08 à 00:21** — exactement la publication de `4e6de8b`. L'application est déployée là, elle tourne,
+elle ne journalise plus.
+
+**Ce que ce n'est pas.** Le câblage est intact (`Program.cs:317-319`, `ClearProviders()` +
+`UseNLog()`), et le seul commit qui ait jamais touché cette ligne est le rebrand de mai. Le
+`nlog.config` déployé est identique à celui du dépôt — daté du 30/06, `CopyToOutputDirectory` valant
+`PreserveNewest`, il n'est recopié que lorsqu'il change.
+
+**Première hypothèse : le disque.** Ce seul dossier pèse **~920 Mo pour 370 fichiers**, à ~20 Mo par
+jour, alors que `maxArchiveFiles="30"` devrait en garder trente — la purge ne fait donc plus son
+travail depuis longtemps, et huit autres applications partagent ce volume. Avec
+`throwConfigExceptions="false"`, un disque plein produit **exactement** ce symptôme : plus rien, sans
+erreur.
+
+**Trois vérifications, dans cet ordre** — elles demandent la main sur le serveur :
+
+1. L'**espace disque** de `192.168.1.112`, et le poids total de `prod_api`.
+2. Le **journal interne de NLog**, qui dira la cause : il est configuré en `internalLogLevel="Info"`
+   vers `${tempdir}/usvector-nlog-internal.log` — le `%TEMP%` de l'**identité du pool
+   d'applications**, pas celui de l'utilisateur connecté.
+3. Les **droits d'écriture** de cette identité sur `…\Vector.Api\logs`.
+
+⚠️ **Pourquoi c'est bloquant pour `DEC6-E1`, et pas seulement gênant.** La sonde de surface anonyme
+écrit **par le même tuyau**. Déployée en l'état, elle produirait un fichier vide — et le plan pose que
+le vide de ce fichier *vaut conclusion* : « personne n'appelle », donc on ferme `documents/content`.
+`AnonymousSurfaceProbeTests` protège contre une sonde qui regarde ailleurs ; **aucun test ne protège
+contre un pipeline de journalisation mort en production**. La mesure des 7 jours ne peut pas démarrer
+avant que ce point soit levé.
+
+**La leçon, à garder au-delà de ce cas** : une mesure dont l'absence de résultat *est* le résultat doit
+d'abord prouver qu'elle sait écrire. Un canari, pas une supposition.
+
+**Fin** : la cause est nommée, la purge fonctionne, et une ligne écrite volontairement se relit dans le
+fichier du jour.
 
 ## H. ⚪ Différé (V2 / hors MVP)
 
