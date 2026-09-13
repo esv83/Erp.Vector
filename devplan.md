@@ -129,12 +129,15 @@ du 04/07 au 24/08 : 24 cas, 21 équipages, délai médian de **23 min** entre la
 composition, 9 cas au-delà d'une heure. Quand l'équipage entier est composé en retard, **les deux
 membres échouent ensemble** — d'où l'impression d'un « second membre » bloqué.
 
-**À trancher :**
-1. **Le message terrain.** « Aucun équipage actif pour ce personnel aujourd'hui » ne dit pas quoi
-   faire. Proposition : « Votre équipage n'est pas encore composé par la régulation », avec un bouton
-   *Réessayer* côté écran. Même code 404, texte seul : additif (D14).
-2. **L'organisation de la régulation.** Composer les équipages avant la prise de service — sans quoi
-   l'accès anticipé de 30 min (CREW-1) ne sert à rien pour ces équipages.
+1. 🟡 **Le message terrain — décidé et codé le 2026-09-13, à déployer.** Le 404 de
+   `CrewController.Mine` dit désormais « Votre équipage n'est pas encore composé par la régulation.
+   Réessayez dans quelques minutes ; si rien ne change, appelez la régulation. » Même code, texte
+   seul (D14). **Reste** : déployer ; faire ajouter le bouton *Réessayer* côté écran (contrat mis à
+   jour : [`docs/ui-web/UI_selection-equipage-multi-crew.md`](docs/ui-web/UI_selection-equipage-multi-crew.md)).
+   ⚠️ L'autre 404 du sélecteur — équipage composé mais hors fenêtre (`ClGetMyActiveCrewsUseCase`) —
+   part **sans corps** : `ToActionResult` rend un `NotFound` nu, son message n'atteint jamais l'écran.
+2. ⛔ **L'organisation de la régulation — à trancher.** Composer les équipages avant la prise de
+   service — sans quoi l'accès anticipé de 30 min (CREW-1) ne sert à rien pour ces équipages.
 
 ⚠️ Le filtre d'appartenance (`MobileIdentityResolver.cs:35`) est **volontaire** : ne pas le retirer.
 

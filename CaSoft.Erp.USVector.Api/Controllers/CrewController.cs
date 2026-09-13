@@ -38,7 +38,11 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             if (crewIds.Count == 0)
             {
                 _logger.LogWarning("GET api/crew/mine — PER_ID={PerId} sans équipage actif aujourd'hui.", personnelId);
-                return NotFound("Aucun équipage actif pour ce personnel aujourd'hui.");
+                // C3 — dans la quasi-totalité des cas mesurés (journaux 04/07→24/08), la régulation n'a pas
+                // encore composé l'équipage : l'ambulancier passe dès qu'elle l'a fait. Le message dit donc
+                // quoi faire plutôt que de constater une absence. Même code, texte seul (D14).
+                return NotFound("Votre équipage n'est pas encore composé par la régulation. "
+                    + "Réessayez dans quelques minutes ; si rien ne change, appelez la régulation.");
             }
 
             _logger.LogInformation("GET api/crew/mine — PER_ID={PerId} : {Count} équipage(s) actif(s).",
