@@ -25,9 +25,8 @@
 
 | # | Action | Pourquoi maintenant |
 |---|---|---|
-| 1 | **Déployer `main`** (§C2, partie Vector) | Sans effet visible : prépare la fermeture des routes anonymes et le jeton vers Orders. ⚠️ Vérifier après publication qu'un ambulancier se connecte toujours — la politique de repli exige désormais l'azp mobile |
-| 2 | **Transmettre à la régulation et à la RH** la [consigne de rattachement](docs/auth/consigne-rattachement-ambulancier.md) (§C1) | Un ambulancier rattaché depuis l'écran d'Employee seul est invisible pour Vector (403) |
-| 3 | **Transmettre au dev web** : [carte mutuelle](note_web_alexandre_carte_mutuelle.md) (§F1), [routes retirées](note_web_alexandre_routes_retirees.md), [sélecteur d'équipage](docs/ui-web/UI_selection-equipage-multi-crew.md) (bouton *Réessayer*, §C3) | Les routes mutuelle sont en service ; tant que l'écran ne les appelle pas, aucune carte n'arrive. |
+| 1 | **Transmettre à la régulation et à la RH** la [consigne de rattachement](docs/auth/consigne-rattachement-ambulancier.md) (§C1) | Un ambulancier rattaché depuis l'écran d'Employee seul est invisible pour Vector (403) |
+| 2 | **Transmettre au dev web** : [carte mutuelle](note_web_alexandre_carte_mutuelle.md) (§F1), [routes retirées](note_web_alexandre_routes_retirees.md), [sélecteur d'équipage](docs/ui-web/UI_selection-equipage-multi-crew.md) (bouton *Réessayer*, §C3) | Les routes mutuelle sont en service ; tant que l'écran ne les appelle pas, aucune carte n'arrive. |
 
 ---
 
@@ -115,9 +114,10 @@ n'accède pas à ses missions.
 
 **Fin** : Orders lit le carnet d'Identity ; `PER_KEYCLOAK_MAP` supprimée ; la consigne tombe.
 
-### C2 — 🟡 Authentification de service à service (`DEC-6`) — *Vector prêt, codé le 2026-09-13, à déployer*
+### C2 — 🟡 Authentification de service à service (`DEC-6`) — *partie Vector en production depuis le 2026-09-13*
 
-**Fait côté Vector, sans rien fermer** (137 tests) :
+**Fait côté Vector, sans rien fermer** — en production, jetons mobiles admis par la nouvelle politique
+([`delivered.md`](delivered.md)) :
 - **Entrant** — l'authentification accepte les jetons des modules déclarés (`Keycloak:ServiceAzp` =
   `us-facturation`). ⚠️ La **politique de repli exige désormais l'azp mobile** : un jeton de service
   n'ouvre aucune route du terrain. La politique `ClKeycloakCallers.ServiceOrMobilePolicy` est prête

@@ -1,6 +1,6 @@
 # Livré — Vector (module terrain ambulanciers)
 
-> **Mis à jour le** 2026-09-13 · **En production** : `8193fbf` (`main`), publié le 2026-09-13 à 16:54,
+> **Mis à jour le** 2026-09-13 · **En production** : `8ace89f` (`main`), rechargé le 2026-09-13 à 18:12,
 > vérifié par sourcelink.
 >
 > Ce document porte **ce qui est livré** : ce que le module fait, le journal daté des livraisons,
@@ -108,6 +108,24 @@ depuis `main`** (`a6c2aba`, fusion de `e942967`), vérifiée par sourcelink à 1
 - Plan mutuelle recalé : `M7` (facturation : la carte ne va jamais en `C54`), `M8` (capture par
   mission), `M9` (route image anonyme jusqu'à P4) ; écart `T2` de la traçabilité levé.
 - ⚠️ Publiée **avant** le commit (§8).
+
+## 2026-09-13 — Vector accepte le jeton de la facturation et sait présenter le sien (C2, partie Vector)
+
+*En production — `8ace89f` (`main`), rechargé à 18:12:59, vérifié par sourcelink, configuration
+déployée et journal.*
+
+- **Entrant** — l'authentification accepte les jetons des modules déclarés (`Keycloak:ServiceAzp` =
+  `us-facturation`), et la **politique de repli exige désormais l'azp mobile** : un jeton de service
+  n'ouvre aucune route du terrain. `ClKeycloakCallers.ServiceOrMobilePolicy` est enregistrée pour la
+  fermeture future des quatre routes anonymes, qui restent ouvertes.
+- **Sortant** — `ServiceAccountTokenHandler` sur les deux clients Orders.Api : jeton
+  `client_credentials` dès que `OrdersApi:ServiceAccount` est renseigné. **Déployé inerte** (section
+  vide). Un realm indisponible ne bloque pas l'appel.
+- **Constaté après publication** : jetons mobiles validés (`azp=us-ambulance`) et **admis par la
+  nouvelle politique** — les requêtes atteignent le sélecteur, 0 jeton rejeté, 0 réponse 403, 0
+  erreur. Au passage, le message C3 hors fenêtre est vu en direct : « Votre service est clôturé… ».
+- 20 tests ; 137 verts.
+- Reste hors Vector : client Keycloak de Vector, jeton de BillingGateway, puis fermeture (devplan C2).
 
 ## 2026-09-13 — Le sélecteur dit quoi faire, la file de projection cesse de s'acharner (C3, G9)
 
