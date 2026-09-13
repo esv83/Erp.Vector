@@ -129,10 +129,11 @@ n'accède pas à ses missions.
 
 **Reste, dans l'ordre — hors code Vector jusqu'à l'étape 4 :**
 1. **Keycloak** — guide : [`docs/deploiement/keycloak-compte-service-vector.md`](docs/deploiement/keycloak-compte-service-vector.md).
-   Clients de service **`erp-vector-api`** (créé le 13/09 sous `us-vector-api`, à renommer) et
-   **`erp-billinggateway-api`** (à créer : la facturation n'a aucun client, `us-facturation` n'a
-   jamais existé). Poser `OrdersApi__ServiceAccount__ClientId` et `…__ClientSecret` dans le
-   `web.config` de Vector. **Déployer Vector** : la production accepte encore l'ancien nom.
+   ✅ **`erp-vector-api` en service** depuis le 2026-09-13 18:59 : Vector obtient son jeton et le pose
+   sur ses appels à Orders ([`delivered.md`](delivered.md)). ⏳ **`erp-billinggateway-api`** : créer
+   le client s'il ne l'est pas encore (la facturation n'en a aucun, `us-facturation` n'a jamais
+   existé) ; son secret ira à BillingGateway. Vector l'accepte déjà (`Keycloak:ServiceAzp`, en
+   production depuis `bc105c1`).
 2. **BillingGateway** (autre dépôt) : poser son jeton de service sur `IVectorFieldDataClient` et
    `IVectorSignatureClient` — et sur les documents et la carte le jour où il les tire.
 3. **Vérifier** en production que la facturation passe avec son jeton (journal `JWT validé … azp=erp-billinggateway-api`).
@@ -320,6 +321,24 @@ publier un arbre non commité**.
 visible — ou impossible.
 
 ---
+
+### G9 — ⏳ Le refus d'Orders sur le conducteur arrive à l'ambulancier sous forme de panne
+
+**Constaté le 2026-09-13** : désigner un conducteur après la fin de la vacation est refusé par Orders
+avec un motif clair — « *La vacation s'est terminée le 13/09/2026 à 18:00 : on ne peut pas y désigner
+un conducteur après.* » (400). Vector le traite comme une panne :
+
+1. `HttpErpWriteApiClient.SetCrewDriverAsync` journalise en **`ERROR`** et lève une exception technique ;
+2. `ClSetDriverUseCase` la convertit en erreur applicative ;
+3. `POST api/driver/{crewId}` répond **400 « Orders.Api PUT crews/…/driver → 400. »** — le motif
+   d'Orders est perdu.
+
+L'ambulancier ne sait pas pourquoi et réessaie : **5 fois en 35 s** le 13/09, déjà vu les 20 et 21/08.
+
+**Contenu** — sur le modèle de l'écriture du type de mission (`EnContextOrderWriteOutcome`) :
+`SetCrewDriverAsync` rend un résultat typé pour les refus métier (400, 404, 409) en conservant le
+`detail` d'Orders, journalisé en `WARN` ; le cas d'usage renvoie ce motif tel quel. Même code HTTP pour
+l'app, texte seul (D14). **Fin** : l'écran affiche le motif d'Orders, plus d'`ERROR` pour un refus.
 
 ## H. ⚪ Différé (V2 / hors MVP)
 

@@ -1,6 +1,6 @@
 # Livré — Vector (module terrain ambulanciers)
 
-> **Mis à jour le** 2026-09-13 · **En production** : `8ace89f` (`main`), rechargé le 2026-09-13 à 18:12,
+> **Mis à jour le** 2026-09-13 · **En production** : `bc105c1` (`main`), rechargé le 2026-09-13 à 18:59,
 > vérifié par sourcelink.
 >
 > Ce document porte **ce qui est livré** : ce que le module fait, le journal daté des livraisons,
@@ -108,6 +108,25 @@ depuis `main`** (`a6c2aba`, fusion de `e942967`), vérifiée par sourcelink à 1
 - Plan mutuelle recalé : `M7` (facturation : la carte ne va jamais en `C54`), `M8` (capture par
   mission), `M9` (route image anonyme jusqu'à P4) ; écart `T2` de la traçabilité levé.
 - ⚠️ Publiée **avant** le commit (§8).
+
+## 2026-09-13 — Vector présente son jeton de service à Orders (C2, sortant)
+
+*En production — `bc105c1` (`main`), rechargé à 18:59:53, vérifié par sourcelink, `web.config` et
+journal.*
+
+- **Client Keycloak `erp-vector-api`** créé dans le realm `delesse` (d'abord sous `us-vector-api`,
+  renommé pour suivre la convention `erp-<module>-api`) ; secret posé dans le `web.config`.
+- **Constaté** : « Jeton de service obtenu pour erp-vector-api » trois secondes après le démarrage ;
+  les appels à Orders passent avec le jeton (Orders ne le vérifie pas encore). Jetons de 5 minutes,
+  renouvelés une minute avant l'échéance.
+- **Le client de la facturation n'avait jamais existé** : `us-facturation` n'était qu'un nom de
+  configuration de BillingGateway, où Keycloak est désactivé. Vector attend désormais
+  **`erp-billinggateway-api`** (`Keycloak:ServiceAzp`).
+- ⚠️ **Deux accrocs pendant la mise en place, à retenir** : une première publication faite avant le
+  commit (`.pdb` à `f5b2996`, republiée depuis `main`) ; deux variables du `web.config` écrites
+  **sans leur chevron ouvrant**, donc ignorées sans erreur par IIS — le compte de service ne
+  s'activait pas et rien ne le signalait.
+- Guide : [`docs/deploiement/keycloak-compte-service-vector.md`](docs/deploiement/keycloak-compte-service-vector.md).
 
 ## 2026-09-13 — Vector accepte le jeton de la facturation et sait présenter le sien (C2, partie Vector)
 
