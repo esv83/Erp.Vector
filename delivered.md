@@ -109,6 +109,16 @@ depuis `main`** (`a6c2aba`, fusion de `e942967`), vérifiée par sourcelink à 1
   mission), `M9` (route image anonyme jusqu'à P4) ; écart `T2` de la traçabilité levé.
 - ⚠️ Publiée **avant** le commit (§8).
 
+## 2026-09-13 — Les journaux de production reprennent (G9)
+
+*Constaté à 16:22 : `logs/usvector-api-2026-09-13.log`, première ligne à 16:18:01.*
+
+- NLog et stdout s'étaient arrêtés ensemble le 24/08 vers 02:17 : trois semaines sans aucune trace
+  en production, alors que l'API servait normalement.
+- Rétablis côté serveur, hors dépôt ; la cause n'est pas documentée ici.
+- Premier constat qu'ils permettent : la file de projection opérationnelle relance sans fin une
+  mission qu'Orders ne connaît plus (404, tentative n° 55 414) — ouvert au devplan.
+
 ## 2026-09-13 — Le 404 du « second membre » est diagnostiqué : ce n'est pas un défaut (C3)
 
 *Analyse — aucun code livré. Journaux de production du 04/07 au 24/08, rejoués contre Orders.Api.*
@@ -457,6 +467,7 @@ depuis un arbre modifié annonce un commit qui ne contient pas le code servi (§
 | Date | Incident | Ce qui l'a révélé | Suite |
 |---|---|---|---|
 | **2026-09-13** | **Publication en production depuis un arbre non commité** : binaires à 14:40, commit `e942967` à 14:42. Le `.pdb` annonce `86b5b28`, qui ne contient pas la capture par mission. | comparaison des horodatages et des chaînes des DLL au moment de rédiger ce document | republié depuis `main` à 15:05 (`a6c2aba`), vérifié par sourcelink ; blocage des publications non commitées au plan (G8) |
+| 2026-08-24 → 2026-09-13 | **Journaux de production muets** : NLog et stdout arrêtés le 24/08 vers 02:17, l'API servant normalement | en cherchant les 404 du sélecteur pour C3 | rétablis le 13/09 à 16:18, côté serveur |
 | 2026-08-25 | Binaire de production publié depuis un arbre non commité | par hasard, en cherchant l'origine d'un champ | reproductible depuis git le 27/08 |
 | 2026-08-25 | Drapeaux de bascule armés sur le serveur, désarmés dans le fichier versionné | lecture du fichier déployé | armement versionné (`0c3ad34`), puis drapeaux retirés |
 | 2026-08-25 | Correctif joué sur la mauvaise base Orders (`115` au lieu de `109`), sans erreur | une erreur SQL ultérieure | devplan G8 |

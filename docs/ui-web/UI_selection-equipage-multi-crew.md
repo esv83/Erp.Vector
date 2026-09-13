@@ -63,8 +63,11 @@ Réponse (exemple à 2 équipages) :
   « Votre équipage n'est pas encore composé par la régulation. Réessayez dans quelques minutes ; si
   rien ne change, appelez la régulation. » — c'est le cas de loin le plus fréquent (la régulation
   compose l'équipage après l'ouverture de l'app, souvent à la prise de service).
-  ⚠️ Un `404` **sans corps** existe aussi : équipage composé mais hors fenêtre (prise de service dans
-  plus de 30 min, service clôturé ou expiré). Afficher alors un texte par défaut, même bouton.
+  Même `404` quand l'équipage est composé mais **hors fenêtre** ; le message dit alors ce qui bloque :
+  « Votre service commence à 14:00 : vos missions seront accessibles à partir de 13:30. » (précédé
+  de « le 13/07 » si ce n'est pas aujourd'hui), « Votre service est clôturé : il n'y a plus de mission
+  à afficher… », ou « Votre vacation a commencé il y a plus de 18 h sans être clôturée… ». Toujours
+  afficher le texte reçu tel quel ; ne pas en déduire un comportement.
 
 ### 2. Ensuite → tout est scopé au `CrewId` épinglé
 
@@ -111,6 +114,6 @@ Le serveur valide **systématiquement** que le `crewId` fait partie des équipag
 |---|---|---|
 | `401` | token absent / rejeté / `sub` invalide | ré-authentifier (Keycloak) |
 | `403` | compte non rattaché à un personnel, **ou** `crewId` hors de tes équipages actifs | afficher le message ; si équipage périmé → relancer `GET /api/crew/mine` |
-| `404` | aucun équipage sélectionnable — le plus souvent, pas encore composé par la régulation | afficher le message (texte par défaut si corps vide) + bouton « Réessayer » → `GET /api/crew/mine` |
+| `404` | aucun équipage sélectionnable — pas encore composé par la régulation, ou composé mais hors fenêtre | afficher le message reçu + bouton « Réessayer » → `GET /api/crew/mine` |
 
 En cas de `403` sur un `crewId` épinglé (ex. vacation terminée entre-temps), **rappelle `GET /api/crew/mine`** pour re-choisir : c'est le point d'entrée unique de (re)sélection.

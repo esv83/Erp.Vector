@@ -5,7 +5,7 @@
 > dans [`delivered.md`](delivered.md).
 >
 > **Prod** : `\\192.168.1.112\prod_api\Vector.Api` (IIS `/vector`) · **Dépôt** :
-> `github.com/esv83/Erp.Vector` (`USVector.sln`) · **106 tests verts** (2026-09-13).
+> `github.com/esv83/Erp.Vector` (`USVector.sln`) · **114 tests verts** (2026-09-13).
 > **Régénéré le** 2026-09-13 (compact devplan).
 >
 > **Règle de travail** : on code neutre ou additif, jamais de rupture du contrat consommé par l'app
@@ -25,8 +25,8 @@
 
 | # | Action | Pourquoi maintenant |
 |---|---|---|
-| 1 | **Transmettre les deux notes au dev web** : [carte mutuelle](note_web_alexandre_carte_mutuelle.md) (§F1) et [routes retirées](note_web_alexandre_routes_retirees.md) | Les routes mutuelle sont en service ; tant que l'écran ne les appelle pas, aucune carte n'arrive. Les routes retirées répondent déjà 404 en production. |
-| 2 | **Rétablir les journaux de production** (§G9) | Muets depuis le 24/08 : le prochain incident en production ne laissera aucune trace. |
+| 1 | **Déployer `main`** (messages du sélecteur, §C3) | La publication du 13/09 après `8a0da0b` n'est pas arrivée : la production tourne toujours `0122b7a` (vérifié à 16:19). |
+| 2 | **Transmettre au dev web** : [carte mutuelle](note_web_alexandre_carte_mutuelle.md) (§F1), [routes retirées](note_web_alexandre_routes_retirees.md), [sélecteur d'équipage](docs/ui-web/UI_selection-equipage-multi-crew.md) (bouton *Réessayer*, §C3) | Les routes mutuelle sont en service ; tant que l'écran ne les appelle pas, aucune carte n'arrive. |
 
 ---
 
@@ -134,8 +134,10 @@ membres échouent ensemble** — d'où l'impression d'un « second membre » blo
    Réessayez dans quelques minutes ; si rien ne change, appelez la régulation. » Même code, texte
    seul (D14). **Reste** : déployer ; faire ajouter le bouton *Réessayer* côté écran (contrat mis à
    jour : [`docs/ui-web/UI_selection-equipage-multi-crew.md`](docs/ui-web/UI_selection-equipage-multi-crew.md)).
-   ⚠️ L'autre 404 du sélecteur — équipage composé mais hors fenêtre (`ClGetMyActiveCrewsUseCase`) —
-   part **sans corps** : `ToActionResult` rend un `NotFound` nu, son message n'atteint jamais l'écran.
+   Le 404 **hors fenêtre** — équipage composé mais pas encore ouvert, clôturé ou expiré — porte lui
+   aussi un message qui dit ce qui bloque (« Votre service commence à 14:00 : vos missions seront
+   accessibles à partir de 13:30 », etc.) : motif calculé par `ClCrew.UnselectableReasonAt`, renvoyé
+   par `CrewController.Mine` sans toucher `ToActionResult`, 8 tests.
 2. ⛔ **L'organisation de la régulation — à trancher.** Composer les équipages avant la prise de
    service — sans quoi l'accès anticipé de 30 min (CREW-1) ne sert à rien pour ces équipages.
 
@@ -294,18 +296,19 @@ visible — ou impossible.
 
 ---
 
-### G9 — ⏳ Les journaux de production sont muets depuis le 2026-08-24
+### G9 — ⏳ La file de projection relance sans fin une mission inconnue d'Orders
 
-**Constaté le 2026-09-13** : le dernier fichier de `\\192.168.1.112\prod_api\Vector.Api\logs` date du
-24/08 — NLog (`usvector-api-*.log`) **et** stdout ANCM s'arrêtent tous deux vers 02:17. L'API sert
-pourtant depuis ce dossier (binaires du 13/09), et le `nlog.config` déployé est correct.
+**Constaté le 2026-09-13** dans les journaux rétablis : `PUT missions/745c9f76-…/operational` répond
+**404** chez Orders, et `OperationalOutboxDispatcher` en est à la **tentative n° 55 414** — relance
+toutes les 60 s (plafond du backoff) depuis début août environ. Une seule mission concernée.
 
-**Cause probable** : le pool IIS n'écrit plus dans `logs/` (droits), NLog échouant en silence
-(`throwConfigExceptions="false"`). **À vérifier sur le serveur** : droits du dossier pour l'identité
-du pool, journal interne NLog (`${tempdir}/usvector-nlog-internal.log`, dossier temporaire du pool).
+**Pourquoi** : le worker ne retire une entrée que si elle est livrée, ou si la mission a disparu de
+la base **Vector** (`OperationalOutboxDispatcher.cs:71`). Un 404 **d'Orders** — mission supprimée ou
+jamais connue côté ERP — est traité comme une panne passagère : il ne se résorbe jamais.
 
-**Conséquence** : plus aucun diagnostic possible sur la production depuis trois semaines — C3 n'a pu
-être instruit que sur l'historique antérieur. **Fin** : un fichier du jour dans `logs/`.
+**Contenu** : distinguer l'échec définitif (404) de l'échec passager — abandonner l'entrée en
+journalisant un `WARN` explicite, plutôt que relancer. Vérifier d'abord chez Orders ce qu'est devenue
+cette mission. **Fin** : aucune entrée de la file au-delà d'un seuil de tentatives.
 
 ## H. ⚪ Différé (V2 / hors MVP)
 

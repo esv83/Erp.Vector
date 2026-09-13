@@ -71,10 +71,20 @@ Public Class ClCrew
     ''' <see cref="MaxServiceDurationHours"/> h — au-delà, vacation probablement oubliée).
     ''' </summary>
     Public Function IsSelectableAt(at As DateTime) As Boolean
-        Dim started = SelectableFrom <= at
-        Dim closed = IsServiceEnded OrElse (_serviceEnd.HasValue AndAlso _serviceEnd.Value < at)
-        Dim obsolete = (at - _serviceStart) > TimeSpan.FromHours(MaxServiceDurationHours)
-        Return started AndAlso Not closed AndAlso Not obsolete
+        Return UnselectableReasonAt(at) = EnCrewUnselectableReason.None
+    End Function
+
+    ''' <summary>
+    ''' Motif pour lequel l'équipage n'est pas sélectionnable à <paramref name="at"/>, ou
+    ''' <see cref="EnCrewUnselectableReason.None"/> s'il l'est. Seule source de la règle de
+    ''' <see cref="IsSelectableAt"/>. Ordre des tests : la clôture d'abord — un service fini ne rouvre
+    ''' pas, même dans la fenêtre d'accès anticipé —, puis l'ouverture à venir, puis l'expiration.
+    ''' </summary>
+    Public Function UnselectableReasonAt(at As DateTime) As EnCrewUnselectableReason
+        If IsServiceEnded OrElse (_serviceEnd.HasValue AndAlso _serviceEnd.Value < at) Then Return EnCrewUnselectableReason.Closed
+        If SelectableFrom > at Then Return EnCrewUnselectableReason.NotYetOpen
+        If (at - _serviceStart) > TimeSpan.FromHours(MaxServiceDurationHours) Then Return EnCrewUnselectableReason.Expired
+        Return EnCrewUnselectableReason.None
     End Function
 
 

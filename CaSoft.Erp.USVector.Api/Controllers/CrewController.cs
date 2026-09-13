@@ -1,6 +1,7 @@
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Api.Infrastructure;
+using CaSoft.Framework;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CaSoft.Erp.USVector.Api.Controllers
@@ -47,7 +48,20 @@ namespace CaSoft.Erp.USVector.Api.Controllers
 
             _logger.LogInformation("GET api/crew/mine — PER_ID={PerId} : {Count} équipage(s) actif(s).",
                 personnelId, crewIds.Count);
-            return _crewService.GetMyActiveCrews(crewIds, DateTime.Now).ToActionResult();
+
+            var result = _crewService.GetMyActiveCrews(crewIds, DateTime.Now);
+
+            // Équipage composé mais hors fenêtre (pas encore ouvert, clôturé, expiré) : le message du cas
+            // d'usage dit quoi faire. ToActionResult rendrait un 404 nu — c'est le cas pour tous les
+            // NotFound de l'API, et le changer ici ajouterait un corps à chacun d'eux.
+            if (result.InnerError is ClError { IsNotFound: true } notFound)
+            {
+                _logger.LogWarning("GET api/crew/mine — PER_ID={PerId} : équipage(s) hors fenêtre — {Message}",
+                    personnelId, notFound.ErrorText);
+                return NotFound(notFound.ErrorText);
+            }
+
+            return result.ToActionResult();
         }
     }
 }
