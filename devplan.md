@@ -119,7 +119,7 @@ n'accède pas à ses missions.
 **Fait côté Vector, sans rien fermer** — en production, jetons mobiles admis par la nouvelle politique
 ([`delivered.md`](delivered.md)) :
 - **Entrant** — l'authentification accepte les jetons des modules déclarés (`Keycloak:ServiceAzp` =
-  `us-facturation`). ⚠️ La **politique de repli exige désormais l'azp mobile** : un jeton de service
+  `erp-billinggateway-api`). ⚠️ La **politique de repli exige désormais l'azp mobile** : un jeton de service
   n'ouvre aucune route du terrain. La politique `ClKeycloakCallers.ServiceOrMobilePolicy` est prête
   pour les quatre routes ci-dessous, qui restent anonymes.
 - **Sortant** — `ServiceAccountTokenHandler` pose un jeton `client_credentials` sur les appels à
@@ -128,12 +128,14 @@ n'accède pas à ses missions.
   `CaSoft.Identity.Client` : il exige le socle 2.8.0.
 
 **Reste, dans l'ordre — hors code Vector jusqu'à l'étape 4 :**
-1. **Keycloak** : créer le client de service de Vector (confidentiel, *Service accounts enabled*) ;
-   poser `OrdersApi__ServiceAccount__ClientId` et `…__ClientSecret` dans le `web.config`. Vérifier
-   que `us-facturation` autorise aussi `client_credentials`.
+1. **Keycloak** — guide : [`docs/deploiement/keycloak-compte-service-vector.md`](docs/deploiement/keycloak-compte-service-vector.md).
+   Clients de service **`erp-vector-api`** (créé le 13/09 sous `us-vector-api`, à renommer) et
+   **`erp-billinggateway-api`** (à créer : la facturation n'a aucun client, `us-facturation` n'a
+   jamais existé). Poser `OrdersApi__ServiceAccount__ClientId` et `…__ClientSecret` dans le
+   `web.config` de Vector. **Déployer Vector** : la production accepte encore l'ancien nom.
 2. **BillingGateway** (autre dépôt) : poser son jeton de service sur `IVectorFieldDataClient` et
    `IVectorSignatureClient` — et sur les documents et la carte le jour où il les tire.
-3. **Vérifier** en production que la facturation passe avec son jeton (journal `JWT validé … azp=us-facturation`).
+3. **Vérifier** en production que la facturation passe avec son jeton (journal `JWT validé … azp=erp-billinggateway-api`).
 4. **Fermer** : remplacer `[AllowAnonymous]` par `[Authorize(Policy = ClKeycloakCallers.ServiceOrMobilePolicy)]`
    sur les quatre routes, et vider leurs entrées d'`AnonymousSurfaceTests`.
 5. **Orders** peut alors exiger un jeton du terrain — son plan l'attendait de Vector.

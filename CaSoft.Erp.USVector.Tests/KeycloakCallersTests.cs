@@ -15,7 +15,7 @@ namespace CaSoft.Erp.USVector.Tests;
 public class KeycloakCallersTests
 {
     private const string Mobile = "us-ambulance";
-    private const string Facturation = "us-facturation";
+    private const string Facturation = "erp-billinggateway-api";
     private static readonly string[] Services = { Facturation };
 
     private static ClaimsPrincipal Caller(string? azp)
@@ -72,9 +72,9 @@ public class KeycloakCallersTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Keycloak:ServiceAzp:0"] = " us-facturation ",
+                ["Keycloak:ServiceAzp:0"] = " erp-billinggateway-api ",
                 ["Keycloak:ServiceAzp:1"] = "",
-                ["Keycloak:ServiceAzp:2"] = "us-facturation"
+                ["Keycloak:ServiceAzp:2"] = "erp-billinggateway-api"
             })
             .Build();
 
