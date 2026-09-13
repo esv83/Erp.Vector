@@ -31,6 +31,9 @@ if (keycloakEnabled)
     // ⚠️ DEV/TEST UNIQUEMENT : décode le token SANS vérifier signature / issuer / audience /
     // expiration, et SANS contacter Keycloak (Authority inutile). NE JAMAIS activer en production.
     var disableValidation = builder.Configuration.GetValue("Keycloak:DisableValidation", false);
+    // C2 — modules de service dont le jeton est accepté (la facturation). Ils n'entrent que sur les
+    // routes qui portent ClKeycloakCallers.ServiceOrMobilePolicy : la politique de repli exige l'azp mobile.
+    var serviceAzp = ClKeycloakCallers.ReadServiceAzp(builder.Configuration);
 
     // Garde-fou AU DÉMARRAGE (KC-1) : hors mode dégradé, une Authority absente ou restée au
     // placeholder fait échouer le fetch OIDC et rejette SILENCIEUSEMENT tous les tokens (401 en
@@ -103,12 +106,14 @@ if (keycloakEnabled)
                         .GetRequiredService<ILoggerFactory>().CreateLogger("Keycloak.Jwt");
 
                     // Cloisonnement API (remplace la validation d'aud) : le token doit avoir été émis POUR
-                    // le client mobile. On l'exige via « azp ». Ignoré en mode DisableValidation (dev pur).
+                    // le client mobile, ou pour un module de service déclaré (Keycloak:ServiceAzp, C2). On
+                    // l'exige via « azp ». Ignoré en mode DisableValidation (dev pur). Accepter un jeton de
+                    // service ici n'ouvre AUCUNE route du terrain : la politique de repli exige l'azp mobile.
                     var expectedAzp = audience; // = Keycloak:Audience (KC-1 : plus de valeur en dur)
-                    var azp = ctx.Principal?.FindFirst("azp")?.Value;
-                    if (!disableValidation && !string.Equals(azp, expectedAzp, StringComparison.Ordinal))
+                    var azp = ctx.Principal?.FindFirst(ClKeycloakCallers.AzpClaim)?.Value;
+                    if (!disableValidation && !ClKeycloakCallers.IsAccepted(azp, expectedAzp, serviceAzp))
                     {
-                        var reason = $"azp '{azp}' non autorisé (attendu '{expectedAzp}').";
+                        var reason = $"azp '{azp}' non autorisé (attendu '{expectedAzp}'{ClKeycloakCallers.DescribeServices(serviceAzp)}).";
                         // Déposé pour lecture par les controllers (cf. MobileCallerExtensions.GetJwtError).
                         ctx.HttpContext.Items[MobileCallerExtensions.JwtErrorKey] = reason;
                         log.LogWarning("JWT REJETÉ sur {Path} : {Reason}.", ctx.HttpContext.Request.Path, reason);
@@ -148,16 +153,29 @@ if (keycloakEnabled)
     //
     // Elle n'est posée que si Keycloak est actif : sans schéma d'authentification, elle rejetterait
     // tout, y compris en développement local où la validation est volontairement désactivée.
+    //
+    // C2 — la politique de repli exige en plus l'azp MOBILE : un jeton de service accepté à
+    // l'authentification (la facturation) n'entre que sur les routes qui portent
+    // ClKeycloakCallers.ServiceOrMobilePolicy. En DisableValidation (dev pur), aucun azp n'est garanti :
+    // seule l'authentification reste exigée, comme avant.
+    var mobileAzpEnforced = !disableValidation && !string.IsNullOrWhiteSpace(audience);
     builder.Services.AddAuthorization(options =>
     {
-        options.FallbackPolicy = new AuthorizationPolicyBuilder()
-            .RequireAuthenticatedUser()
-            .Build();
+        options.FallbackPolicy = mobileAzpEnforced
+            ? ClKeycloakCallers.MobileOnly(audience!)
+            : new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+
+        options.AddPolicy(ClKeycloakCallers.ServiceOrMobilePolicy, mobileAzpEnforced
+            ? ClKeycloakCallers.ServiceOrMobile(audience!, serviceAzp)
+            : new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
     });
 }
 else
 {
-    builder.Services.AddAuthorization();
+    // Sans Keycloak (développement local), la politique nommée existe quand même : une route qui la
+    // porte ne doit pas faire échouer l'application au démarrage, faute de politique enregistrée.
+    builder.Services.AddAuthorization(options =>
+        options.AddPolicy(ClKeycloakCallers.ServiceOrMobilePolicy, policy => policy.RequireAssertion(_ => true)));
 }
 
 // BD Mobile dédiée (MOB_* : sessions, timeline statuts, signatures)
@@ -174,14 +192,37 @@ static Uri OrdersBaseUri(IConfiguration cfg)
     return new Uri(raw.EndsWith('/') ? raw : raw + "/");
 }
 
+// C2 — jeton du compte de service de Vector sur les appels à Orders.Api. INERTE tant que
+// OrdersApi:ServiceAccount est incomplet (secret dans le web.config) : les appels partent sans jeton,
+// comme avant. Orders reste anonyme pour le terrain ; ce jeton est le préalable à sa fermeture.
+var serviceAccount = builder.Configuration.GetSection(ServiceAccountOptions.SectionName).Get<ServiceAccountOptions>()
+    ?? new ServiceAccountOptions();
+if (string.IsNullOrWhiteSpace(serviceAccount.TokenEndpoint)
+    && !string.IsNullOrWhiteSpace(builder.Configuration["Keycloak:Authority"]))
+{
+    serviceAccount.TokenEndpoint = builder.Configuration["Keycloak:Authority"]!.TrimEnd('/') + "/protocol/openid-connect/token";
+}
+builder.Services.AddSingleton(serviceAccount);
+builder.Services.AddSingleton(sp => new ServiceAccountTokenProvider(
+    // Client propre au realm, SANS le gestionnaire qui pose le jeton : sinon demander un jeton en exigerait un.
+    new HttpClient(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(15) })
+    {
+        Timeout = TimeSpan.FromSeconds(10)
+    },
+    sp.GetRequiredService<ServiceAccountOptions>(),
+    sp.GetRequiredService<ILogger<ServiceAccountTokenProvider>>()));
+builder.Services.AddTransient<ServiceAccountTokenHandler>();
+
 // Découplage Vector↔Orders (4a) : données de référence ERP lues via Orders.Api en HTTP
 // (missions, commandes, bénéficiaires, équipages), comme Address.Api. Plus aucune réf projet Orders.
 builder.Services.AddHttpClient<IErpReadApiClient, HttpErpReadApiClient>(c =>
-    c.BaseAddress = OrdersBaseUri(builder.Configuration));
+    c.BaseAddress = OrdersBaseUri(builder.Configuration))
+    .AddHttpMessageHandler<ServiceAccountTokenHandler>();
 
 // TRF-5 : chemin d'écriture Vector→Orders (projection de l'avancement opérationnel terrain).
 builder.Services.AddHttpClient<IErpWriteApiClient, HttpErpWriteApiClient>(c =>
-    c.BaseAddress = OrdersBaseUri(builder.Configuration));
+    c.BaseAddress = OrdersBaseUri(builder.Configuration))
+    .AddHttpMessageHandler<ServiceAccountTokenHandler>();
 
 // Contrat mobile inchangé : PascalCase comme l'ancienne WebApi (pas de camelCase).
 builder.Services.AddControllers()

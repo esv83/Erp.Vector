@@ -5,7 +5,7 @@
 > dans [`delivered.md`](delivered.md).
 >
 > **Prod** : `\\192.168.1.112\prod_api\Vector.Api` (IIS `/vector`) · **Dépôt** :
-> `github.com/esv83/Erp.Vector` (`USVector.sln`) · **117 tests verts** (2026-09-13).
+> `github.com/esv83/Erp.Vector` (`USVector.sln`) · **137 tests verts** (2026-09-13).
 > **Régénéré le** 2026-09-13 (compact devplan).
 >
 > **Règle de travail** : on code neutre ou additif, jamais de rupture du contrat consommé par l'app
@@ -25,7 +25,9 @@
 
 | # | Action | Pourquoi maintenant |
 |---|---|---|
-| 1 | **Transmettre au dev web** : [carte mutuelle](note_web_alexandre_carte_mutuelle.md) (§F1), [routes retirées](note_web_alexandre_routes_retirees.md), [sélecteur d'équipage](docs/ui-web/UI_selection-equipage-multi-crew.md) (bouton *Réessayer*, §C3) | Les routes mutuelle sont en service ; tant que l'écran ne les appelle pas, aucune carte n'arrive. |
+| 1 | **Déployer `main`** (§C2, partie Vector) | Sans effet visible : prépare la fermeture des routes anonymes et le jeton vers Orders. ⚠️ Vérifier après publication qu'un ambulancier se connecte toujours — la politique de repli exige désormais l'azp mobile |
+| 2 | **Transmettre à la régulation et à la RH** la [consigne de rattachement](docs/auth/consigne-rattachement-ambulancier.md) (§C1) | Un ambulancier rattaché depuis l'écran d'Employee seul est invisible pour Vector (403) |
+| 3 | **Transmettre au dev web** : [carte mutuelle](note_web_alexandre_carte_mutuelle.md) (§F1), [routes retirées](note_web_alexandre_routes_retirees.md), [sélecteur d'équipage](docs/ui-web/UI_selection-equipage-multi-crew.md) (bouton *Réessayer*, §C3) | Les routes mutuelle sont en service ; tant que l'écran ne les appelle pas, aucune carte n'arrive. |
 
 ---
 
@@ -35,7 +37,7 @@
 |---|---|---|
 | **A** — Contexte de mission | suites de la bascule vers Order | A3 en attente du dev web |
 | **B** — Dépendances amont Orders | rien à coder ici : suivre, réclamer | — |
-| **C** — Identité & authentification | sécurité, chaîne de connexion | oui (C2) ; C1 et C3 sur décision |
+| **C** — Identité & authentification | sécurité, chaîne de connexion | C2 : Vector prêt, reste Keycloak et facturation ; C1 dépendance amont ; C3 sur décision |
 | **D** — Robustesse des appels sortants | plomberie HTTP | **oui, isolé** |
 | **E** — Chaîne facturation | contrat du paquet terrain | oui (E2) ; E1 après arbitrage |
 | **F** — Fonctions terrain | features indépendantes | oui |
@@ -90,25 +92,53 @@ Demandé au dev web le 26/08. **Fin** : les deux constatés sur l'app.
 
 ## C. Identité & authentification
 
-### C1 — ⛔ Écran de rattachement compte Keycloak ↔ ambulancier — *choisir l'hôte*
+### C1 — ⛔ Rattachement des comptes : Vector lit un référentiel que plus aucun écran n'alimente — *dépendance amont*
 
-Aujourd'hui **INSERT SQL manuel** dans `PER_KEYCLOAK_MAP` : seul maillon manuel de la chaîne.
-**Mesuré le 2026-09-13 : 8 membres d'équipage sur 244** (équipages à plusieurs membres des 7 derniers
-jours) n'ont aucun compte rattaché — ils reçoivent un 403 au sélecteur. Les
-endpoints Orders sont livrés ; le **module Identity possède désormais la correspondance** (reprise du
-23/08/2026 : 146 pivots, 105 correspondances).
-→ **Identity** (cible) **ou** endpoints Orders le temps de la bascule. Dans les deux cas : lister les
-comptes, rechercher un `PER_PERSONNEL`, persister **via API**, afficher les garde-fous (409).
-⚠️ Tant que trois emplacements coexistent, ils divergeront.
+**Tranché le 2026-09-13** ([`delivered.md`](delivered.md) §4) : pas de code dans Vector, pas d'écran
+de plus. **La question « quel hôte pour l'écran » est dépassée** : l'écran de rattachement existe dans
+**Employee** et écrit dans le **carnet d'Identity**.
 
-### C2 — ⏳ Authentification de service à service (`DEC-6`) — *les deux sens*
+**Le problème réel** : Vector résout le compte via Orders (`GET /personnel/by-keycloak/{sub}`), donc
+dans `PER_KEYCLOAK_MAP` — que l'écran d'Employee **n'alimente pas**. Un ambulancier rattaché depuis
+Employee reste **invisible pour Vector** et reçoit un 403 au sélecteur. Les deux référentiels
+divergent : **155 correspondances chez Orders, 116 chez Identity** (mesure d'Orders, 05/09).
+Mesuré côté terrain le 2026-09-13 : **8 membres d'équipage sur 244** sans compte rattaché chez Orders.
 
-**Sortant** : `Orders.Api` est appelée **sans jeton**. Le jour où elle est protégée, il faut un
-**client credentials Keycloak** avec cache et renouvellement ; symptôme sinon : des 401 sur la joblist
-en production, sans autre indice.
+**Ce qui débloque** — hors de ce dépôt : la **bascule d'Orders sur le carnet** (Identity itération 7,
+Orders itération 24), bloquée par la RH — **273 des 422 personnels actifs d'Orders n'ont pas de fiche
+Employee**, et le lien `EMP_EMPLOYEE.PersonnelId` est vide en production.
 
-**Entrant** : quatre routes répondent sans jeton, uniquement parce que la facturation les tire sans
-jeton :
+**En attendant — consigne transitoire** :
+[`docs/auth/consigne-rattachement-ambulancier.md`](docs/auth/consigne-rattachement-ambulancier.md).
+Un ambulancier se rattache **aussi côté Orders** (`PUT /personnel/{id}/keycloak`), sans quoi il
+n'accède pas à ses missions.
+
+**Fin** : Orders lit le carnet d'Identity ; `PER_KEYCLOAK_MAP` supprimée ; la consigne tombe.
+
+### C2 — 🟡 Authentification de service à service (`DEC-6`) — *Vector prêt, codé le 2026-09-13, à déployer*
+
+**Fait côté Vector, sans rien fermer** (137 tests) :
+- **Entrant** — l'authentification accepte les jetons des modules déclarés (`Keycloak:ServiceAzp` =
+  `us-facturation`). ⚠️ La **politique de repli exige désormais l'azp mobile** : un jeton de service
+  n'ouvre aucune route du terrain. La politique `ClKeycloakCallers.ServiceOrMobilePolicy` est prête
+  pour les quatre routes ci-dessous, qui restent anonymes.
+- **Sortant** — `ServiceAccountTokenHandler` pose un jeton `client_credentials` sur les appels à
+  Orders.Api **dès que `OrdersApi:ServiceAccount` est renseigné** ; inerte sinon. Un realm
+  indisponible ne bloque pas l'appel (Orders reste anonyme pour le terrain). Pas de référence à
+  `CaSoft.Identity.Client` : il exige le socle 2.8.0.
+
+**Reste, dans l'ordre — hors code Vector jusqu'à l'étape 4 :**
+1. **Keycloak** : créer le client de service de Vector (confidentiel, *Service accounts enabled*) ;
+   poser `OrdersApi__ServiceAccount__ClientId` et `…__ClientSecret` dans le `web.config`. Vérifier
+   que `us-facturation` autorise aussi `client_credentials`.
+2. **BillingGateway** (autre dépôt) : poser son jeton de service sur `IVectorFieldDataClient` et
+   `IVectorSignatureClient` — et sur les documents et la carte le jour où il les tire.
+3. **Vérifier** en production que la facturation passe avec son jeton (journal `JWT validé … azp=us-facturation`).
+4. **Fermer** : remplacer `[AllowAnonymous]` par `[Authorize(Policy = ClKeycloakCallers.ServiceOrMobilePolicy)]`
+   sur les quatre routes, et vider leurs entrées d'`AnonymousSurfaceTests`.
+5. **Orders** peut alors exiger un jeton du terrain — son plan l'attendait de Vector.
+
+**Les quatre routes encore anonymes**, uniquement parce que la facturation les tire sans jeton :
 
 | Route ouverte | Ce qu'elle expose |
 |---|---|

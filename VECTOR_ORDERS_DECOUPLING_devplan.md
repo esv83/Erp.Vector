@@ -32,14 +32,14 @@ dans `git log`.*
 
 ## 2. Ce qui reste
 
-### 2.1 ⏳ DEC-6 — Authentification de service à service
+### 2.1 🟡 DEC-6 — Authentification de service à service
 
-`Orders.Api` est aujourd'hui appelée **sans jeton** : les deux `HttpClient` de
-`Program.cs` (`IErpReadApiClient`, `IErpWriteApiClient`) ne posent aucun en-tête `Authorization`.
-Cela tient tant qu'Orders.Api n'est pas protégée. Le jour où elle l'est, il faut un **client
-credentials Keycloak** (compte de service dédié à Vector), avec cache et renouvellement du jeton, sur
-le modèle de ce que le module Identity a mis en place (`Keycloak:AllowedAzp` côté serveur appelé).
-**À anticiper** : le symptôme sera une série de 401 sur la joblist, en production, sans autre indice.
+**Codé le 2026-09-13, inerte jusqu'à configuration** : les deux `HttpClient` d'Orders.Api portent
+`ServiceAccountTokenHandler`, qui pose un jeton `client_credentials` (cache, renouvellement avant
+expiration, oubli sur 401) dès que `OrdersApi:ServiceAccount` est renseigné. Reste le **geste
+d'administration** : créer le client de service de Vector dans Keycloak et poser son secret dans le
+`web.config`. Orders peut ensuite fermer son API au terrain — son plan attend précisément ce jeton.
+Suivi et séquence complète : [`devplan.md`](devplan.md) §C2.
 
 ### 2.2 ⏳ DEC-7 — Résilience des appels sortants
 
