@@ -5,8 +5,7 @@
 > dans l'écran mission. **Routes nouvelles et additives** : rien de ce qui existe ne change.
 > **JSON** : PascalCase, comme le reste du contrat mobile.
 >
-> ⚠️ Les routes par mission sont **en service au prochain déploiement de Vector** — je te confirme
-> la date. D'ici là, elles répondent 404.
+> ✅ Les routes par mission sont **en service en production depuis le 2026-09-13**.
 
 Salut Alexandre 👋
 

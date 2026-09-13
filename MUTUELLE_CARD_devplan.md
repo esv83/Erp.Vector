@@ -57,11 +57,12 @@ d'ailleurs reçu aucune note sur la carte, et `AppMobile_specifications.md` ne l
 
 ### 3.1 ⏳ Adoption terrain — préalable à tout le reste
 
-La capture par mission est **codée et testée, pas déployée** (`MutuelleCardController` :
-`POST`/`GET api/missions/{missionId}/mutuelle-card`, `ClUploadMissionMutuelleCardUseCase`,
-`ClGetMissionMutuelleCardUseCase`, `MissionBeneficiaryQueryService`, 8 tests).
+La capture par mission est **en production depuis le 2026-09-13** (publication 14:40, constatée dans
+les binaires à 14:46 — `MutuelleCardController` : `POST`/`GET api/missions/{missionId}/mutuelle-card`).
+Détail de la livraison : [`delivered.md`](delivered.md).
 
-1. **Déployer** Vector.Api.
+1. ⚠️ **Rétablir la traçabilité** : la publication a précédé le commit `e942967` (14:42), le `.pdb` en
+   service annonce donc `86b5b28`. Fusionner la branche, puis republier depuis `main`.
 2. **Transmettre** [`note_web_alexandre_carte_mutuelle.md`](note_web_alexandre_carte_mutuelle.md) au
    dev web, avec la date de mise en service.
 3. **Mesurer** le remplissage de `MOB_MUTUELLE_CARD` après la livraison de l'écran. ⚠️ Le compte
@@ -132,8 +133,8 @@ on reste en blob SQL, le firewall ayant retiré le motif DMZ d'origine.
 
 | Route | Usage |
 |---|---|
-| `POST /api/missions/{missionId}/mutuelle-card` | ⭐ **Capture depuis l'app**, **multipart** (champ `file`), `crewId` optionnel en query. Patient résolu côté serveur, mission tracée d'office → `{ Id }`. `404` si mission introuvable ou sans patient. *(non déployé)* |
-| `GET /api/missions/{missionId}/mutuelle-card` | ⭐ Carte courante du patient de la mission. `404` si aucune. *(non déployé)* |
+| `POST /api/missions/{missionId}/mutuelle-card` | ⭐ **Capture depuis l'app**, **multipart** (champ `file`), `crewId` optionnel en query. Patient résolu côté serveur, mission tracée d'office → `{ Id }`. `404` si mission introuvable ou sans patient. *(en service 2026-09-13)* |
+| `GET /api/missions/{missionId}/mutuelle-card` | ⭐ Carte courante du patient de la mission. `404` si aucune. *(en service 2026-09-13)* |
 | `POST /api/beneficiaries/{beneficiaryId}/mutuelle-card` | Capture par identifiant patient, traçabilité optionnelle `crewId` / `missionId`. Validation : MIME `image/*`, 8 Mo max. Conservée, non recommandée (`M8`). |
 | `GET /api/beneficiaries/{beneficiaryId}/mutuelle-card` | Carte courante : métadonnées + les 4 champs + `imageUrl`. |
 | `GET /api/mutuelle-card/{id}/image` | Les octets, avec le `Content-Type` d'origine. **Anonyme** (`M9`). |
