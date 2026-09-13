@@ -61,11 +61,9 @@ La capture par mission est **en production depuis le 2026-09-13** (publication 1
 les binaires à 14:46 — `MutuelleCardController` : `POST`/`GET api/missions/{missionId}/mutuelle-card`).
 Détail de la livraison : [`delivered.md`](delivered.md).
 
-1. ⚠️ **Rétablir la traçabilité** : la publication a précédé le commit `e942967` (14:42), le `.pdb` en
-   service annonce donc `86b5b28`. Fusionner la branche, puis republier depuis `main`.
-2. **Transmettre** [`note_web_alexandre_carte_mutuelle.md`](note_web_alexandre_carte_mutuelle.md) au
-   dev web, avec la date de mise en service.
-3. **Mesurer** le remplissage de `MOB_MUTUELLE_CARD` après la livraison de l'écran. ⚠️ Le compte
+1. **Transmettre** [`note_web_alexandre_carte_mutuelle.md`](note_web_alexandre_carte_mutuelle.md) au
+   dev web.
+2. **Mesurer** le remplissage de `MOB_MUTUELLE_CARD` après la livraison de l'écran. ⚠️ Le compte
    `ErpAccount` de `appsettings.json` est refusé depuis le poste de dev (2026-09-13) : mesurer via le
    paquet `field-data`, ou fournir un compte de lecture.
 

@@ -1,7 +1,7 @@
 # Livré — Vector (module terrain ambulanciers)
 
-> **Mis à jour le** 2026-09-13 · **En production** : binaires publiés le 2026-09-13 à 14:40 — ⚠️ le
-> `.pdb` annonce `86b5b28`, le code est celui d'`e942967` (§8).
+> **Mis à jour le** 2026-09-13 · **En production** : `a6c2aba` (`main`), publié le 2026-09-13 à 15:05,
+> vérifié par sourcelink à 15:09.
 >
 > Ce document porte **ce qui est livré** : ce que le module fait, le journal daté des livraisons,
 > les décisions appliquées, la configuration qui a déjà cassé la production, les pistes retirées.
@@ -94,8 +94,8 @@ Principe constant : **le terrain n'écrase jamais la donnée officielle de l'ERP
 
 ## 2026-09-13 — Carte mutuelle : la capture passe par la mission
 
-*En production — binaires publiés à 14:40, nouvelles classes constatées dans les DLL à 14:46.
-Commit `e942967`, branche `claude/mutuelle-capture-par-mission`, **non fusionnée** au 13/09.*
+*En production — première publication à 14:40 depuis un arbre non commité (§8), **republiée à 15:05
+depuis `main`** (`a6c2aba`, fusion de `e942967`), vérifiée par sourcelink à 15:09.*
 
 - **Cause de la table vide trouvée** : 1 344 paquets terrain sur 1 344 sans carte (24→27/08, mesure
   facturation). La capture demandait l'identifiant du patient, qu'aucun DTO terrain ne porte
@@ -108,6 +108,16 @@ Commit `e942967`, branche `claude/mutuelle-capture-par-mission`, **non fusionné
 - Plan mutuelle recalé : `M7` (facturation : la carte ne va jamais en `C54`), `M8` (capture par
   mission), `M9` (route image anonyme jusqu'à P4) ; écart `T2` de la traçabilité levé.
 - ⚠️ Publiée **avant** le commit (§8).
+
+## 2026-09-13 — L'écran affiche les refus du contexte de mission (A1)
+
+*Confirmé par le dev web, en réponse aux notes du 25 et du 26/08.*
+
+- Depuis la bascule du 25/08, l'API peut refuser : choix du type de mission (`409` — type imposé par
+  la régulation ou inadapté à la commande), enregistrement du questionnaire (`409` — champ verrouillé ;
+  `400` — valeur invalide, n° de sécurité sociale à clé fausse, date future).
+- **L'UI affiche l'information de refus** : l'ambulancier sait que sa saisie n'est pas enregistrée.
+  Ferme le dernier risque de la bascule côté écran ; restent les améliorations d'A3.
 
 ## 2026-08-27 — Le contexte n'a plus qu'un chemin, et la prod redevient traçable
 
@@ -289,7 +299,14 @@ Commit `e942967`, branche `claude/mutuelle-capture-par-mission`, **non fusionné
   valeur reposée à l'identique). Aucune règle métier n'est rejouée côté Vector.
 - **A4** — Le paquet terrain ne proxifie pas les attributs vers Order : la facturation les lit déjà
   chez Orders et les fait primer ; un troisième chemin coûterait un appel par mission.
-- **A6** — Abandon pur de l'historique d'attributs antérieur au 2026-08-25 (données de test).
+- **A6** — Abandon pur de l'historique d'attributs antérieur au 2026-08-25 (données de test, 26/08) ;
+  confirmé le 2026-09-13 : la facturation n'en a plus besoin.
+- **A5** *(2026-09-13)* — Les routes adossées à des stubs (recherche et modification de bénéficiaire,
+  main courante mécanicien et ses analyses) **sortent du contrat mobile** plutôt que d'être
+  implémentées. Elles répondaient 500 ; `MOB-14` est abandonné sous sa forme mobile.
+- **A0** *(2026-09-13)* — Quand le terrain remplace un type de mission proposé par la régulation, la
+  proposition est **perdue** (écrasement en place, aucune trace). **Perte assumée** : aucun audit à
+  construire, ni côté Vector ni côté Order.
 
 ---
 
@@ -383,6 +400,8 @@ depuis un arbre modifié annonce un commit qui ne contient pas le code servi (§
 | **Écran Siège `UcEmployeeKeycloakAccount`** comme hôte du mapping Keycloak | Siège archivé ; la correspondance passe à Identity. |
 | **Historique de portage legacy** et dettes C4, C5, C6, KC-1, DEP-2, DET-1, DET-2, DET-3 | Résolues ; l'information vit dans `git log`. |
 | **Result pattern, vague 2** (G1 du devplan) | Livrée le 2026-07-05 ; le plan ne l'avait pas enregistré. |
+| **`MOB-14` — logs mécaniques et analyses** (tables `MOB_MECANIQUE_*`, référentiels, repositories) | Abandonné le 2026-09-13 avec A5 : les routes sortent du contrat mobile au lieu d'être implémentées. |
+| **Trace de la proposition de type écrasée par le terrain** (A0) | Perte assumée le 2026-09-13 (§4.2). |
 
 ---
 
@@ -390,7 +409,7 @@ depuis un arbre modifié annonce un commit qui ne contient pas le code servi (§
 
 | Date | Incident | Ce qui l'a révélé | Suite |
 |---|---|---|---|
-| **2026-09-13** | **Publication en production depuis un arbre non commité** : binaires à 14:40, commit `e942967` à 14:42. Le `.pdb` annonce `86b5b28`, qui ne contient pas la capture par mission. | comparaison des horodatages et des chaînes des DLL au moment de rédiger ce document | fusionner puis republier depuis `main` (devplan) |
+| **2026-09-13** | **Publication en production depuis un arbre non commité** : binaires à 14:40, commit `e942967` à 14:42. Le `.pdb` annonce `86b5b28`, qui ne contient pas la capture par mission. | comparaison des horodatages et des chaînes des DLL au moment de rédiger ce document | republié depuis `main` à 15:05 (`a6c2aba`), vérifié par sourcelink ; blocage des publications non commitées au plan (G8) |
 | 2026-08-25 | Binaire de production publié depuis un arbre non commité | par hasard, en cherchant l'origine d'un champ | reproductible depuis git le 27/08 |
 | 2026-08-25 | Drapeaux de bascule armés sur le serveur, désarmés dans le fichier versionné | lecture du fichier déployé | armement versionné (`0c3ad34`), puis drapeaux retirés |
 | 2026-08-25 | Correctif joué sur la mauvaise base Orders (`115` au lieu de `109`), sans erreur | une erreur SQL ultérieure | devplan G8 |

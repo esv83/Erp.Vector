@@ -25,7 +25,7 @@
 
 | # | Action | Pourquoi maintenant |
 |---|---|---|
-| 1 | ⚠️ **Fusionner `claude/mutuelle-capture-par-mission` puis republier depuis `main`** | La production tourne depuis le 2026-09-13 14:40 un code publié **avant** son commit : le `.pdb` annonce `86b5b28`, qui ne contient pas la capture par mission (`e942967`). La prod n'est plus reproductible depuis git. |
+| 1 | **Pousser `main`** vers GitHub | La production tourne `a6c2aba` (publié le 2026-09-13 à 15:05), commit encore absent d'`origin` : le sourcelink du `.pdb` pointe vers un commit introuvable en ligne. |
 | 2 | **Transmettre la note carte mutuelle au dev web** (§F1) | Les routes sont en service ; tant que l'écran ne les appelle pas, aucune carte n'arrive. |
 
 ---
@@ -34,7 +34,7 @@
 
 | Chapitre | Nature | Attaquable maintenant ? |
 |---|---|---|
-| **A** — Contexte de mission | suites de la bascule vers Order | en attente de réponses (dev web, facturation) ; une décision |
+| **A** — Contexte de mission | suites de la bascule vers Order | **A5, A6 oui** ; A3 en attente du dev web |
 | **B** — Dépendances amont Orders | rien à coder ici : suivre, réclamer | — |
 | **C** — Identité & authentification | sécurité, chaîne de connexion | oui (C2, C3) ; C1 sur décision |
 | **D** — Robustesse des appels sortants | plomberie HTTP | **oui, isolé** |
@@ -50,48 +50,62 @@
 > ⚠️ **Deux numérotations `OC-` coexistent.** Un `OC-x` nu désigne la tâche **Vector** ; la tâche
 > Order s'écrit `Order OC-x` ([plan Order](../Erp.Order/feature_order_context_devplan.md) §7).
 
-### A0 — ⛔ Trace de la proposition écrasée — *décision*
+> **En deux phrases.** Depuis le 25/08, le type de mission et le questionnaire d'attributs viennent
+> d'Order, qui peut **refuser** une saisie ou **verrouiller** un champ. Vector transmet déjà tout
+> cela ; l'écran affiche les refus (confirmé le 2026-09-13), A3 attend encore deux améliorations
+> d'affichage — rien à coder ici.
 
-Quand le terrain écrase un type proposé par la régulation, la proposition est **perdue** (écrasement
-en place, aucun audit). **À trancher** : si la facturation ou l'arbitrage d'un litige doit pouvoir la
-relire, il faut une trace côté Order ; sinon, on assume la perte.
+### A3 — ⏳ Deux améliorations d'écran demandées — *attente dev web*
 
-### A1 — ⏳ Confirmation du dev web sur les refus
+L'API envoie déjà l'information ; c'est l'affichage qui manque.
 
-Depuis la bascule, la sélection du type peut répondre `409` et la saisie des attributs `409`/`400`,
-là où ces appels réussissaient toujours. Notes envoyées : [le contrat](note_web_alexandre_context_mission_dto.md)
-(25/08) · [la demande de confirmation](note_web_alexandre_context_mission_confirmation.md) (26/08).
-**Réponse non tracée dans le dépôt au 2026-09-13.** Rappel : un incident se corrige désormais par un
-redéploiement, plus par une clé de configuration.
-**Fin** : confirmation écrite que l'écran affiche le motif du refus.
+1. **Dire pourquoi un champ est grisé.** Un champ verrouillé arrive avec son motif (par exemple
+   « déjà renseignée sur la fiche »). Sans ce texte, l'ambulancier voit un champ bloqué sans savoir
+   pourquoi ni à qui s'adresser.
+2. **Faire relire le n° de sécurité sociale avant d'enregistrer.** La fiche patient ne le fournit
+   presque jamais (0 fois sur 40 missions mesurées le 26/08) : c'est l'ambulancier qui le tape. Une
+   fois enregistré, **aucun module ne permet de le corriger** — une faute de frappe part en
+   facturation. Un écran de confirmation suffit.
 
-### A3 — 🟡 Règles métier portées par Order — *reste l'écran*
+Demandé au dev web le 26/08. **Fin** : les deux constatés sur l'app.
 
-Rien côté API (vérifié le 2026-08-26). Côté écran, demandé au dev web le 26/08 : **afficher le motif
-du verrou** plutôt qu'un champ grisé, et **faire relire le NIR à la saisie** — renseigné 0 fois sur
-40 par la fiche, il est toujours posé par le terrain et n'est corrigeable dans aucun module ensuite.
+### A5 — ⏳ Retirer du contrat les routes adossées à des stubs — *décidé le 2026-09-13*
 
-*(Interrogé en rafale le 26/08, l'endpoint d'Order a rendu 16 `503` d'affilée avant de se stabiliser —
-démarrage à froid probable. Non conclu.)*
+Trois contrôleurs injectent des stubs qui lèvent `NotImplementedException` : toutes leurs routes
+répondent **500**. **Décision : on les retire** plutôt que de les implémenter (`MOB-14` abandonné).
 
-### A5 — ⏳ Trois routes adossées à des stubs
+| Contrôleur | Routes |
+|---|---|
+| `ContactController` (`api/Contact`) | `GET` recherche de bénéficiaire · `PATCH` modification |
+| `MecanicLogController` (`api/MecanicLog`) | `GET` · `GET {crewId}` · `POST` main courante |
+| `AnalyzeController` (`analyze`) | `GET {logId}` · `POST` · `PUT` · `DELETE {logId}` · `DELETE {logId}/actions/{actionId}` |
 
-`NotImplementedStubs.cs` reste injecté par les routes de **recherche de bénéficiaire** et de **main
-courante mécanicien**, qui répondent **500** (dette ancienne, pas une régression). **À décider** :
-les implémenter ou les retirer du contrat mobile — question posée au dev web le 26/08 : le front
-les appelle-t-il ? **Fin** : `NotImplementedStubs.cs` supprimé.
+**À retirer** : les trois contrôleurs ; `NotImplementedStubs.cs` et ses trois enregistrements dans
+`Program.cs` ; les ports `IContactRepository`, `ILogRepository`, `ILogAnalyzeRepository` ; les cas
+d'usage `MechanicLog` et `ClMechanicService` ; ce qui devient orphelin (`ClContactModel`,
+`ModContactModelExtension`, `ClLogEntry`, `ClLogAnalyze`, modèles de log). **Prévenir le dev web** :
+ces routes passent de 500 à 404 (D14 — elles n'ont jamais fonctionné, mais le contrat change).
+**Fin** : `NotImplementedStubs.cs` supprimé, suite verte.
 
-### A6 — ⛔ Supprimer les tables `MOB_*` du contrat (`OC-8`) — *décidé, exécution bloquée*
+### A6 — ⏳ Supprimer le magasin d'attributs Vector (`OC-8`) — *débloqué le 2026-09-13*
 
-Abandon pur tranché le 2026-08-26 ; script écrit et **volontairement non joué** :
-[`MOB_008_DropContractOverlay.sql`](CaSoft.Erp.USVector.Infrastructure/Sql/MOB_008_DropContractOverlay.sql).
+Plus rien ne le retient : abandon pur tranché le 26/08, et **la facturation n'a plus besoin des
+attributs saisis avant le 25/08** (13/09). Les valeurs en vigueur viennent d'Order.
 
-⛔ **Verrou restant : le paquet terrain.** `FieldAttributesReader` compose le bloc `attributes` depuis
-ce magasin (vérifié en production le 2026-08-27) ; jouer le `DROP` casserait le transfert.
+**Ordre imposé** — le bloc `attributes` du paquet terrain lit encore ces tables ; jouer le script
+d'abord casserait le transfert.
 
-**Question à poser à la facturation** : *jusqu'à quand l'historique d'avant le 2026-08-25 doit-il
-rester servi ?* Elle lit déjà les valeurs d'Order et les fait primer ; ce bloc ne comble que les trous
-des missions antérieures. **Ensuite** : retirer le bloc du paquet, puis jouer `MOB_008`.
+1. **Retirer la lecture** : `FieldAttributesReader`, `JobAttributeOverlayRepository`, les ports
+   `IFieldAttributesReader` / `IJobAttributeOverlay`, leur enregistrement dans `Program.cs`, les
+   entités et le mapping de `MobileDbContext`, les tests associés. `FieldDataReader` sert
+   `attributes: null` — propriété conservée. Sans effet côté facturation : sa lecture tolère déjà le
+   `null` (`ModTraductionAttributs.vb:229`).
+2. **Déployer**, puis tirer un paquet `field-data` en production.
+3. **Jouer** [`MOB_008_DropContractOverlay.sql`](CaSoft.Erp.USVector.Infrastructure/Sql/MOB_008_DropContractOverlay.sql)
+   (`MOB_JOB_ATTRIBUTE_VALUE`, `MOB_JOB_CONTRACT`, catalogue `MOB_CONTRACT_*`) — **destructif**, compte
+   db_owner, sauvegarde préalable.
+
+**Fin** : tables supprimées, paquet terrain servi sans erreur.
 
 ---
 
@@ -199,12 +213,11 @@ publication d'une journée, ou retirer le palier de l'énumération.
 La capture par mission est **en service depuis le 2026-09-13** (cause de la table vide : la route
 demandait un identifiant patient qu'aucun DTO terrain ne porte). Reste :
 
-1. **Traçabilité** : §0, action 1.
-2. **Transmettre** [`note_web_alexandre_carte_mutuelle.md`](note_web_alexandre_carte_mutuelle.md) au dev web.
-3. **Mesurer** le remplissage après livraison de l'écran. ⚠️ Le compte `ErpAccount` de
+1. **Transmettre** [`note_web_alexandre_carte_mutuelle.md`](note_web_alexandre_carte_mutuelle.md) au dev web.
+2. **Mesurer** le remplissage après livraison de l'écran. ⚠️ Le compte `ErpAccount` de
    `appsettings.json` est refusé depuis le poste de dev : mesurer via `field-data`, ou obtenir un
    compte de lecture.
-4. **Signaler à BillingGateway** que ses « 401 » du 27/08 portaient sur deux routes inexistantes : la
+3. **Signaler à BillingGateway** que ses « 401 » du 27/08 portaient sur deux routes inexistantes : la
    vraie route image est ouverte.
 
 Faiblesses connues de la saisie (le `PATCH` remplace les quatre champs et accepte un corps vide ; une
@@ -218,12 +231,13 @@ Seul le **statut** existe. Pipeline **asynchrone** : `pending` à l'upload → w
 par carte. Rappel `M7` : même validés, ces champs n'alimentent pas `C54`.
 **Préalable** : F1. **Fin** : quatre champs proposés, jamais écrits en aveugle.
 
-### F3 — ⏳ Trois chantiers hérités, autonomes
+### F3 — ⏳ Deux chantiers hérités, autonomes
+
+*(`MOB-14`, logs mécaniques, abandonné le 2026-09-13 : ses routes sortent du contrat, cf. A5.)*
 
 | Réf | Objet | Ce qui reste |
 |---|---|---|
 | `MOB-12` | **Fin de service** | Le contrôleur vise `MOB_SESSION`, qui n'est plus la source d'authentification : la clôture doit viser la **vacation d'équipage côté Orders**. `TODO` ouvert sur les permissions. *Re-cadrage avant code.* |
-| `MOB-14` | **Logs mécaniques et analyses** | Trois contrôleurs sur des stubs : tables `MOB_MECANIQUE_*`, référentiels, repositories réels. |
 | `MOB-16` | **Connecteurs Sirus / GpsGate** | Portés et injectés, **non recâblés** : positions (GpsGate REST), statuts véhicule (Sirus UDP). |
 
 ### F4 — ⛔ Présence : qui est connecté à Vector — *décision d'abord*
