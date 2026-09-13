@@ -1,6 +1,6 @@
 # Livré — Vector (module terrain ambulanciers)
 
-> **Mis à jour le** 2026-09-13 · **En production** : `bc105c1` (`main`), rechargé le 2026-09-13 à 18:59,
+> **Mis à jour le** 2026-09-13 · **En production** : `c5eedca` (`main`), rechargé le 2026-09-13 à 20:04,
 > vérifié par sourcelink.
 >
 > Ce document porte **ce qui est livré** : ce que le module fait, le journal daté des livraisons,
@@ -108,6 +108,30 @@ depuis `main`** (`a6c2aba`, fusion de `e942967`), vérifiée par sourcelink à 1
 - Plan mutuelle recalé : `M7` (facturation : la carte ne va jamais en `C54`), `M8` (capture par
   mission), `M9` (route image anonyme jusqu'à P4) ; écart `T2` de la traçabilité levé.
 - ⚠️ Publiée **avant** le commit (§8).
+
+## 2026-09-13 — Incident : des ambulanciers en service exclus à la fin théorique de leur vacation
+
+*Corrigé en production — `c5eedca` (`main`), rechargé à 20:04:18, vérifié par sourcelink et journal.*
+
+- **Symptôme** : « l'application ne fonctionne plus » remonté par les utilisateurs. Le sélecteur
+  d'équipage répondait **« Votre service est clôturé »** à des ambulanciers encore en service :
+  137 réponses 404 entre 18 h et 19 h, puis **125 refus pour 9 ambulanciers** de 18:59 à 19:57
+  (équipages A209, A307, A111, A603 — **ouverts** chez Orders, fin à 18:00). Les 15 autres
+  personnels connectés passaient.
+- **Cause** : Orders `7984ec0` (13/09, 15:55) donne à toute vacation une **fin théorique** dès sa
+  création (début + 10 h, `finDeServiceSource` = 2). Vector tenait depuis le 12/07 (`b6d5dec`)
+  « fin de service dépassée » pour une clôture — juste tant que la fin n'était posée qu'à la clôture
+  réelle. Aucun des deux modules n'était faux isolément ; c'est leur rencontre qui a exclu le terrain.
+- **Écarté** : le renommage du client Keycloak `us-vector-api` → `erp-vector-api` soupçonné en
+  premier. Journal : 316 jetons mobiles validés, 0 rejeté, appels à Orders en 200.
+- **Correctif** : la clôture se lit sur le **statut** de la vacation (`status` = 2, `Closed`),
+  jamais sur l'heure de fin — dans la règle de sélection, l'affichage du sélecteur (« en cours »,
+  « clôturé ») et le diagnostic. La fin reste affichée ; l'expiration à 18 h reste le filet.
+  3 tests reproduisent le cas du soir ; 140 verts.
+- **Constaté après publication** : plus aucun refus « service clôturé » ; le premier ambulancier
+  bloqué qui a réessayé (A307, 57 refus avant) obtient son équipage.
+- **Leçon** : le même jour, le refus d'Orders sur le conducteur disait déjà « La vacation s'est
+  terminée … à 18:00 » — le signe était dans le journal une heure avant les appels des utilisateurs.
 
 ## 2026-09-13 — Vector présente son jeton de service à Orders (C2, sortant)
 
@@ -529,6 +553,7 @@ depuis un arbre modifié annonce un commit qui ne contient pas le code servi (§
 
 | Date | Incident | Ce qui l'a révélé | Suite |
 |---|---|---|---|
+| **2026-09-13** *(18:00 → 20:04)* | **Ambulanciers en service exclus de l'application** (« Votre service est clôturé ») : 9 personnels, 125 refus en une heure. Orders pose désormais une fin théorique à chaque vacation (`7984ec0`), que Vector lisait comme une clôture | appels des utilisateurs ; le refus du conducteur disait déjà « vacation terminée à 18:00 » | clôture lue sur le statut (`c5eedca`), publié à 20:04 |
 | **2026-09-13** | **Publication en production depuis un arbre non commité** : binaires à 14:40, commit `e942967` à 14:42. Le `.pdb` annonce `86b5b28`, qui ne contient pas la capture par mission. | comparaison des horodatages et des chaînes des DLL au moment de rédiger ce document | republié depuis `main` à 15:05 (`a6c2aba`), vérifié par sourcelink ; blocage des publications non commitées au plan (G8) |
 | 2026-08-24 → 2026-09-13 | **Journaux de production muets** : NLog et stdout arrêtés le 24/08 vers 02:17, l'API servant normalement | en cherchant les 404 du sélecteur pour C3 | rétablis le 13/09 à 16:18, côté serveur |
 | 2026-08-25 | Binaire de production publié depuis un arbre non commité | par hasard, en cherchant l'origine d'un champ | reproductible depuis git le 27/08 |
