@@ -125,8 +125,9 @@ une couche déclarative que la facturation relit et corrige.
 
 ## 1.8 ⚠️ Livré mais pas encore exploité
 
-- **La carte mutuelle n'est jamais remplie en production** (table vide au 23/08/2026) : la chaîne
-  serveur fonctionne, mais aucune photo n'arrive. Ce qui coince est en aval, pas dans l'API (§3.F1).
+- **La carte mutuelle n'est jamais remplie en production** (1 344 paquets sur 1 344 sans carte, 24→27/08) :
+  la route de capture demandait un identifiant patient qu'aucun DTO terrain ne porte. Capture par
+  mission codée le 2026-09-13, à déployer et à transmettre au dev web (§3.F1).
 - **Le kilométrage n'est pas transmis** avec le dossier terrain : la facturation attend ce champ
   pour activer son contrôle (§3.E1).
 - **Le repère de fraîcheur du paquet** (`updatedAt`) est servi mais aucun consommateur ne s'en sert :
@@ -510,10 +511,13 @@ théorique. **À trancher** : le faire poser par la facturation à la publicatio
 
 ### F1 — ⏳ Carte mutuelle : débloquer l'adoption *(avant tout le reste)*
 
-**Rien à coder côté API.** Confirmer avec le dev web que l'écran ambulancier appelle bien la capture
-(multipart) et le `PATCH` de saisie, puis **mesurer le remplissage en production**. C'est le seul
-point qui débloque de la valeur immédiate — l'extraction automatique n'a aucun intérêt tant qu'aucune
-photo n'arrive. Détail : [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) §3.1.
+**Cause trouvée le 2026-09-13 : la capture était inatteignable depuis l'app** — elle demandait
+l'identifiant du patient, qu'aucun DTO terrain ne porte. Capture **par mission** codée et testée
+(`POST`/`GET api/missions/{missionId}/mutuelle-card`, patient résolu côté serveur). Reste :
+**déployer**, **transmettre** [`note_web_alexandre_carte_mutuelle.md`](note_web_alexandre_carte_mutuelle.md),
+puis **mesurer le remplissage en production**. C'est le seul point qui débloque de la valeur immédiate
+— l'extraction automatique n'a aucun intérêt tant qu'aucune photo n'arrive. Détail :
+[`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) §3.1.
 
 ### F2 — ⏳ Carte mutuelle : extraction automatique (P3)
 
