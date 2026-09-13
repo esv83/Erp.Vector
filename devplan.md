@@ -26,6 +26,7 @@
 | # | Action | Pourquoi maintenant |
 |---|---|---|
 | 1 | **Transmettre les deux notes au dev web** : [carte mutuelle](note_web_alexandre_carte_mutuelle.md) (§F1) et [routes retirées](note_web_alexandre_routes_retirees.md) | Les routes mutuelle sont en service ; tant que l'écran ne les appelle pas, aucune carte n'arrive. Les routes retirées répondent déjà 404 en production. |
+| 2 | **Rétablir les journaux de production** (§G9) | Muets depuis le 24/08 : le prochain incident en production ne laissera aucune trace. |
 
 ---
 
@@ -35,7 +36,7 @@
 |---|---|---|
 | **A** — Contexte de mission | suites de la bascule vers Order | A3 en attente du dev web |
 | **B** — Dépendances amont Orders | rien à coder ici : suivre, réclamer | — |
-| **C** — Identité & authentification | sécurité, chaîne de connexion | oui (C2, C3) ; C1 sur décision |
+| **C** — Identité & authentification | sécurité, chaîne de connexion | oui (C2) ; C1 et C3 sur décision |
 | **D** — Robustesse des appels sortants | plomberie HTTP | **oui, isolé** |
 | **E** — Chaîne facturation | contrat du paquet terrain | oui (E2) ; E1 après arbitrage |
 | **F** — Fonctions terrain | features indépendantes | oui |
@@ -76,7 +77,6 @@ Demandé au dev web le 26/08. **Fin** : les deux constatés sur l'app.
 | Réf | Ce qui manque | Effet visible côté terrain | État |
 |---|---|---|---|
 | **B2** | **Repli sur le snapshot `ORD_ORDER`** dans le chemin de lecture d'Orders — plan code-only : [`plan_correctif_vector_fallback_snapshot.md`](plan_correctif_vector_fallback_snapshot.md) | **~3 883 étapes de mission s'affichent vides** ; résiduel attendu ~93 | ⏳ à coder dans `Erp.Order` |
-| **B3** | **Chaîne équipage pour le 2ᵉ membre** — `GET /crews?personnelId=` ne rattache pas le personnel, ou `Members` incomplet | sur un équipage à 2, **un seul accède à ses missions** (404) | ⏳ diagnostic prêt → C3 |
 | **B4** | `Billed` n'a **aucun écrivain** | palier théorique | ⛔ décision (E4) |
 | **B5** | **`field-data` par période** (à l'image de `for-export`) | 14,7 s pour 284 missions, sur un clic | ⏳ non engagé côté demandeur |
 | **B6** | **Tests xUnit du transfert côté Orders** : dérivation `MIS_STATUS`, pose de `Transferable`, garde-fous de `MarkTransferred` / `MarkBilled` | aucun filet aujourd'hui | ⏳ |
@@ -93,7 +93,9 @@ Demandé au dev web le 26/08. **Fin** : les deux constatés sur l'app.
 
 ### C1 — ⛔ Écran de rattachement compte Keycloak ↔ ambulancier — *choisir l'hôte*
 
-Aujourd'hui **INSERT SQL manuel** dans `PER_KEYCLOAK_MAP` : seul maillon manuel de la chaîne. Les
+Aujourd'hui **INSERT SQL manuel** dans `PER_KEYCLOAK_MAP` : seul maillon manuel de la chaîne.
+**Mesuré le 2026-09-13 : 8 membres d'équipage sur 244** (équipages à plusieurs membres des 7 derniers
+jours) n'ont aucun compte rattaché — ils reçoivent un 403 au sélecteur. Les
 endpoints Orders sont livrés ; le **module Identity possède désormais la correspondance** (reprise du
 23/08/2026 : 146 pivots, 105 correspondances).
 → **Identity** (cible) **ou** endpoints Orders le temps de la bascule. Dans les deux cas : lister les
@@ -118,12 +120,23 @@ jeton :
 
 Elles se referment **ensemble**, avec `DEC-6`. `AnonymousSurfaceTests` fige la liste.
 
-### C3 — ⏳ Trancher le 404 du second membre d'équipage
+### C3 — ⛔ 404 du sélecteur avant la composition de l'équipage — *décision*
 
-Diagnostic prêt ([`docs/auth/diag-404-second-membre-equipage.md`](docs/auth/diag-404-second-membre-equipage.md)) :
-lancer `GET /api/diag/crew-chain` sur les **deux** membres **au même instant**, comparer, ouvrir le
-ticket Orders (B3). ⚠️ Le filtre d'appartenance qui produit le 404 est **volontaire** : ne pas le
-retirer pour masquer le symptôme.
+**Diagnostic tranché le 2026-09-13** ([`delivered.md`](delivered.md)) : **ni défaut de code, ni donnée
+fausse chez Orders.** Le 404 « Aucun équipage actif » survient quand l'ambulancier ouvre l'app **avant
+que la régulation ait composé son équipage** ; il passe dès que c'est fait. Mesuré sur les journaux
+du 04/07 au 24/08 : 24 cas, 21 équipages, délai médian de **23 min** entre la tentative et la
+composition, 9 cas au-delà d'une heure. Quand l'équipage entier est composé en retard, **les deux
+membres échouent ensemble** — d'où l'impression d'un « second membre » bloqué.
+
+**À trancher :**
+1. **Le message terrain.** « Aucun équipage actif pour ce personnel aujourd'hui » ne dit pas quoi
+   faire. Proposition : « Votre équipage n'est pas encore composé par la régulation », avec un bouton
+   *Réessayer* côté écran. Même code 404, texte seul : additif (D14).
+2. **L'organisation de la régulation.** Composer les équipages avant la prise de service — sans quoi
+   l'accès anticipé de 30 min (CREW-1) ne sert à rien pour ces équipages.
+
+⚠️ Le filtre d'appartenance (`MobileIdentityResolver.cs:35`) est **volontaire** : ne pas le retirer.
 
 ---
 
@@ -277,6 +290,19 @@ publier un arbre non commité**.
 visible — ou impossible.
 
 ---
+
+### G9 — ⏳ Les journaux de production sont muets depuis le 2026-08-24
+
+**Constaté le 2026-09-13** : le dernier fichier de `\\192.168.1.112\prod_api\Vector.Api\logs` date du
+24/08 — NLog (`usvector-api-*.log`) **et** stdout ANCM s'arrêtent tous deux vers 02:17. L'API sert
+pourtant depuis ce dossier (binaires du 13/09), et le `nlog.config` déployé est correct.
+
+**Cause probable** : le pool IIS n'écrit plus dans `logs/` (droits), NLog échouant en silence
+(`throwConfigExceptions="false"`). **À vérifier sur le serveur** : droits du dossier pour l'identité
+du pool, journal interne NLog (`${tempdir}/usvector-nlog-internal.log`, dossier temporaire du pool).
+
+**Conséquence** : plus aucun diagnostic possible sur la production depuis trois semaines — C3 n'a pu
+être instruit que sur l'historique antérieur. **Fin** : un fichier du jour dans `logs/`.
 
 ## H. ⚪ Différé (V2 / hors MVP)
 

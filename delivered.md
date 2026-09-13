@@ -109,6 +109,32 @@ depuis `main`** (`a6c2aba`, fusion de `e942967`), vérifiée par sourcelink à 1
   mission), `M9` (route image anonyme jusqu'à P4) ; écart `T2` de la traçabilité levé.
 - ⚠️ Publiée **avant** le commit (§8).
 
+## 2026-09-13 — Le 404 du « second membre » est diagnostiqué : ce n'est pas un défaut (C3)
+
+*Analyse — aucun code livré. Journaux de production du 04/07 au 24/08, rejoués contre Orders.Api.*
+
+- **Le symptôme était réel** : 1 344 réponses 404 « sans équipage actif » au sélecteur, sur 119
+  couples (personnel, jour), jusqu'à 184 par jour.
+- **Classement de chaque 404** contre l'état de l'équipage chez Orders :
+
+  | Cause | Couples | 404 |
+  |---|---|---|
+  | Aucun équipage ce jour-là (1 seul réussit ensuite) | 90 | 982 |
+  | **Équipage composé après la tentative** — médiane 23 min, 9 cas > 1 h, 21 équipages | 24 | 340 |
+  | Membre remplacé ou retiré de l'équipage | 4 | 21 |
+  | Échec isolé, réussite 6 s plus tard | 1 | 1 |
+
+- **Les deux causes suspectées sont écartées** sur les 122 équipages à plusieurs membres des 7
+  derniers jours : 0 membre dont `crews?personnelId=` ne rend pas l'équipage (cause 1), 0 membre actif
+  absent de `members` (cause 2).
+- **Piège de lecture évité** : `joinedAt` est en **UTC** chez Orders, les journaux Vector et les
+  vacations en heure de Paris. Sans conversion, 18 cas paraissaient inexpliqués ; convertis, le membre
+  est ajouté **entre le dernier échec et la réussite**. Jusqu'au 03/09, l'adhésion fondatrice était
+  datée de l'instant de composition (Order `88aa425`) — c'est ce qui rend la mesure possible sur cette
+  période, et plus au-delà.
+- Côté identité : 8 membres d'équipage sur 244 n'ont pas de compte Keycloak rattaché (403, pas 404).
+- Suite à décider : message terrain et organisation de la régulation (devplan C3).
+
 ## 2026-09-13 — Routes mortes retirées du contrat, magasin d'attributs supprimé (A5, A6)
 
 *En production — `0122b7a` (`main`), publié à 15:43, vérifié par sourcelink, Swagger et paquets
@@ -422,6 +448,7 @@ depuis un arbre modifié annonce un commit qui ne contient pas le code servi (§
 | **Result pattern, vague 2** (G1 du devplan) | Livrée le 2026-07-05 ; le plan ne l'avait pas enregistré. |
 | **`MOB-14` — logs mécaniques et analyses** (tables `MOB_MECANIQUE_*`, référentiels, repositories) | Abandonné le 2026-09-13 avec A5 : les routes sortent du contrat mobile au lieu d'être implémentées. |
 | **Trace de la proposition de type écrasée par le terrain** (A0) | Perte assumée le 2026-09-13 (§4.2). |
+| **Ticket Orders « chaîne équipage du 2ᵉ membre »** (ex-B3 : jointure `crews?personnelId=` ou `Members` incomplet) | Écarté le 2026-09-13 : aucune des deux causes n'existe dans les données ; le 404 vient d'équipages composés après la tentative (C3). |
 
 ---
 

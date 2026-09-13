@@ -1,5 +1,15 @@
 # Test de diagnostic — 404 sur le second membre d'un équipage
 
+> ✅ **Tranché le 2026-09-13 — ni la cause 1, ni la cause 2.** Rejoué sur les journaux de production
+> (1 344 réponses 404, du 04/07 au 24/08) et sur les 122 équipages à plusieurs membres de la semaine :
+> le 404 survient quand l'ambulancier ouvre l'app **avant que la régulation ait composé son
+> équipage**, et disparaît dès qu'elle l'a fait. Quand l'équipage entier est composé en retard, les
+> deux membres échouent ensemble. Détail et chiffres : [`delivered.md`](../../delivered.md) (2026-09-13).
+>
+> ⚠️ **Piège pour une prochaine lecture** : `joinedAt` est servi en **UTC** par Orders, les journaux
+> Vector sont en heure de Paris. Comparer les deux sans conversion fait croire à un membre inscrit deux
+> heures avant son échec.
+
 ## Symptôme
 
 Sur un équipage à **2 membres**, un seul des deux accède à la liste des missions. Le second reçoit un **404**.
