@@ -14,7 +14,6 @@ public sealed class FieldDataReader : IFieldDataReader
     private readonly IErpReadApiClient _erp;
     private readonly IJobTimeRepository _jobTime;
     private readonly ISignatureRepository _signature;
-    private readonly IFieldAttributesReader _attributes;
     private readonly IMutuelleCardRepository _mutuelle;
     private readonly IDocumentRepository _documents;
     private readonly IAnomalyRepository _anomalies;
@@ -23,7 +22,6 @@ public sealed class FieldDataReader : IFieldDataReader
         IErpReadApiClient erp,
         IJobTimeRepository jobTime,
         ISignatureRepository signature,
-        IFieldAttributesReader attributes,
         IMutuelleCardRepository mutuelle,
         IDocumentRepository documents,
         IAnomalyRepository anomalies)
@@ -31,7 +29,6 @@ public sealed class FieldDataReader : IFieldDataReader
         _erp = erp;
         _jobTime = jobTime;
         _signature = signature;
-        _attributes = attributes;
         _mutuelle = mutuelle;
         _documents = documents;
         _anomalies = anomalies;
@@ -68,13 +65,6 @@ public sealed class FieldDataReader : IFieldDataReader
             ImageUrl = sigExists ? $"api/Signature/{missionId}" : null
         };
 
-        // Attributs de facturation dynamiques — OC-7 : lus dans le seul magasin Vector, sans appel
-        // réseau. Depuis la bascule du référentiel, la facturation lit ces valeurs directement chez
-        // Order et les fait primer ; ce bloc ne sert plus qu'à combler les trous pour les missions
-        // saisies avant. Les faire transiter par ici en interrogeant Order serait un troisième chemin
-        // vers la même donnée, payé deux appels par mission sur un traitement déjà lent.
-        var attributes = _attributes.Read(missionId);
-
         // Carte mutuelle courante du bénéficiaire.
         ClMutuelleCardDtoOut? mutuelle = null;
         if (beneficiaryId.HasValue)
@@ -103,7 +93,10 @@ public sealed class FieldDataReader : IFieldDataReader
             UpdatedAt = updatedAt,
             Timeline = timeline,
             Signature = signature,
-            Attributes = attributes,
+            // OC-8 — toujours null : le magasin d'attributs Vector est retiré (2026-09-13). Les valeurs
+            // en vigueur sont chez Order, où la facturation les lit ; l'historique antérieur au
+            // 2026-08-25 n'est plus demandé. Propriété conservée : la facturation tolère le null.
+            Attributes = null,
             Mutuelle = mutuelle,
             Kilometers = null,   // crew/véhicule-scoped (cf. TRF-9), surfacé séparément
             Documents = documents,

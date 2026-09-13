@@ -236,13 +236,6 @@ builder.Services.AddScoped<IMutuelleCardRepository, MutuelleCardRepository>();
 builder.Services.AddScoped<IAnomalyRepository, AnomalyRepository>();
 // Documents/photos terrain (TRF-10) : stockage BD Mobile.
 builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
-// Bloc « attributs » du paquet terrain : il lit le magasin Vector et ne doit jamais interroger
-// Orders.Api pour cela — la facturation y trouve l'historique des missions saisies avant la bascule,
-// et le paquet est tiré par lots (14,7 s pour 284 missions) où un appel réseau par mission coûterait
-// cher pour une information dont personne ne fait rien. C'est le seul consommateur qui reste de
-// l'overlay, d'où l'instance construite ici plutôt qu'enregistrée pour tout le monde.
-builder.Services.AddScoped<IFieldAttributesReader>(sp => new FieldAttributesReader(
-    new JobAttributeOverlayRepository(sp.GetRequiredService<MobileDbContext>())));
 // Paquet d'enrichissement consolidé (TRF-6) : tiré par Certification au transfert.
 builder.Services.AddScoped<IFieldDataReader, CaSoft.Erp.USVector.Infrastructure.Repositories.FieldDataReader>();
 
@@ -283,11 +276,6 @@ builder.Services.AddScoped<IMobileIdentityResolver>(sp =>
 builder.Services.AddScoped<CaSoft.Erp.USVector.Infrastructure.Diagnostics.CrewChainDiagnostic>();
 // Support diag : résolution username → sub via l'Admin API Keycloak (service account, dev-only).
 builder.Services.AddHttpClient<CaSoft.Erp.USVector.Infrastructure.Diagnostics.KeycloakAdminClient>();
-
-// ── Ports ERP → stubs (remplacés itération par itération, MOB-4+) ────────────
-builder.Services.AddScoped<ILogRepository, LogRepositoryStub>();
-builder.Services.AddScoped<ILogAnalyzeRepository, LogAnalyzeRepositoryStub>();
-builder.Services.AddScoped<IContactRepository, ContactRepositoryStub>();
 
 // ── Services applicatifs (portés tels quels de MobApp.Application) ───────────
 builder.Services.AddScoped<ICrewCache, ClCrewListCache>();
