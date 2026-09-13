@@ -66,12 +66,12 @@ public class ClGetMyActiveCrewsUseCaseTests
 
     [Fact]
     public void Service_cloture_le_dit()
-        => NotFoundMessage(Select(Crew(Now.AddHours(-4), end: Now.AddHours(-1))))
+        => NotFoundMessage(Select(Crew(Now.AddHours(-4), serviceEnded: true)))
             .Should().StartWith("Votre service est clôturé");
 
     [Fact]
     public void Service_a_venir_prime_sur_un_service_du_matin_cloture()
-        => NotFoundMessage(Select(Crew(Now.AddHours(-4), end: Now.AddHours(-1)), Crew(new DateTime(2026, 7, 12, 14, 0, 0))))
+        => NotFoundMessage(Select(Crew(Now.AddHours(-4), serviceEnded: true), Crew(new DateTime(2026, 7, 12, 14, 0, 0))))
             .Should().StartWith("Votre service commence à 14:00");
 
     [Fact]
@@ -81,7 +81,7 @@ public class ClGetMyActiveCrewsUseCaseTests
 
     [Fact]
     public void Un_equipage_selectionnable_suffit()
-        => Select(Crew(Now.AddHours(-4), end: Now.AddHours(-1)), Crew(Now.AddHours(-1))).IsSucces.Should().BeTrue();
+        => Select(Crew(Now.AddHours(-4), serviceEnded: true), Crew(Now.AddHours(-1))).IsSucces.Should().BeTrue();
 
     [Fact]
     public void Le_motif_de_cloture_prime_sur_la_fenetre_anticipee()

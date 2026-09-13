@@ -12,12 +12,14 @@ Public Module ModActiveCrewMapping
         Dim immat = If(crew.Vehicle?.Immatriculation, String.Empty)
         Dim members = String.Join(" / ", crew.EmployeeList.Select(Function(e) e.DisplayName()))
 
-        ' Couvre l'instant présent : début passé et (fin absente OU pas encore atteinte).
-        Dim isCurrent = crew.ServiceStart <= at AndAlso (Not crew.ServiceEnd.HasValue OrElse at <= crew.ServiceEnd.Value)
+        ' Couvre l'instant présent : service commencé et vacation non clôturée. La fin de service n'entre
+        ' pas en compte : depuis le 13/09/2026 elle peut être théorique (début + 10 h) et dépassée par un
+        ' équipage encore en route — il doit rester pré-sélectionné.
+        Dim isCurrent = crew.ServiceStart <= at AndAlso Not crew.IsServiceEnded
         ' Accès anticipé : proposé avant la prise de service (fenêtre ClCrew.EarlyAccessMinutes).
         Dim isPending = at < crew.ServiceStart
-        ' Clôturé : fin de service marquée, ou fenêtre de vacation déjà passée.
-        Dim isClosed = crew.IsServiceEnded OrElse (crew.ServiceEnd.HasValue AndAlso crew.ServiceEnd.Value < at)
+        ' Clôturé : vacation clôturée chez Orders (statut), et rien d'autre.
+        Dim isClosed = crew.IsServiceEnded
 
         Dim label = If(String.IsNullOrEmpty(immat), members, $"{immat} · {members}")
 

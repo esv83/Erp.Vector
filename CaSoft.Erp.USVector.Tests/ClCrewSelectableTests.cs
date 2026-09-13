@@ -48,9 +48,13 @@ public class ClCrewSelectableTests
     public void Fenetre_anticipee_mais_service_deja_cloture_non_selectionnable()
         => Crew(Now.AddMinutes(10), serviceEnded: true).IsSelectableAt(Now).Should().BeFalse();
 
+    /// <summary>
+    /// Incident du 2026-09-13 : Orders pose une fin THÉORIQUE (début + 10 h) dès la création de la
+    /// vacation. Un équipage qui la dépasse est encore en service — seul le statut clôturé l'exclut.
+    /// </summary>
     [Fact]
-    public void Fin_de_service_passee_non_selectionnable()
-        => Crew(Now.AddHours(-4), end: Now.AddHours(-1)).IsSelectableAt(Now).Should().BeFalse();
+    public void Fin_de_service_depassee_mais_vacation_ouverte_reste_selectionnable()
+        => Crew(Now.AddHours(-4), end: Now.AddHours(-1)).IsSelectableAt(Now).Should().BeTrue();
 
     [Fact]
     public void Service_declare_termine_non_selectionnable()
