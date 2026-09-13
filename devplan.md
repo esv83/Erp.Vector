@@ -5,8 +5,7 @@
 > dans [`delivered.md`](delivered.md).
 >
 > **Prod** : `\\192.168.1.112\prod_api\Vector.Api` (IIS `/vector`) · **Dépôt** :
-> `github.com/esv83/Erp.Vector` (`USVector.sln`) · **106 tests verts** (2026-09-13, branche
-> `claude/a5-a6-retrait` : 112 − 7 tests de l'overlay + 1).
+> `github.com/esv83/Erp.Vector` (`USVector.sln`) · **106 tests verts** (2026-09-13).
 > **Régénéré le** 2026-09-13 (compact devplan).
 >
 > **Règle de travail** : on code neutre ou additif, jamais de rupture du contrat consommé par l'app
@@ -26,8 +25,7 @@
 
 | # | Action | Pourquoi maintenant |
 |---|---|---|
-| 1 | **Fusionner `claude/a5-a6-retrait` et déployer** (A5, A6) | Débloque le `DROP` des tables d'attributs (A6 étape 3) ; les routes mortes passent de 500 à 404. |
-| 2 | **Transmettre les deux notes au dev web** : [carte mutuelle](note_web_alexandre_carte_mutuelle.md) (§F1) et [routes retirées](note_web_alexandre_routes_retirees.md) (A5) | Les routes mutuelle sont en service ; tant que l'écran ne les appelle pas, aucune carte n'arrive. |
+| 1 | **Transmettre les deux notes au dev web** : [carte mutuelle](note_web_alexandre_carte_mutuelle.md) (§F1) et [routes retirées](note_web_alexandre_routes_retirees.md) | Les routes mutuelle sont en service ; tant que l'écran ne les appelle pas, aucune carte n'arrive. Les routes retirées répondent déjà 404 en production. |
 
 ---
 
@@ -35,7 +33,7 @@
 
 | Chapitre | Nature | Attaquable maintenant ? |
 |---|---|---|
-| **A** — Contexte de mission | suites de la bascule vers Order | **A5, A6 oui** ; A3 en attente du dev web |
+| **A** — Contexte de mission | suites de la bascule vers Order | A3 en attente du dev web |
 | **B** — Dépendances amont Orders | rien à coder ici : suivre, réclamer | — |
 | **C** — Identité & authentification | sécurité, chaîne de connexion | oui (C2, C3) ; C1 sur décision |
 | **D** — Robustesse des appels sortants | plomberie HTTP | **oui, isolé** |
@@ -70,37 +68,6 @@ L'API envoie déjà l'information ; c'est l'affichage qui manque.
 
 Demandé au dev web le 26/08. **Fin** : les deux constatés sur l'app.
 
-### A5 — 🟡 Retirer du contrat les routes adossées à des stubs — *codé, à déployer*
-
-**Décidé le 2026-09-13** : on retire plutôt que d'implémenter (`MOB-14` abandonné). **Codé sur la
-branche `claude/a5-a6-retrait`** : `ContactController`, `MecanicLogController`, `AnalyzeController`,
-`NotImplementedStubs.cs`, les trois ports, les cas d'usage `MechanicLog` et leurs orphelins (types
-de log, `ModDataList`, `ClConstraintType`). S'y ajoute `ReferenceDataController` (listes codées en
-dur de la main courante, seules routes qui répondaient 200). Les deux mappings de la timeline,
-rangés par erreur dans le module mécanique, sont déplacés dans `Time/Model/ModJobTimeMapping.vb`.
-
-**Reste** : fusionner et déployer ; transmettre
-[`note_web_alexandre_routes_retirees.md`](note_web_alexandre_routes_retirees.md).
-**Fin** : routes à 404 en production, note transmise.
-
-### A6 — 🟡 Supprimer le magasin d'attributs Vector (`OC-8`) — *lecture retirée, à déployer*
-
-Plus rien ne le retient : abandon pur tranché le 26/08, et **la facturation n'a plus besoin des
-attributs saisis avant le 25/08** (13/09). Les valeurs en vigueur viennent d'Order.
-
-**Ordre imposé** — tant que la production lit ces tables, jouer le script casserait le transfert.
-
-1. ✅ **Lecture retirée** sur la branche `claude/a5-a6-retrait` : `FieldAttributesReader`,
-   `JobAttributeOverlayRepository`, les ports `IFieldAttributesReader` / `IJobAttributeOverlay`, leur
-   enregistrement, les six entités et leur mapping dans `MobileDbContext`, 7 tests. `FieldDataReader`
-   sert `attributes: null`, figé par un test. Sans effet côté facturation : sa lecture tolère déjà le
-   `null` (`ModTraductionAttributs.vb:229`).
-2. **Déployer**, puis tirer un paquet `field-data` en production.
-3. **Jouer** [`MOB_008_DropContractOverlay.sql`](CaSoft.Erp.USVector.Infrastructure/Sql/MOB_008_DropContractOverlay.sql)
-   (`MOB_JOB_ATTRIBUTE_VALUE`, `MOB_JOB_CONTRACT`, catalogue `MOB_CONTRACT_*`) — **destructif**, compte
-   db_owner, sauvegarde préalable.
-
-**Fin** : tables supprimées, paquet terrain servi sans erreur.
 
 ---
 
@@ -228,7 +195,7 @@ par carte. Rappel `M7` : même validés, ces champs n'alimentent pas `C54`.
 
 ### F3 — ⏳ Deux chantiers hérités, autonomes
 
-*(`MOB-14`, logs mécaniques, abandonné le 2026-09-13 : ses routes sortent du contrat, cf. A5.)*
+*(`MOB-14`, logs mécaniques, abandonné le 2026-09-13 : ses routes sont retirées du contrat, cf. [`delivered.md`](delivered.md).)*
 
 | Réf | Objet | Ce qui reste |
 |---|---|---|

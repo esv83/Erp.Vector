@@ -1,7 +1,7 @@
 # Livré — Vector (module terrain ambulanciers)
 
-> **Mis à jour le** 2026-09-13 · **En production** : `a6c2aba` (`main`), publié le 2026-09-13 à 15:05,
-> vérifié par sourcelink à 15:09.
+> **Mis à jour le** 2026-09-13 · **En production** : `0122b7a` (`main`), publié le 2026-09-13 à 15:43,
+> vérifié par sourcelink.
 >
 > Ce document porte **ce qui est livré** : ce que le module fait, le journal daté des livraisons,
 > les décisions appliquées, la configuration qui a déjà cassé la production, les pistes retirées.
@@ -108,6 +108,25 @@ depuis `main`** (`a6c2aba`, fusion de `e942967`), vérifiée par sourcelink à 1
 - Plan mutuelle recalé : `M7` (facturation : la carte ne va jamais en `C54`), `M8` (capture par
   mission), `M9` (route image anonyme jusqu'à P4) ; écart `T2` de la traçabilité levé.
 - ⚠️ Publiée **avant** le commit (§8).
+
+## 2026-09-13 — Routes mortes retirées du contrat, magasin d'attributs supprimé (A5, A6)
+
+*En production — `0122b7a` (`main`), publié à 15:43, vérifié par sourcelink, Swagger et paquets
+terrain dans la foulée.*
+
+- **A5** — `ContactController`, `MecanicLogController`, `AnalyzeController` (toutes leurs routes
+  répondaient 500) et `ReferenceDataController` (listes codées en dur de la main courante) retirés,
+  avec les stubs, trois ports, les cas d'usage `MechanicLog` et leurs orphelins. `MOB-14` abandonné.
+  **Constaté** : aucune de ces routes dans le Swagger de production (29 routes servies).
+- Les mappings de la timeline, rangés par erreur dans le module mécanique, déplacés dans
+  `Time/Model/ModJobTimeMapping.vb` — la compilation l'a révélé.
+- **A6** — lecture de l'overlay d'attributs retirée (lecteur, repository, ports, six entités EF).
+  **Constaté** sur 5 missions récentes : `field-data` répond 200 avec `Attributes: null`, timeline,
+  signature, mutuelle et documents présents.
+- **`MOB_008` joué** en production le 2026-09-13 : les six tables de l'overlay sont supprimées,
+  confirmé en base par l'exploitant (le poste de dev n'y a pas accès, compte `ErpAccount` refusé).
+- 106 tests verts (112 − 7 tests de l'overlay + 1). Note au dev web écrite :
+  [`note_web_alexandre_routes_retirees.md`](note_web_alexandre_routes_retirees.md).
 
 ## 2026-09-13 — L'écran affiche les refus du contexte de mission (A1)
 
@@ -329,6 +348,7 @@ depuis `main`** (`a6c2aba`, fusion de `e942967`), vérifiée par sourcelink à 1
 | Orders | `063` | `OCT_FIELD_OVERRIDABLE` | joué 2026-08-25 sur `109` et `118` — *ne pas rejouer `062`* |
 | Vector | `MOB_001` → `MOB_006` | session/timeline/signature · catalogue contrat + overlay · carte mutuelle · anomalies · documents · file de projection | appliqués (13 tables vérifiées le 2026-08-24) |
 | Vector | `MOB_007` | libellé `ART80` → « Article 80 » | appliqué |
+| Vector | `MOB_008` | suppression de l'overlay d'attributs (`MOB_CONTRACT_*`, `MOB_JOB_CONTRACT`, `MOB_JOB_ATTRIBUTE_VALUE`) | joué le 2026-09-13, confirmé en base |
 
 ---
 
