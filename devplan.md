@@ -5,7 +5,7 @@
 > dans [`delivered.md`](delivered.md).
 >
 > **Prod** : `\\192.168.1.112\prod_api\Vector.Api` (IIS `/vector`) · **Dépôt** :
-> `github.com/esv83/Erp.Vector` (`USVector.sln`) · **114 tests verts** (2026-09-13).
+> `github.com/esv83/Erp.Vector` (`USVector.sln`) · **117 tests verts** (2026-09-13).
 > **Régénéré le** 2026-09-13 (compact devplan).
 >
 > **Règle de travail** : on code neutre ou additif, jamais de rupture du contrat consommé par l'app
@@ -25,7 +25,7 @@
 
 | # | Action | Pourquoi maintenant |
 |---|---|---|
-| 1 | **Déployer `main`** (messages du sélecteur, §C3) | La publication du 13/09 après `8a0da0b` n'est pas arrivée : la production tourne toujours `0122b7a` (vérifié à 16:19). |
+| 1 | **Déployer `main`** (messages du sélecteur §C3, abandon des missions inconnues d'Orders §G9) | La publication du 13/09 après `8a0da0b` n'est pas arrivée : la production tourne toujours `0122b7a` (vérifié à 16:19). |
 | 2 | **Transmettre au dev web** : [carte mutuelle](note_web_alexandre_carte_mutuelle.md) (§F1), [routes retirées](note_web_alexandre_routes_retirees.md), [sélecteur d'équipage](docs/ui-web/UI_selection-equipage-multi-crew.md) (bouton *Réessayer*, §C3) | Les routes mutuelle sont en service ; tant que l'écran ne les appelle pas, aucune carte n'arrive. |
 
 ---
@@ -296,19 +296,22 @@ visible — ou impossible.
 
 ---
 
-### G9 — ⏳ La file de projection relance sans fin une mission inconnue d'Orders
+### G9 — 🟡 La file de projection relance sans fin une mission inconnue d'Orders — *codé, à déployer*
 
 **Constaté le 2026-09-13** dans les journaux rétablis : `PUT missions/745c9f76-…/operational` répond
-**404** chez Orders, et `OperationalOutboxDispatcher` en est à la **tentative n° 55 414** — relance
-toutes les 60 s (plafond du backoff) depuis début août environ. Une seule mission concernée.
+**404**, et `OperationalOutboxDispatcher` en est à la **tentative n° 55 414** — une relance par minute
+depuis début août environ. Orders confirme : la mission **n'existe pas** (404 aussi en lecture).
 
-**Pourquoi** : le worker ne retire une entrée que si elle est livrée, ou si la mission a disparu de
-la base **Vector** (`OperationalOutboxDispatcher.cs:71`). Un 404 **d'Orders** — mission supprimée ou
-jamais connue côté ERP — est traité comme une panne passagère : il ne se résorbe jamais.
+**Cause** : le client levait la même exception pour un 404 que pour une panne, et le worker relançait
+tout échec jusqu'au succès.
 
-**Contenu** : distinguer l'échec définitif (404) de l'échec passager — abandonner l'entrée en
-journalisant un `WARN` explicite, plutôt que relancer. Vérifier d'abord chez Orders ce qu'est devenue
-cette mission. **Fin** : aucune entrée de la file au-delà d'un seuil de tentatives.
+**Codé le 2026-09-13** : `ProjectOperationalAsync` renvoie `EnOperationalProjectionOutcome`
+(`Applied` / `MissionNotFound`), sur le modèle de l'écriture du context ; sur `MissionNotFound`, le
+worker **abandonne l'entrée** avec un `WARN` explicite. Les pannes (5xx, réseau) gardent le backoff :
+**pas de plafond de tentatives**, pour ne perdre aucun jalon pendant une longue panne d'Orders.
+3 tests (livrée, abandonnée, relancée).
+
+**Reste** : déployer, puis constater dans les journaux l'abandon de `745c9f76` et la fin des relances.
 
 ## H. ⚪ Différé (V2 / hors MVP)
 

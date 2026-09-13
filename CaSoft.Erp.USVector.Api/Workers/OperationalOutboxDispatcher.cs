@@ -11,7 +11,8 @@ namespace CaSoft.Erp.USVector.Api.Workers;
 /// Dispatcher de l'Outbox de projection opérationnelle → synchro régulation GARANTIE.
 /// Poll périodique : pour chaque mission dont le délai de debounce est écoulé, projette l'état
 /// <b>consolidé</b> (MOB_MISSION_STATE) vers Orders.Api (<c>PUT missions/{id}/operational</c>).
-/// Succès → l'entrée est supprimée. Échec → relance avec backoff (aucune perte).
+/// Succès → l'entrée est supprimée. Panne → relance avec backoff (aucune perte). Mission inconnue
+/// d'Orders (404) → l'entrée est abandonnée : c'est définitif, relancer ne sert à rien.
 /// Le debounce (repousser <c>OOB_DISPATCH_AFTER</c> à chaque changement) est fait côté écriture
 /// (<see cref="Repositories.Mobile.JobTimeRepository"/>) : ici on ne traite que les entrées dues.
 /// </summary>
@@ -48,7 +49,8 @@ public sealed class OperationalOutboxDispatcher : BackgroundService
         }
     }
 
-    private async Task DispatchDueAsync(CancellationToken ct)
+    /// <summary>Un cycle : traite les entrées dues. <c>internal</c> pour être testé sans attendre le poll.</summary>
+    internal async Task DispatchDueAsync(CancellationToken ct)
     {
         using var scope = _scopeFactory.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<MobileDbContext>();
@@ -75,13 +77,23 @@ public sealed class OperationalOutboxDispatcher : BackgroundService
             try
             {
                 // État consolidé courant (jalons null inclus → l'effacement/annulation est propagé).
-                await erpWrite.ProjectOperationalAsync(
+                var outcome = await erpWrite.ProjectOperationalAsync(
                     ob.OOB_MISSION_ID,
                     mst.MST_ACK_AT, mst.MST_READ_AT, mst.MST_GO_AT,
                     mst.MST_ONSITE_AT, mst.MST_TERMINATED_AT,
                     sourceCrewId: null, ct);
 
-                ctx.OperationalOutbox.Remove(ob);   // livré → retiré de l'outbox
+                if (outcome == EnOperationalProjectionOutcome.MissionNotFound)
+                {
+                    // Définitif : la mission n'existe pas (ou plus) chez Orders. La relancer ne la fera pas
+                    // réapparaître — une seule entrée a tourné 55 414 fois avant ce correctif (2026-09-13).
+                    _logger.LogWarning(
+                        "Projection outbox mission {MissionId} abandonnée : mission introuvable chez Orders.Api (404) " +
+                        "après {Attempts} tentative(s). Les jalons terrain de cette mission ne seront pas projetés.",
+                        ob.OOB_MISSION_ID, ob.OOB_ATTEMPTS + 1);
+                }
+
+                ctx.OperationalOutbox.Remove(ob);   // livré, ou abandonné → retiré de l'outbox
             }
             catch (Exception ex)
             {
