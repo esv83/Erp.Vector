@@ -1,6 +1,6 @@
 # Livré — Vector (module terrain ambulanciers)
 
-> **Mis à jour le** 2026-09-13 · **En production** : `0122b7a` (`main`), publié le 2026-09-13 à 15:43,
+> **Mis à jour le** 2026-09-13 · **En production** : `8193fbf` (`main`), publié le 2026-09-13 à 16:54,
 > vérifié par sourcelink.
 >
 > Ce document porte **ce qui est livré** : ce que le module fait, le journal daté des livraisons,
@@ -108,6 +108,25 @@ depuis `main`** (`a6c2aba`, fusion de `e942967`), vérifiée par sourcelink à 1
 - Plan mutuelle recalé : `M7` (facturation : la carte ne va jamais en `C54`), `M8` (capture par
   mission), `M9` (route image anonyme jusqu'à P4) ; écart `T2` de la traçabilité levé.
 - ⚠️ Publiée **avant** le commit (§8).
+
+## 2026-09-13 — Le sélecteur dit quoi faire, la file de projection cesse de s'acharner (C3, G9)
+
+*En production — `8193fbf` (`main`), publié à 16:54, vérifié par sourcelink, chaînes des DLL et
+journal du redémarrage.*
+
+- **C3 — le 404 du sélecteur dit quoi faire.** Équipage pas encore composé : « Votre équipage n'est
+  pas encore composé par la régulation. Réessayez dans quelques minutes ; si rien ne change, appelez
+  la régulation. » Équipage composé mais hors fenêtre — ce 404 partait **sans corps** : il annonce
+  l'heure d'ouverture de l'accès (« Votre service commence à 14:00 : vos missions seront accessibles à
+  partir de 13:30 »), la clôture, ou la vacation expirée. Motif calculé par
+  `ClCrew.UnselectableReasonAt`, seule source de la règle. Même code 404, texte seul (D14).
+  **Constaté** : nouveaux textes présents dans les DLL, ancien absent.
+- **G9 — une mission inconnue d'Orders est abandonnée.** `ProjectOperationalAsync` distingue le 404
+  (`EnOperationalProjectionOutcome.MissionNotFound`) d'une panne ; le worker retire l'entrée avec un
+  `WARN`, les pannes gardent le backoff sans plafond. **Constaté** : au redémarrage (16:54:51), la
+  mission `745c9f76` est abandonnée deux secondes plus tard, **après 55 450 tentatives** ; 0 relance
+  et 0 erreur ensuite.
+- 117 tests verts (106 + 8 sélecteur + 3 outbox).
 
 ## 2026-09-13 — Les journaux de production reprennent (G9)
 

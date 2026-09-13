@@ -25,8 +25,7 @@
 
 | # | Action | Pourquoi maintenant |
 |---|---|---|
-| 1 | **Déployer `main`** (messages du sélecteur §C3, abandon des missions inconnues d'Orders §G9) | La publication du 13/09 après `8a0da0b` n'est pas arrivée : la production tourne toujours `0122b7a` (vérifié à 16:19). |
-| 2 | **Transmettre au dev web** : [carte mutuelle](note_web_alexandre_carte_mutuelle.md) (§F1), [routes retirées](note_web_alexandre_routes_retirees.md), [sélecteur d'équipage](docs/ui-web/UI_selection-equipage-multi-crew.md) (bouton *Réessayer*, §C3) | Les routes mutuelle sont en service ; tant que l'écran ne les appelle pas, aucune carte n'arrive. |
+| 1 | **Transmettre au dev web** : [carte mutuelle](note_web_alexandre_carte_mutuelle.md) (§F1), [routes retirées](note_web_alexandre_routes_retirees.md), [sélecteur d'équipage](docs/ui-web/UI_selection-equipage-multi-crew.md) (bouton *Réessayer*, §C3) | Les routes mutuelle sont en service ; tant que l'écran ne les appelle pas, aucune carte n'arrive. |
 
 ---
 
@@ -129,15 +128,9 @@ du 04/07 au 24/08 : 24 cas, 21 équipages, délai médian de **23 min** entre la
 composition, 9 cas au-delà d'une heure. Quand l'équipage entier est composé en retard, **les deux
 membres échouent ensemble** — d'où l'impression d'un « second membre » bloqué.
 
-1. 🟡 **Le message terrain — décidé et codé le 2026-09-13, à déployer.** Le 404 de
-   `CrewController.Mine` dit désormais « Votre équipage n'est pas encore composé par la régulation.
-   Réessayez dans quelques minutes ; si rien ne change, appelez la régulation. » Même code, texte
-   seul (D14). **Reste** : déployer ; faire ajouter le bouton *Réessayer* côté écran (contrat mis à
-   jour : [`docs/ui-web/UI_selection-equipage-multi-crew.md`](docs/ui-web/UI_selection-equipage-multi-crew.md)).
-   Le 404 **hors fenêtre** — équipage composé mais pas encore ouvert, clôturé ou expiré — porte lui
-   aussi un message qui dit ce qui bloque (« Votre service commence à 14:00 : vos missions seront
-   accessibles à partir de 13:30 », etc.) : motif calculé par `ClCrew.UnselectableReasonAt`, renvoyé
-   par `CrewController.Mine` sans toucher `ToActionResult`, 8 tests.
+1. ⏳ **Le bouton *Réessayer* côté écran.** Les messages du 404 sont en service depuis le 2026-09-13
+   ([`delivered.md`](delivered.md)) ; reste à faire ajouter le bouton par le dev web (contrat :
+   [`docs/ui-web/UI_selection-equipage-multi-crew.md`](docs/ui-web/UI_selection-equipage-multi-crew.md)).
 2. ⛔ **L'organisation de la régulation — à trancher.** Composer les équipages avant la prise de
    service — sans quoi l'accès anticipé de 30 min (CREW-1) ne sert à rien pour ces équipages.
 
@@ -295,23 +288,6 @@ publier un arbre non commité**.
 visible — ou impossible.
 
 ---
-
-### G9 — 🟡 La file de projection relance sans fin une mission inconnue d'Orders — *codé, à déployer*
-
-**Constaté le 2026-09-13** dans les journaux rétablis : `PUT missions/745c9f76-…/operational` répond
-**404**, et `OperationalOutboxDispatcher` en est à la **tentative n° 55 414** — une relance par minute
-depuis début août environ. Orders confirme : la mission **n'existe pas** (404 aussi en lecture).
-
-**Cause** : le client levait la même exception pour un 404 que pour une panne, et le worker relançait
-tout échec jusqu'au succès.
-
-**Codé le 2026-09-13** : `ProjectOperationalAsync` renvoie `EnOperationalProjectionOutcome`
-(`Applied` / `MissionNotFound`), sur le modèle de l'écriture du context ; sur `MissionNotFound`, le
-worker **abandonne l'entrée** avec un `WARN` explicite. Les pannes (5xx, réseau) gardent le backoff :
-**pas de plafond de tentatives**, pour ne perdre aucun jalon pendant une longue panne d'Orders.
-3 tests (livrée, abandonnée, relancée).
-
-**Reste** : déployer, puis constater dans les journaux l'abandon de `745c9f76` et la fin des relances.
 
 ## H. ⚪ Différé (V2 / hors MVP)
 
