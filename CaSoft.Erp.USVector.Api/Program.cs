@@ -252,6 +252,8 @@ builder.Services.AddScoped<ICrewRepository, CaSoft.Erp.USVector.Infrastructure.R
 builder.Services.AddScoped<IJobRepository, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.JobRepository>();
 // OC-3a : verrou + provenance du context de la mission, lus sur Orders.Api (lecture seule).
 builder.Services.AddScoped<IContextOrderStateQueryService, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.ContextOrderStateQueryService>();
+// Carte mutuelle par mission : le patient est résolu sur Orders.Api, le terrain ne connaissant que la mission.
+builder.Services.AddScoped<IMissionBeneficiaryQueryService, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.MissionBeneficiaryQueryService>();
 // OC-4 : relais de la sélection terrain vers Orders.Api. Branché sur POST api/Contract dès que le
 // drapeau OC-3b est armé ; traduit l'id par code tant qu'il ne l'est pas.
 builder.Services.AddScoped<IContextOrderSelectionService, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.ContextOrderSelectionService>();
