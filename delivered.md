@@ -378,6 +378,12 @@ terrain dans la foulée.*
 - **A5** *(2026-09-13)* — Les routes adossées à des stubs (recherche et modification de bénéficiaire,
   main courante mécanicien et ses analyses) **sortent du contrat mobile** plutôt que d'être
   implémentées. Elles répondaient 500 ; `MOB-14` est abandonné sous sa forme mobile.
+- **C1** *(2026-09-13)* — **Vector n'héberge ni ne duplique l'écran de rattachement des comptes.**
+  L'écran existe dans Employee et écrit dans le carnet d'Identity ; Vector attend la **bascule
+  d'Orders** sur ce carnet (Identity itération 7, Orders itération 24), elle-même bloquée par la RH
+  (273 personnels actifs d'Orders sans fiche Employee). Ni lecture de repli du carnet depuis Vector
+  (lien `EMP_EMPLOYEE.PersonnelId` vide, 273 absents non couverts), ni écran côté Orders (troisième
+  chemin d'écriture). **Consigne transitoire** : rattacher aussi l'ambulancier côté Orders.
 - **A0** *(2026-09-13)* — Quand le terrain remplace un type de mission proposé par la régulation, la
   proposition est **perdue** (écrasement en place, aucune trace). **Perte assumée** : aucun audit à
   construire, ni côté Vector ni côté Order.
@@ -473,6 +479,7 @@ depuis un arbre modifié annonce un commit qui ne contient pas le code servi (§
 | **Arbitrages** 4a/4b · 2a/2b/2c · « défaut = premier contexte actif » | **4a**, **2b**, **supprimé**. |
 | **A4 tel que planifié** (attributs du paquet lus chez Order) | Mauvaise cible, cf. §4.2. |
 | **Écran Siège `UcEmployeeKeycloakAccount`** comme hôte du mapping Keycloak | Siège archivé ; la correspondance passe à Identity. |
+| **Choisir l'hôte d'un écran de rattachement** (ex-C1 : Identity ou endpoints Orders) | Sans objet le 2026-09-13 : l'écran existe dans Employee et écrit dans le carnet d'Identity. Vector attend la bascule d'Orders sur ce carnet (§4.2). |
 | **Historique de portage legacy** et dettes C4, C5, C6, KC-1, DEP-2, DET-1, DET-2, DET-3 | Résolues ; l'information vit dans `git log`. |
 | **Result pattern, vague 2** (G1 du devplan) | Livrée le 2026-07-05 ; le plan ne l'avait pas enregistré. |
 | **`MOB-14` — logs mécaniques et analyses** (tables `MOB_MECANIQUE_*`, référentiels, repositories) | Abandonné le 2026-09-13 avec A5 : les routes sortent du contrat mobile au lieu d'être implémentées. |
