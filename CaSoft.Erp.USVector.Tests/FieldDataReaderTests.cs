@@ -68,23 +68,6 @@ public class FieldDataReaderTests
         public HashSet<Guid> ExistingFor(IEnumerable<Guid> ids) => new();
     }
 
-    private sealed class FakeOverlay : IJobAttributeOverlay
-    {
-        public ClContractType BuildContractType(Guid missionId, IDictionary<string, IEnumerable<string>> baselines)
-        {
-            var attrs = new ClAttributCollection();
-            var a = new ClContractAttribut(1) { Name = "COMMENTS", Value = "RAS" };
-            var empty = new ClContractAttribut(2) { Name = "REFERENCE", Value = null };
-            attrs.Add(a.Name, a);
-            attrs.Add(empty.Name, empty);
-            return new ClContractType(5, "STANDARD", attrs);
-        }
-        public void Save(Guid m, ClContractType c, IDictionary<string, IEnumerable<string>> b) { }
-        public IReadOnlyList<ClContractType> GetContracts() => new List<ClContractType>();
-        public int? GetSelectedContractId(Guid m) => null;
-        public void SelectContract(Guid m, int c) { }
-    }
-
     private sealed class FakeMutuelle : IMutuelleCardRepository
     {
         public ClMutuelleCard? Current;
@@ -131,7 +114,6 @@ public class FieldDataReaderTests
             new FakeErp(),
             new FakeJobTime(time),
             new FakeSignature { DoesExist = true, SignedAt = signed },
-            new FieldAttributesReader(new FakeOverlay()),
             new FakeMutuelle { Current = new ClMutuelleCard { Id = Guid.NewGuid(), BeneficiaryId = Ben, CapturedAt = go, AmcCode = "AMC1" } },
             docs,
             anomalies);
@@ -144,12 +126,31 @@ public class FieldDataReaderTests
         result.Timeline.GoAt.Should().Be(go);
         result.Signature.Exists.Should().BeTrue();
         result.Signature.SignedAt.Should().Be(signed);
-        result.Attributes.ContractDisplay.Should().Be("STANDARD");
-        result.Attributes.Values.Should().ContainSingle(v => v.Name == "COMMENTS" && v.Value == "RAS"); // attribut vide écarté
         result.Mutuelle!.AmcCode.Should().Be("AMC1");
         result.Documents.Should().HaveCount(1);
         result.Anomalies.Should().HaveCount(1);
         result.UpdatedAt.Should().Be(docAt); // max de tous les horodatages
+    }
+
+    /// <summary>
+    /// OC-8 — le magasin d'attributs Vector est retiré : le bloc part toujours à null. La facturation
+    /// lit les attributs chez Order et tolère ce null ; le paquet ne doit pas en inventer.
+    /// </summary>
+    [Fact]
+    public async Task Le_bloc_attributs_part_toujours_a_null()
+    {
+        using var ctx = NewContext();
+        var sut = new FieldDataReader(
+            new FakeErp(),
+            new FakeJobTime(null),
+            new FakeSignature(),
+            new FakeMutuelle(),
+            new DocumentRepository(ctx),
+            new AnomalyRepository(ctx));
+
+        var result = await sut.GetAsync(Mission, CancellationToken.None);
+
+        result.Attributes.Should().BeNull();
     }
 
     [Fact]
@@ -160,7 +161,6 @@ public class FieldDataReaderTests
             new FakeErp { MissionExists = false },
             new FakeJobTime(null),
             new FakeSignature(),
-            new FieldAttributesReader(new FakeOverlay()),
             new FakeMutuelle(),
             new DocumentRepository(ctx),
             new AnomalyRepository(ctx));

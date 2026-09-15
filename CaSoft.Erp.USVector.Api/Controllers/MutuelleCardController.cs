@@ -15,8 +15,53 @@ namespace CaSoft.Erp.USVector.Api.Controllers
     public class MutuelleCardController : Controller
     {
         private readonly IMutuelleCardRepository _repository;
+        private readonly IMissionBeneficiaryQueryService _beneficiaries;
 
-        public MutuelleCardController(IMutuelleCardRepository repository) => _repository = repository;
+        public MutuelleCardController(IMutuelleCardRepository repository, IMissionBeneficiaryQueryService beneficiaries)
+        {
+            _repository = repository;
+            _beneficiaries = beneficiaries;
+        }
+
+        /// <summary>
+        /// Dépose une photo de carte mutuelle depuis une mission (champ de formulaire <c>file</c>).
+        /// Le patient est résolu côté serveur (mission → commande → bénéficiaire), la mission tracée
+        /// d'office. 404 si la mission est introuvable ou sans patient.
+        /// </summary>
+        /// <remarks>
+        /// Route à utiliser par l'app : elle n'a jamais reçu l'identifiant du patient, ce qui rendait
+        /// la route par bénéficiaire inatteignable (aucune carte capturée en production au 27/08/2026).
+        /// </remarks>
+        [HttpPost("missions/{missionId:guid}/mutuelle-card")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadForMission(
+            Guid missionId,
+            [FromForm] UploadMutuelleCardForm form,
+            [FromQuery] Guid? crewId,
+            CancellationToken ct)
+        {
+            var file = form.File;
+            if (file is null || file.Length == 0)
+                return BadRequest("Fichier image manquant.");
+
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms, ct);
+
+            var command = new ClUploadMissionMutuelleCardCommand(missionId, ms.ToArray(), file.ContentType, crewId);
+            var result = await new ClUploadMissionMutuelleCardUseCase(command, _beneficiaries, _repository).HandleAsync(ct);
+            return result.ToActionResult();
+        }
+
+        /// <summary>
+        /// Carte courante du patient de la mission (sans le binaire). 404 si la mission n'a pas de
+        /// patient ou si le patient n'a encore aucune carte — cas normal au premier transport.
+        /// </summary>
+        [HttpGet("missions/{missionId:guid}/mutuelle-card")]
+        public async Task<IActionResult> GetCurrentForMission(Guid missionId, CancellationToken ct)
+        {
+            var result = await new ClGetMissionMutuelleCardUseCase(missionId, _beneficiaries, _repository).HandleAsync(ct);
+            return result.ToActionResult();
+        }
 
         /// <summary>
         /// Corps multipart du dépôt de carte mutuelle. L'<see cref="IFormFile"/> est porté par un

@@ -16,6 +16,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Cycle du worker d'outbox testé sans attendre le poll (OperationalOutboxDispatcher.DispatchDueAsync). -->
+    <InternalsVisibleTo Include="CaSoft.Erp.USVector.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
     <PackageReference Include="NLog.Web.AspNetCore" Version="5.4.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />

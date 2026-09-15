@@ -1,1344 +1,375 @@
 # 📱 devplan — Vector (module terrain ambulanciers)
 
-> **Plan unique du module.** Il sert à trois choses : savoir **ce que le module fait**, savoir **ce
-> qui reste**, et **ne pas rejouer les décisions déjà tranchées**.
+> **Ne porte que les sujets ouverts** : en attente, bloqué, envisagé, décidé mais pas fait. Ce que le
+> module fait, le journal daté, les décisions appliquées, la configuration et les pistes retirées sont
+> dans [`delivered.md`](delivered.md).
 >
-> **§1 se lit sans connaître le code.** **§3 est écrit pour celui qui va coder** : un chapitre = une
-> nature de travail, une étape = une unité livrable avec son état, son préalable et son critère de
-> fin. Une fonctionnalité livrée quitte §3 et enrichit §1 ; une piste abandonnée va au **§6** avec son
-> motif, pour ne pas être ré-instruite.
+> **Prod** : `\\192.168.1.112\prod_api\Vector.Api` (IIS `/vector`) · **Dépôt** :
+> `github.com/esv83/Erp.Vector` (`USVector.sln`) · **137 tests verts** (2026-09-13).
+> **Régénéré le** 2026-09-13 (compact devplan).
 >
-> **Statut** : 🟡 en service, chantiers en cours.
->
-> **Ce qui est livré et tourne en production.** La boucle ambulancier complète — login Keycloak,
-> plan de travail, avancement des missions, dossier terrain — à l'exception du rattachement du
-> compte, resté un `INSERT` manuel (§3.C1). La chaîne terrain → facturation, livrée **et
-> consommée** : 284 missions acquises le 2026-08-06. Le référentiel de contexte, basculé côté Order
-> le 2026-08-25 et à **chemin unique** depuis le 2026-08-27 — le second chemin et ses drapeaux sont
-> retirés (§3.A1). Le verrou par valeur et son motif affichable, déployés le 2026-08-26 (§3.A3). La
-> carte mutuelle : écran de capture en production depuis le 2026-08-26, et deux routes de
-> consultation ouvertes à Order et à la facturation (§3.F1).
->
-> **Reste à faire — et ce que cela attend.** Presque rien de ce qui suit n'est du code Vector
-> arrêté faute de temps : c'est ce que le module attend d'ailleurs, et de qui.
->
-> - ⚠️ **Le dev web** — afficher le motif des refus. L'API le renvoie depuis le 2026-08-26 ; tant
->   que l'UI l'avale, l'ambulancier voit sa saisie disparaître sans explication. **Dernier maillon
->   de la bascule**, et il n'est pas dans ce dépôt (§1.8, §3.A3).
-> - ⛔ **Le paramétrage métier, côté Orders** — la matrice d'applicabilité des types (§3.B9) et les
->   attributs définis mais rattachés à aucune mission (§3.B10) : le commentaire libre, les
->   téléphones et les e-mails ont disparu du terrain. Les deux seuls points qui **dégradent la
->   saisie aujourd'hui**.
-> - ⏳ **Du code dans `Erp.Order`** — le repli sur le snapshot, sans quoi ~3 883 étapes de mission
->   s'affichent vides (§3.B2), et la chaîne équipage du 2ᵉ membre, où sur un équipage à
->   deux un seul accède à ses missions (diagnostic prêt côté Vector : §3.B3, §3.C3).
-> - ⏳ **La facturation** — jusqu'à quand servir l'historique d'avant la bascule, seul verrou qui
->   reste sur `MOB_008` (§3.A6) ; le kilométrage, qu'elle attend pour armer son contrôle (§3.E1) ;
->   et le sort du palier `Billed`, aujourd'hui sans écrivain (§3.E4).
-> - ⛔ **Une décision interne** — où vit l'écran de rattachement Keycloak (§3.C1). Seul maillon
->   manuel de la chaîne, et le seul dont l'oubli prive un ambulancier de toutes ses missions.
->
-> **Ce qui n'attend personne** et s'attaque aujourd'hui, dans l'ordre qu'on veut : le sortant de
-> `DEC-6` (§3.C2, `DEC6-S0..S4`), `DEC-7` (§3.D), les horodatages (§3.E2), les trois chantiers
-> hérités (§3.F3) et la dette (§3.G) — à commencer par **`G9`**, qui bloque la mesure de
-> `DEC6-E1`. Les deux comptages qui restent, eux, demandent un accès serveur : voir le point de
-> reprise ci-dessus.
->
-> **Prod** : `\\192.168.1.112\prod_api\Vector.Api` (IIS `/vector`) — trafic servi, jetons Keycloak
-> réellement validés depuis le 2026-08-02.
-> **Dépôt** : `github.com/esv83/Erp.Vector` (`USVector.sln`) · **128 tests verts** (2026-08-27).
-> **Dernière mise à jour** : 2026-08-28.
-
-> **🔖 Point de reprise — 2026-08-28.** Deux fils ouverts, indépendants l'un de l'autre, aucun des
-> deux n'est du code à écrire. Ils demandent tous deux un accès que le poste de développement n'a pas.
->
-> 1. **Le remplissage de la carte mutuelle en production** (§3.F1, §1.8) — la table `MOB_MUTUELLE_CARD`
->    est vide depuis juin, la cause était dans l'API, elle est corrigée, et l'écran est en service
->    depuis le 26/08. Reste à compter. `SELECT COUNT(*), COUNT(DISTINCT MMC_BENEFICIARY_ID),
->    MIN(MMC_CAPTURED_AT), MAX(MMC_CAPTURED_AT) FROM dbo.MOB_MUTUELLE_CARD` sur
->    `192.168.1.109,1440 / BD_ERP_MOBILE_APP`. ⚠️ Le mot de passe n'est pas dans le dépôt
->    (`__SET_VIA_ENV__`) : il vit dans le `web.config` du serveur (§5.2). **Une capture datée du 26/08
->    ou après** prouve que la chaîne est débloquée et ouvre `F2` ; zéro veut dire que le blocage était
->    ailleurs — et surtout **pas** qu'il faut reconclure à un défaut d'adoption, l'erreur qui a coûté
->    deux mois.
-> 2. **`G9` — la production ne journalise plus depuis le 24/08**, découvert en cherchant le premier
->    point. Trois vérifications, sur le serveur, dans l'ordre : espace disque · journal interne de
->    NLog dans le `%TEMP%` **du pool d'applications** · droits d'écriture sur `…\Vector.Api\logs`.
->    C'est **bloquant pour `DEC6-E1`** : la sonde écrirait dans le vide, et le vide vaut conclusion.
->
-> Le code, lui, est à jour et poussé — la sonde `DEC6-E1` est écrite, testée et commitée, mais **non
-> déployée** ; c'est volontaire, tant que `G9` tient. Prochain geste de code une fois `G9` levée :
-> déployer, écrire une ligne volontairement, la relire — puis seulement lancer les 7 jours.
+> **Règle de travail** : on code neutre ou additif, jamais de rupture du contrat consommé par l'app
+> web (D14, [`delivered.md`](delivered.md) §4).
 
 | | Sens |
 |---|---|
-| 🟢 | livré, vérifié |
 | ⏳ | à faire, rien ne bloque |
+| 🟡 | engagé, reste une partie |
 | ⛔ | bloqué (décision, contenu métier, ou livrable d'un autre module) |
 | ⚪ | différé V2 |
 | ⚠️ | dette / garde-fou |
 
 ---
 
-# 1. Ce que le module fait aujourd'hui
+# 0. À faire en premier
 
-## 1.1 L'application terrain est reconnectée à l'ERP
-
-Après la perte de la base historique, l'API mobile a été reconstruite sur l'ERP **sans toucher au
-contrat consommé par le terminal** : mêmes routes, mêmes formats — l'application n'a eu qu'à être
-re-pointée. Les données de référence (missions, équipages, véhicules, personnel, patients) viennent
-de l'ERP ; tout ce qui est propre au terrain vit dans une base dédiée à Vector.
-
-Vector ne touche plus aux bases des autres modules : **il dialogue avec eux par leurs API**. Un
-chantier en cours ailleurs ne casse plus ni le build ni le déploiement de l'app mobile.
-
-## 1.2 L'ambulancier se connecte avec son compte d'entreprise
-
-Il s'authentifie avec son **compte Keycloak** ; l'application retrouve seule le ou les équipages dont
-il fait partie ce jour-là, lui fait **choisir celui qu'il occupe** quand il y en a plusieurs, et ne
-lui montre que les missions de cet équipage — celle d'un autre est refusée. Un compte non rattaché
-reçoit un message explicite l'invitant à contacter la régulation.
-
-Ses missions lui sont visibles **30 minutes avant sa prise de service**, pour qu'il prépare sa
-journée avant de démarrer sa vacation. Il ne voit que les missions **engagées** par la régulation :
-une mission simplement affectée au planning ne remonte pas au terrain.
-
-## 1.3 Il voit son plan de travail et le fait avancer
-
-- La **liste des missions du jour** : patient, mode de transport, lieux, horaires.
-- Le **détail d'une mission** : identité et coordonnées du patient, adresses de départ et d'arrivée
-  résolues, horaires, sens et fréquence, service médical destinataire. L'affichage des lieux est
-  **composé par le serveur** : l'UI rend ce qu'elle reçoit, sans règle de mise en forme.
-- Le marqueur **« mission vue »** : d'un geste il signale qu'il a pris connaissance de la mission ;
-  l'icône disparaît et la régulation voit l'heure de prise de connaissance.
-- Les **cinq jalons de progression**, horodatés au fil de la course, **annulables** — un jalon posé
-  par erreur peut être retiré, et le retour arrière remonte à la régulation.
-- La **signature du patient**, avec un indicateur de présence visible dès la liste.
-- Le **conducteur** de l'équipage, consultable et modifiable.
-
-Chaque geste est **projeté vers la régulation** en temps quasi réel : le statut de la mission s'y met
-à jour tout seul. Cette synchronisation est **garantie** — les envois en échec sont mis en attente et
-rejoués automatiquement, sans jamais bloquer la saisie de l'ambulancier.
-
-## 1.4 Il complète le dossier depuis le terrain
-
-- **Attributs de mission** : commentaires, coordonnées du patient, type de contrat et champs de
-  facturation, sous forme de **formulaire dynamique** — le jeu de champs dépend du type retenu, et
-  chaque champ dit s'il est saisissable et, sinon, **pourquoi**.
-- **Anomalies** constatées en mission : elles ne bloquent rien, elles partent avec le dossier et
-  c'est la facturation qui arbitre.
-- **Documents et photos** rattachés à la mission.
-- **Carte mutuelle** du patient — photo et saisie des informations
-  ([`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md)).
-
-Principe constant : **le terrain n'écrase jamais la donnée officielle de l'ERP.** Ces saisies sont
-une couche déclarative que la facturation relit et corrige.
-
-## 1.5 Le dossier part en facturation
-
-- Une mission **clôturée par le régulateur** devient automatiquement transférable.
-- Les modules d'aval disposent d'une **file des missions à traiter** — donc de la visibilité sur ce
-  qui reste en attente.
-- Ils récupèrent **un paquet unique et versionné** rassemblant tout l'enrichissement terrain de la
-  mission (jalons, signature, attributs, mutuelle, documents, anomalies) et tirent les **pièces
-  jointes à la demande**. **Ce paquet est réellement consommé** : la facturation l'interroge mission
-  par mission pour construire la journée transmise à AidesNSoft, et la certification des trajets
-  s'appuie sur la même file.
-- Une fois la mission transférée, **le dossier est gelé côté terrain** : toute tentative de
-  modification est refusée avec un message explicite.
-
-## 1.6 Ce qui tient tout cela debout
-
-- **Un contrat mobile préservé** malgré la reconstruction : les ajouts sont additifs, les anciens
-  champs restent servis le temps que l'UI web bascule.
-- **Une authentification à un seul point de passage**, avec cache : le chemin chaud ne refait plus
-  d'appels réseau pour retrouver l'ambulancier et son équipage.
-- **Une API fermée par défaut** : une route est protégée sauf mention contraire, et les quelques
-  sorties sont nommées, justifiées et figées par un test (§3.C2).
-- **Un refus qui se lit** : quand l'ERP refuse une saisie, le terrain reçoit **le motif**, formulé
-  pour lui (D16). Sans cela, un refus se lit comme une saisie qui ne s'enregistre pas.
-- **Un outil de diagnostic** qui rejoue la chaîne d'identité maillon par maillon, réservé au dev,
-  pour trancher une panne d'accès sans lire les logs à l'aveugle.
-- **Un code applicatif homogène** : les cas d'usage renvoient un résultat typé plutôt que d'écrire
-  dans un présentateur, ce qui rend les erreurs traduisibles en codes HTTP sans logique dans les
-  contrôleurs.
-- **Un déploiement outillé** : une commande pour la recette, une pour la production, avec
-  confirmation à taper, vérification préalable du partage réseau et contrôle que ce qui est publié
-  est bien arrivé.
-
-## 1.7 Repères de validation
-
-| Lot | Preuve |
-|---|---|
-| Socle mobile | 25 routes du contrat legacy exposées ; joblist, détail, signature, timeline validés sur missions réelles |
-| Authentification | login Keycloak bout-en-bout 2026-07-05 ; jetons réellement validés en prod 2026-08-02 ; accès anticipé 30 min en prod depuis la même date |
-| Découplage HTTP | isolation de build prouvée (reconstruction sans Orders) |
-| Result pattern, vague 1 | 31 cas d'usage migrés, parité HTTP vérifiée |
-| Terrain (attributs 11, mutuelle 16, lieux 12) | validés en base 2026-06-14 / 06-15 / 07-14 |
-| Transfert (Orders + Vector) | 24 tests ; schéma appliqué 2026-06-22 |
-| Consommation réelle du paquet terrain | mesurée le 2026-08-06 par la facturation : 284 missions acquises |
-| Contexte de mission (type, attributs, paquet terrain) | 58 tests ; **les trois refus constatés en production** le 2026-08-24 ; bascule armée le 2026-08-25 |
-| Verrou par valeur + motif au terrain | Vector `655020a` + Orders `2f7218a`, **déployés en production le 2026-08-26** — vérification terrain à faire (§3.A3) |
-| Suite complète | **128 tests verts** (2026-08-27) · Orders : 840 |
-
-## 1.8 ⚠️ Livré mais pas encore exploité
-
-- **La carte mutuelle n'est jamais remplie en production** (table vide au 23/08/2026). La cause est
-  établie depuis le 2026-08-26 et **elle était dans l'API** : l'identifiant du bénéficiaire n'était
-  servi nulle part, donc le front ne pouvait pas appeler. Corrigé ; reste l'écran web, en cours
-  (§3.F1).
-- **Le kilométrage n'est pas transmis** avec le dossier terrain : la facturation attend ce champ
-  pour activer son contrôle (§3.E1).
-- **Le repère de fraîcheur du paquet** (`updatedAt`) est servi mais aucun consommateur ne s'en sert :
-  ils re-tirent à chaque construction. À garder, sans y investir davantage.
-- ⚠️ **Les refus ne sont pas encore affichés par le front.** Depuis le 2026-08-26 l'API renvoie le
-  motif exact dans le corps du `409`/`400` (§3.A2) ; tant que l'UI web l'avale, l'ambulancier voit
-  toujours une saisie qui disparaît sans explication. **C'est le dernier maillon de la bascule**, et
-  il n'est pas dans ce dépôt.
+| # | Action | Pourquoi maintenant |
+|---|---|---|
+| 1 | **Transmettre à la régulation et à la RH** la [consigne de rattachement](docs/auth/consigne-rattachement-ambulancier.md) (§C1) | Un ambulancier rattaché depuis l'écran d'Employee seul est invisible pour Vector (403) |
+| 2 | **Transmettre au dev web** : [carte mutuelle](note_web_alexandre_carte_mutuelle.md) (§F1), [routes retirées](note_web_alexandre_routes_retirees.md), [sélecteur d'équipage](docs/ui-web/UI_selection-equipage-multi-crew.md) (bouton *Réessayer*, §C3) | Les routes mutuelle sont en service ; tant que l'écran ne les appelle pas, aucune carte n'arrive. |
 
 ---
 
-# 2. Décisions structurantes (toujours en vigueur)
-
-| # | Décision |
-|---|---|
-| D1 | **Contrat mobile préservé** : on remplace l'implémentation des repositories, pas les routes ni les DTO. Les ajouts sont additifs. |
-| D2 | **Séparation officiel ↔ terrain** : la donnée terrain est déclarative et non fiable par construction ; elle n'écrase jamais l'ERP. |
-| D3 | **Accès aux autres modules par API HTTP uniquement** (posture DMZ), base propre à Vector sur le LAN derrière firewall. L'architecture actuelle est conforme ; le durcissement événementiel est une option V2. |
-| D4 | **Identités de référence en Guid** (équipage / véhicule / personnel), alignées sur l'ERP. |
-| D5 | **Grain de transfert = la mission**, avec le rattachement à sa commande conservé dans le paquet. |
-| D6 | **Transfert automatique** des missions clôturées ; l'aval contrôle via la file des non-transférées. Pas de validation régulateur préalable : la facturation agrège et corrige. |
-| D7 | **Gel au transfert**, pas à la clôture : tant que la mission est seulement transférable, le terrain peut encore corriger. |
-| D8 | **L'aval tire les octets** (signature, photos, documents) depuis Vector.Api — pas de stockage partagé. |
-| D9 | **Anomalies non bloquantes** : transférées comme donnée, arbitrées en facturation. |
-| D10 | **Temps réel régulateur = persistance + polling** au MVP ; le push est V2. |
-| D11 | **`Closed` reste la main du régulateur** : le mobile n'écrit jamais la clôture administrative. |
-| D12 | **Photos et documents en base** en V1 ; sortie vers un stockage fichier planifiée V2. |
-| D13 | **Le claim `per_id` dans le jeton est écarté** : un turnover le rendrait non invalidable. C'est le cache HTTP qui s'invalide, pas le jeton. |
-| **D14** | **On code neutre ou additif — jamais de rupture du contrat consommé par l'appli web en production.** L'app web ambulancier tourne contre `Vector.Api` et **n'est pas déployée en même temps que l'API** : un champ retiré, renommé, ou un type de réponse changé (tableau → objet) casse le terrain immédiatement, sans filet. Corollaires : on ajoute à côté plutôt qu'on ne remplace ; les alias de compatibilité (§3.G2) ne se retirent **que** sur confirmation que le front a basculé ; un renommage de type .NET est neutre (le nom n'est pas sur le fil), un renommage de propriété ne l'est pas. Quand une évolution ne **peut** pas être additive, elle se coordonne avec le dev web avant livraison (note `note_web_alexandre_*.md`). |
-| D15 | **La surchargeabilité d'un type de mission est une propriété du catalogue**, pas une décision prise commande par commande : le régulateur saisit un type, c'est le type qui dit si le terrain peut le corriger. |
-| **D16** | **Un refus de l'ERP remonte au terrain avec son motif, formulé pour l'ambulancier** *(2026-08-26)*. Vector ne réécrit pas la règle : il change de **destinataire**. Order s'adresse à la régulation et nomme le référentiel où la fiche se corrige — un système auquel l'ambulancier n'a pas accès, et dont le nom se lit sur un brancard comme une panne. `DDN` et `NIR` s'adossent à la fiche : leur verrou est toujours reformulé (« Fiche verrouillée par la facturation »), sur le **nom de l'attribut**, donc sans reconnaissance de texte. Tout autre motif passe **intact** — « case déjà cochée » se lit très bien sur le terrain. Le format ne change pas : texte simple, à afficher tel quel. |
-
----
-
-# 3. Ce qui reste — chapitres d'étapes codables
-
-> **Comment lire.** Sept chapitres, homogènes par **nature de travail** : on peut entrer dans un
-> chapitre et y rester. Chaque étape garde sa référence historique (celle des commits et des autres
-> plans) et porte : **état · préalable · contenu · fin**. Les étapes sans préalable sont attaquables
-> aujourd'hui.
+# 1. Chapitres
 
 | Chapitre | Nature | Attaquable maintenant ? |
 |---|---|---|
-| **A** — Contexte de mission (`OC`) | bascule d'un référentiel, contrat mobile en jeu | A1, A2, A4, A5 **faits**, A3 vérifié côté API ; restent l'écran web (A3) et une question de calendrier à la facturation (A6) |
-| **B** — Dépendances amont Orders | rien à coder ici : suivre, réclamer, ou coder dans l'autre dépôt | — |
-| **C** — Identité & authentification | sécurité, chaîne de connexion | oui (C2, C3) ; C1 sur décision |
-| **D** — Robustesse des appels sortants | plomberie HTTP, aucun contrat touché | **oui, isolé** |
-| **E** — Chaîne facturation | contrat du paquet terrain, coordination aval | oui (E1, E2) |
-| **F** — Fonctions terrain restantes | features à part entière, indépendantes | oui |
+| **A** — Contexte de mission | suites de la bascule vers Order | A3 en attente du dev web |
+| **B** — Dépendances amont Orders | rien à coder ici : suivre, réclamer | — |
+| **C** — Identité & authentification | sécurité, chaîne de connexion | C2 : Vector prêt, reste Keycloak et facturation ; C1 dépendance amont ; C3 sur décision |
+| **D** — Robustesse des appels sortants | plomberie HTTP | **oui, isolé** |
+| **E** — Chaîne facturation | contrat du paquet terrain | oui (E2) ; E1 après arbitrage |
+| **F** — Fonctions terrain | features indépendantes | oui |
 | **G** — Dette & hygiène | refactor, zéro changement de contrat | **oui, en continu** |
 | **H** — Différé V2 | — | non |
 
 ---
 
-## A. Contexte de mission — bascule vers Order (`OC`)
+## A. Contexte de mission — suites de la bascule vers Order
 
-Le référentiel des types de mission a migré côté Order ; Vector en est devenu consommateur. **La
-bascule est en service en production depuis le 2026-08-25** : la sélection du type (A1) et le
-questionnaire d'attributs (A2) viennent d'Order, le paquet terrain a suivi (A4), et le code qu'elle
-remplaçait a été retiré (A5).
+> ⚠️ **Deux numérotations `OC-` coexistent.** Un `OC-x` nu désigne la tâche **Vector** ; la tâche
+> Order s'écrit `Order OC-x` ([plan Order](../Erp.Order/feature_order_context_devplan.md) §7).
 
-**Ce qui reste tient en une phrase.** Le filet de configuration n'existe plus : le second chemin est
-retiré depuis le 2026-08-27 (A1), et un incident se corrige désormais par un redéploiement. Restent
-la réponse du dev web, qui débloque l'affichage des refus (A3), et une question de calendrier à la
-facturation (A6) ; rien d'autre n'attend.
-Notes envoyées : [le contrat](note_web_alexandre_context_mission_dto.md) (25/08) ·
-[la demande de confirmation](note_web_alexandre_context_mission_confirmation.md) (26/08).
+> **En deux phrases.** Depuis le 25/08, le type de mission et le questionnaire d'attributs viennent
+> d'Order, qui peut **refuser** une saisie ou **verrouiller** un champ. Vector transmet déjà tout
+> cela ; l'écran affiche les refus (confirmé le 2026-09-13), A3 attend encore deux améliorations
+> d'affichage — rien à coder ici.
 
-> ⚠️ **Deux numérotations `OC-` coexistent.** Ici, un `OC-x` nu désigne la tâche **Vector** ; la tâche
-> Order s'écrit toujours `Order OC-x`
-> ([`featDesc_ContextOrder.md`](../Erp.Order/docs/features/featDesc_ContextOrder.md) §7, où la ligne
-> « Migration Vector » désigne *tout* ce chapitre).
+### A3 — ⏳ Deux améliorations d'écran demandées — *attente dev web*
 
-> ⚠️ **Les identifiants ont changé d'espace le jour de la bascule.** Les deux catalogues n'ont jamais
-> partagé leurs ids — `4` désignait « Article 80 » côté Vector et « Centre 15 » côté Order. Un id
-> resté en dur dans le front affiche donc faux **sans lever d'erreur** : c'est le principal risque qui
-> subsiste côté écran.
+L'API envoie déjà l'information ; c'est l'affichage qui manque.
 
-### ✅ Dépendance levée : le verrou est devenu intentionnel (`Order OC-28`)
+1. **Dire pourquoi un champ est grisé.** Un champ verrouillé arrive avec son motif (par exemple
+   « déjà renseignée sur la fiche »). Sans ce texte, l'ambulancier voit un champ bloqué sans savoir
+   pourquoi ni à qui s'adresser.
+2. **Faire relire le n° de sécurité sociale avant d'enregistrer.** La fiche patient ne le fournit
+   presque jamais (0 fois sur 40 missions mesurées le 26/08) : c'est l'ambulancier qui le tape. Une
+   fois enregistré, **aucun module ne permet de le corriger** — une faute de frappe part en
+   facturation. Un écran de confirmation suffit.
 
-Le verrou n'était pas décidé, il était **dérivé de l'auteur de l'écriture** : toute valeur posée par
-la régulation gelait la mission, sans que personne l'ait voulu — les 4 099 assignations de production
-viennent toutes de la régulation. Depuis le correctif déployé le 2026-08-25, la surchargeabilité est
-une propriété du **type**, configurée une fois, et tout est surchargeable par défaut : plus aucune
-mission n'arrive verrouillée, et « la régulation propose, l'ambulancier garde la main » est devenu le
-cas courant. *(Côté Order : ne pas rejouer le script `062`, défait par `063`.)*
+Demandé au dev web le 26/08. **Fin** : les deux constatés sur l'app.
 
-**À trancher** : quand le terrain écrase une proposition de la régulation, celle-ci est **perdue** —
-écrasement en place, aucun audit. Si la facturation ou l'arbitrage d'un litige doit pouvoir la relire,
-il faut une trace. Sinon, on assume la perte.
-
-### A1 — ✅ Sélection du contexte (`OC-3b` + `OC-4`) — en service, chemin unique, déployé
-
-En production, la liste des types de mission vient d'Order et le choix de l'ambulancier y retourne.
-Le front n'a changé ni de route ni de format de réponse.
-
-**Ce que le terrain voit de différent**
-- Aucun type n'est présélectionné : « non renseigné » est l'état de départ normal, là où l'API
-  cochait le premier de la liste.
-- Enregistrer un type peut désormais échouer — la régulation l'a imposé, ou il ne convient pas à la
-  commande — alors que l'appel réussissait toujours.
-- Si l'ERP ne répond pas, la liste arrive **vide** plutôt que fausse : les identifiants du catalogue
-  local ne désignent pas les mêmes types côté Order.
-
-**Trois décisions à ne pas rejouer**
-1. Le lien type ↔ attributs est refait par le code à chaque lecture, plutôt que par une écriture en
-   double dans l'ancienne table — sans quoi on aurait recréé le doublon que tout ce chapitre supprime.
-2. Une panne d'Orders rend une liste vide, jamais le catalogue local : ne rien proposer vaut mieux
-   qu'enregistrer un type pour un autre.
-3. L'identifiant reçu est vérifié contre les types réellement proposés. C'était le filet du jour de
-   la bascule, pour le client resté sur l'ancienne liste.
-
-**Ce qu'il reste à faire — plus rien ici.** Le double chemin est retiré (2026-08-27) : les drapeaux,
-les cas d'usage du catalogue local, le résolveur de type et l'aiguillage des contrôleurs ont disparu.
-Il ne reste qu'une source, celle d'Order.
-
-**Pourquoi sans attendre la réponse du dev web**, alors que la règle est de ne retirer un filet que
-sur confirmation (D14) : parce que la mesure a montré que ce filet-là était plus dangereux que ce
-qu'il protégeait. Le chemin de désarmement ne posait **jamais** `IsReadOnly` et ne validait **aucune**
-valeur. Le rebrancher aurait rouvert à la saisie les **34 dates de naissance verrouillées sur 40**
-(A3) et accepté un NIR à clé fausse en silence — pour se prémunir contre un message d'erreur mal
-affiché. Ce n'était plus un retour arrière, c'était une régression.
-
-⚠️ **Conséquence assumée** : un incident se corrige désormais par un redéploiement, donc une coupure
-d'API, et non plus par une clé de configuration. Le dev web en est informé — c'est le seul point de
-la note du 2026-08-27 qui appelle une réaction rapide de sa part.
-
-✅ **Déployé et vérifié le 2026-08-27** (commit `4e6de8b`, publication à 00:21). Trois contrôles :
-la section `ContextOrder` a bien disparu de la configuration déployée, l'API répond, et le **paquet
-terrain est identique à l'octet près** à celui d'avant le retrait — c'est le seul point qui pouvait
-régresser, puisque le bloc `attributes` lit encore le magasin Vector (A4).
-
-### A2 — ✅ Attributs pilotés par Order (`OC-5`) — en service, chemin unique, déployé
-
-Le questionnaire d'attributs et les valeurs saisies viennent d'Order. Le front garde sa route et son
-format ; deux propriétés s'ajoutent, qui disent qu'un champ est verrouillé et pourquoi.
-
-**Ce que le terrain voit de différent**
-- Une valeur saisie à l'aller vaut pour le retour : elle vit au niveau de la commande, plus de la
-  mission. Un bon de transport coché à l'aller arrive coché au retour.
-- Date de naissance et n° de sécurité sociale arrivent pré-remplis et **verrouillés** dès que la
-  fiche bénéficiaire les connaît.
-- La saisie devient **tout ou rien** et peut être refusée — valeur invalide, ou champ déjà scellé —
-  là où elle réussissait toujours.
-
-**Deux décisions à ne pas rejouer**
-1. On renvoie le formulaire entier sans trier les champs verrouillés : Order ignore une valeur
-   reposée à l'identique. Trier ici obligerait à y recopier sa règle du verrou, donc à la voir
-   diverger le jour où il la change.
-2. Aucune règle métier n'est rejouée côté Vector — clé de contrôle du NIR, refus d'une date future,
-   partage de la case entre l'aller et le retour. Elle vit là où vit la donnée.
-
-**Garde-fou de démarrage** : armer les attributs sans la sélection **empêche l'API de démarrer**.
-Sans le premier cran, l'ambulancier choisirait un type dans un catalogue et verrait les champs d'un
-autre.
-
-**Ce qu'il reste à faire — plus rien ici.** Le double chemin est retiré avec celui d'A1
-(2026-08-27), pour la même raison et au même moment.
-
-### A3 — 🟡 Règles métier portées par Order (`OC-6`) — côté API : vérifié
-
-Les règles vivent chez Order, Vector les transmet sans les rejouer. Vérifié dans le code le
-2026-08-26 : le verrou par champ traverse en recopie, aucune validation n'est refaite ici, et le
-verrou du **type** n'est consulté nulle part dans le formulaire — un type imposé laisse donc la
-saisie ouverte, par construction et non par convention.
-
-**Mesuré en production le 2026-08-26**, sur 40 missions des trois derniers jours, en interrogeant
-Order directement :
-
-| | |
-|---|---|
-| Champs servis sur toutes les missions | `DDN`, `NIR`, `PHONES`, `MAILS`, `COMMENTS` — puis selon le type : `PMT` (21/40), `BT` (11), `MUTUELLE` (10), `NUM_CENTAURE` (7) |
-| `DDN` renseignée | **34 / 40 — et verrouillée dans les 34 cas, sans une exception** |
-| `NIR` renseigné | **0 / 40** — donc jamais verrouillé, et ouvert à la saisie sur *toutes* les missions |
-
-La règle « renseigné ⇒ verrouillé » est donc appliquée à la lettre, motif affichable compris. Le NIR,
-lui, n'est **jamais** pré-rempli : c'est toujours le terrain qui le pose. Cette mesure vaut aussi
-vérification du correctif décrit juste en dessous — un champ dont la fiche ignore la valeur reste
-bien **ouvert** à la saisie.
-
-**Le verrou porte sur la valeur, pas sur la fiche** *(Orders `2f7218a`, 2026-08-26)*. Deux défauts
-remontés du terrain avaient une seule cause : `ModContextOrderFicheAttribute` verrouillait sur
-l'existence de la **fiche**, et non sur celle de la **valeur**.
-
-- Une fiche du référentiel **sans** numéro de sécurité sociale rendait le champ **vide et grisé** :
-  la collecte se fermait exactement sur les commandes qu'elle devait servir — patient arrivé sans
-  identité renseignée, Centre 15, secours sur piste.
-- Un numéro saisi une fois devenait **définitif**, y compris pour son auteur trois minutes plus tard.
-  La clé de contrôle ne voit rien à redire d'un numéro voisin recopié — celui de l'accompagnant, la
-  mauvaise ligne d'un bon de transport — et **aucun écran de l'ERP** ne savait revenir dessus.
-
-La règle telle qu'elle est désormais (`ModContextOrderFicheAttribute` + `ModContextOrderFicheWriteBack`
-+ `ClBeneficiary`) :
-
-| Situation | Comportement |
-|---|---|
-| Fiche du référentiel, valeur présente | verrouillé — c'est là-bas qu'elle se corrige |
-| Fiche du référentiel, valeur **absente** | **ouvert** : la saisie va dans la commande, la fiche n'est **jamais** touchée |
-| Valeur versée par **cette commande** | **corrigeable** par son auteur |
-| Valeur venue d'ailleurs (régulation, référentiel) | verrouillé |
-| Effacement d'une valeur connue | refusé — sinon vider le champ verrouillerait pour de bon |
-
-La provenance se lit sur l'origine `Field` du magasin EAV (`GetFieldValuesAsync`), sans changement de
-schéma : une valeur de fiche **égale** à celle de la commande n'a pas d'autre source qu'une frappe
-faite sur cette commande. `ReplaceCollectedNir` / `ReplaceCollectedBirthDate` exigent la valeur
-attendue et **lèvent** sur tout écart : l'invariant vit dans l'agrégat, pas chez l'appelant.
-
-⚠️ **Amende la règle métier du 22/08** sur ce seul quatrième cas — un NIR venu du référentiel reste
-immuable. **À porter au métier** : le dire après coup se lirait comme un contournement.
-
-*(Au passage : interrogé en rafale, l'endpoint a rendu 16 `503` d'affilée avant de se stabiliser —
-démarrage à froid probable, 40/40 en `200` au tir suivant. Pas de conclusion, mais c'est noté.)*
-
-**Ce qu'il reste à faire** — rien côté API.
-
-1. **Côté écran** : afficher le motif du verrou plutôt qu'un champ grisé sans explication, et faire
-   relire le numéro de sécurité sociale à la saisie — hors de la commande qui l'a posé, il n'est
-   corrigeable dans aucun module. Demandé au dev web le 26/08, avec le reste.
-2. ⚠️ **Sur une fiche du référentiel, le NIR s'arrête à la commande** : il n'atteint `C51` que par le
-   **repli d'attribut** de la facturation (`ModUpstreamTranslator`, `Case "NIR", "NUMSECU"`). Ce repli
-   existe et a été relu, mais c'est la première fois qu'il porte un NIR en production — à confirmer
-   sur un export de contrôle.
-3. **Les NIR posés avant que l'EAV ne les trace restent figés** : la fiche les porte, la commande non,
-   la provenance ne peut donc pas être établie. Correction au cas par cas
-   (`../Erp.Order/DB_UPDATE.MD` §10) ; les dénombrer avant de choisir un traitement de masse.
-
-**Les messages de verrou ne nomment plus le référentiel, ils nomment la facturation** *(Order,
-déployé le 2026-08-27)*. L'ambulancier lisait « la modification doit être faite dans AidesNSoft » —
-un système auquel il n'a pas accès et dont il ignore le plus souvent l'existence : le message nommait
-un outil au lieu de dire quoi faire. Mesuré après déploiement sur 25 missions : **8 servent le
-nouveau texte, 0 mentionne encore AidesNSoft**. Les 12 autres portent l'autre motif (« déjà
-renseignée sur la fiche »), qui ne nommait aucun système et n'a pas bougé.
-
-### A4 — 🟢 Le paquet terrain ne proxifie pas les attributs (`OC-7`) — livré le 2026-08-25
-
-**Le plan visait la mauvaise cible.** Il demandait que le bloc `attributes` du paquet terrain vienne
-d'Order ; vérification faite, la facturation lit **déjà** ces valeurs chez Orders et les fait primer.
-Les faire transiter par Vector aurait construit un troisième chemin vers une donnée que le
-consommateur possède avant même de nous appeler — au prix d'un appel HTTP par mission, sur un
-traitement déclenché par un clic et déjà mesuré à 14,7 s pour 284 missions.
-
-**Ce qui a été fait à la place** : le paquet lit le magasin Vector et rien d'autre, sans passer par le
-résolveur de type. Il est donc **plus rapide qu'avant la bascule**, à contenu identique.
-
-**Pourquoi ce bloc survit** : les valeurs saisies *avant* la bascule n'existent que côté Vector, et
-elles comblent les trous de l'historique. Son retrait n'est pas un sujet de code — il vient avec A6.
-
-### A5 — 🟢 Nettoyage du code que la bascule remplace (`OC-9`) — fait le 2026-08-26
-
-Retirés : les quatre ports qui n'avaient plus aucun consommateur et dont les seules implémentations
-levaient une exception, leurs enregistrements, et tout ce qui n'était joignable que par eux — deux
-présentateurs, un cas d'usage, trois DTO, et des adaptateurs jamais instanciés. **126 tests verts,
-aucune route touchée.**
-
-**La « fin » annoncée — supprimer `NotImplementedStubs.cs` — n'est pas atteignable en l'état.** Il en
-reste trois, injectés par les routes de recherche de bénéficiaire et de main courante mécanicien. Ces
-routes répondent **500**, et le faisaient déjà : ce n'est pas une régression, c'est une dette
-ancienne que ce nettoyage met au jour.
-
-**Ce qu'il reste à faire** : décider du sort de ces trois routes — les implémenter ou les retirer du
-contrat mobile. La question est partie au dev web le 26/08 : est-ce que le front les appelle ?
-
-### A6 — 🟡 Dépréciation des tables `MOB_*` du contrat (`OC-8`) — décidée, exécution bloquée
-
-✅ **Tranché le 2026-08-26 : abandon pur.** Les 2 132 valeurs d'attributs et les 0 sélection de type
-présentes en base sont des données de test ; aucune reprise ne sera écrite. Ce qu'on assume : la
-saisie terrain antérieure au 2026-08-25 ne sera plus relisible — elle n'a jamais alimenté la
-facturation, qui lit les valeurs chez Order.
-
-Le script de suppression est écrit et **volontairement non joué** :
-[`MOB_008_DropContractOverlay.sql`](CaSoft.Erp.USVector.Infrastructure/Sql/MOB_008_DropContractOverlay.sql).
-
-⛔ **Un seul verrou reste, et ce n'est pas celui qu'on croyait.**
-
-1. ~~Le chemin de désarmement~~ — **levé le 2026-08-27** : les drapeaux et le second chemin sont
-   retirés (A1), plus rien ne rebranche ces tables.
-2. **Le paquet terrain.** `FieldAttributesReader` (A4) compose le bloc `attributes` depuis ce
-   magasin — vérifié le 2026-08-27 en tirant le paquet en production, qui sert bien
-   `ContractId: 1 / "Transport standard"`. Jouer le `DROP` casserait le transfert vers la facturation.
-
-**Ce qu'il reste à faire** : une question de calendrier à poser à la facturation — *jusqu'à quand
-l'historique d'avant le 2026-08-25 doit-il rester servi ?* Elle lit déjà les valeurs d'Order et les
-fait primer ; ce bloc ne comble que les trous des missions antérieures. Le jour où la réponse tombe,
-il reste à retirer le bloc du paquet, puis à jouer `MOB_008`.
 
 ---
 
 ## B. Dépendances amont — rien à coder dans ce dépôt
 
-*Ces points cassent ou dégradent le terrain, mais se corrigent ailleurs. Ils sont ici pour être
-suivis, pas traités.*
-
 | Réf | Ce qui manque | Effet visible côté terrain | État |
 |---|---|---|---|
-| **B2** | **Repli sur le snapshot `ORD_ORDER`** dans le chemin de lecture d'Orders — plan complet, code-only, sans migration : [`plan_correctif_vector_fallback_snapshot.md`](plan_correctif_vector_fallback_snapshot.md) | **~3 883 étapes de mission s'affichent vides** (saisies libres orphelines) ; résiduel attendu ~93 | ⏳ à coder dans `Erp.Order` |
-| **B3** | **Chaîne équipage pour le 2ᵉ membre** — soit `GET /crews?personnelId=` ne rattache pas le personnel, soit `Members` est incomplet | sur un équipage à 2, **un seul des deux accède à ses missions** (404) | ⏳ diagnostic prêt → §3.C3 |
-| **B4** | `Billed` n'a **aucun écrivain** : la facturation est en lecture seule par décision de son module | le palier existe mais reste théorique | ⛔ décision (§3.E4) |
-| **B5** | **`field-data` par période** (à l'image de `for-export`) | 14,7 s pour 284 missions, dans un traitement déclenché par un clic | ⏳ non engagé côté demandeur |
-| **B6** | **Tests xUnit du transfert côté Orders** : dérivation `MIS_STATUS`, pose automatique de `Transferable`, garde-fous monotones de `MarkTransferred` / `MarkBilled` | aucun aujourd'hui — filet de sécurité manquant | ⏳ |
-| **B7** | **Relance de clôture** : alerter les régulateurs des missions terminées mais **non clôturées** — sans quoi elles ne deviennent jamais transférables | dossiers qui n'arrivent jamais en facturation | ⏳ piste : tableau de bord `?status=Done` |
-| **B8** | **Adresses « non structurées »** (`DET-3`) : revue de la saisie et de la validation côté Orders / Address.Api | repli mono-ligne, WARNING journalisé côté Vector | ⏳ mesurer l'ampleur avant d'engager |
-| **B9** | **Applicabilité agence/mode non configurée.** Le filtre existe et fonctionne des deux côtés — `ContextOrderCatalogQueryService.ListAsync`, le **même service** pour la régulation et pour le terrain — mais les tables de liaison `ORD_ORDER_CONTEXT_AGENCE` et `ORD_ORDER_CONTEXT_MODE` sont **vides**. Convention du code : *un type sans liaison s'applique partout*. Mesuré le 2026-08-25 : 4 agences (1, 2, 50, 60) → **les 7 types à chaque fois**. | l'ambulancier se voit proposer « Secours sur piste » ou « Centre 15 » sur des missions qui n'ont rien à voir — la régulation aussi | ⛔ décision métier : la **matrice d'applicabilité**. ⚠️ **Piège** : la première liaison posée sur un type le restreint aux seules valeurs liées, donc une matrice partielle fait disparaître ce type partout ailleurs. Aucun écran ne gère ces liaisons |
-| **B10** | **Attributs au catalogue Order mais rattachés à rien.** Relevé sur **30 formulaires servis en production** le 2026-08-25 : `COMMENTS`, `PHONES`, `MAILS`, `PMT`, `SMUR_DE`, `COMMUNE`, `NOM_CENTRALE` sont définis (script `041`) mais **n'atteignent aucune mission**. Seuls `BT` (26/30), `DDN`, `NIR`, et ponctuellement `NOM_ASSISTANCE` et `NUM_DOSSIER` (1/30) sortent. ⚠️ La base a **divergé des scripts** : `NOM_ASSISTANCE` est déclaré `list` et servi en `text` sans options ; `NIR` est servi alors que le script `058` est encore « à appliquer » dans `DB_UPDATE.MD`. | l'ambulancier a perdu, sur **toutes** les missions, le commentaire libre et l'ajout de téléphone/e-mail. `PMT` a disparu alors que son jumeau `BT` est partout | ⛔ paramétrage, même famille que **B9** (script `064` prêt côté Orders). Deux attributs Vector n'ont **aucun équivalent** et sont à arbitrer : `REFERENCE` (text) et `URGENT` (checkbox) |
-| **B11** | **Ce que deviennent `COMMENTS`, `PHONES`, `MAILS` une fois servis** *(relevé 2026-08-26)*. Ils remontent bien jusqu'à la facturation, mais **uniquement dans le commentaire libre C60** : `COMMENTS` sans préfixe, `PHONES`/`MAILS` **sous leur forme JSON brute** (`PHONES: ["06…"]`), par le `Case Else` du traducteur. Aucune colonne dédiée — le seul téléphone du contrat, `C16`, vient de `BEN_PRIMARY_PHONE`, et il n'existe pas de colonne e-mail. Ils **n'alimentent jamais la fiche** : le reversement ne concerne que `DDN` et `NIR`. ⚠️ `PHONES`/`MAILS` sont `IS_MULTI` : Order exige un **tableau JSON** et refuse tout le lot sinon — une chaîne nue emporterait aussi la DDN saisie en même temps. | un numéro ajouté sur le terrain n'atteint pas C16 et se lit en JSON dans C60 ; la fusion avec les coordonnées connues de la fiche, qu'assurait l'ancien overlay Vector, a disparu | ⏳ deux chantiers séparables : désérialiser côté facturation (~30 lignes dans `ModUpstreamTranslator`), et arbitrer le reversement vers la fiche côté Orders |
-| — | ✅ **`Order OC-28` déployé** — mesuré le 2026-08-25 : **0 mission verrouillée sur 15** (contre 20 sur 25 la veille) | plus aucun verrou subi | 🟢 |
-| — | ✅ `engagedOnly` sur `GET /crews/{id}/missions` · ✅ `null = effacé` sur `PUT /missions/{id}/operational` | *résolus* | 🟢 |
+| **B2** | **Repli sur le snapshot `ORD_ORDER`** dans le chemin de lecture d'Orders — plan code-only : [`plan_correctif_vector_fallback_snapshot.md`](plan_correctif_vector_fallback_snapshot.md) | **~3 883 étapes de mission s'affichent vides** ; résiduel attendu ~93 | ⏳ à coder dans `Erp.Order` |
+| **B4** | `Billed` n'a **aucun écrivain** | palier théorique | ⛔ décision (E4) |
+| **B5** | **`field-data` par période** (à l'image de `for-export`) | 14,7 s pour 284 missions, sur un clic | ⏳ non engagé côté demandeur |
+| **B6** | **Tests xUnit du transfert côté Orders** : dérivation `MIS_STATUS`, pose de `Transferable`, garde-fous de `MarkTransferred` / `MarkBilled` | aucun filet aujourd'hui | ⏳ |
+| **B7** | **Relance de clôture** des missions terminées non clôturées | dossiers qui n'arrivent jamais en facturation | ⏳ piste : tableau de bord `?status=Done` |
+| **B8** | **Adresses « non structurées »** (`DET-3`) côté Orders / Address.Api | repli mono-ligne, WARNING journalisé | ⏳ mesurer l'ampleur d'abord |
+| **B9** | **Applicabilité agence/mode non configurée** : `ORD_ORDER_CONTEXT_AGENCE` et `_MODE` vides → les 7 types proposés partout (mesuré le 2026-08-25) | « Secours sur piste » proposé sur des missions sans rapport | ⛔ décision métier : la **matrice**. ⚠️ la première liaison posée sur un type le restreint aux seules valeurs liées. Aucun écran ne gère ces liaisons |
+| **B10** | **Attributs au catalogue Order rattachés à rien** : `COMMENTS`, `PHONES`, `MAILS`, `PMT`, `SMUR_DE`, `COMMUNE`, `NOM_CENTRALE` n'atteignent aucune mission (30 formulaires, 2026-08-25). `NOM_ASSISTANCE` déclaré `list`, servi `text` | commentaire libre et ajout téléphone/e-mail perdus sur **toutes** les missions ; `PMT` disparu | ⛔ paramétrage, famille de B9. `REFERENCE` et `URGENT` sans équivalent, à arbitrer |
 
-> Contrat détaillé de tout ce que Vector attend d'Orders : [`endPoint.md`](endPoint.md).
+> Contrat détaillé de ce que Vector attend d'Orders : [`endPoint.md`](endPoint.md).
 
 ---
 
 ## C. Identité & authentification
 
-### C1 — ⛔ Écran de rattachement compte Keycloak ↔ ambulancier (ex-MOB-4b)
+### C1 — ⛔ Rattachement des comptes : Vector lit un référentiel que plus aucun écran n'alimente — *dépendance amont*
 
-Aujourd'hui le rattachement se fait **par INSERT SQL manuel** dans `PER_KEYCLOAK_MAP`. C'est le seul
-maillon manuel de la chaîne : sans lui, un ambulancier ne reçoit aucune mission.
+**Tranché le 2026-09-13** ([`delivered.md`](delivered.md) §4) : pas de code dans Vector, pas d'écran
+de plus. **La question « quel hôte pour l'écran » est dépassée** : l'écran de rattachement existe dans
+**Employee** et écrit dans le **carnet d'Identity**.
 
-**À trancher avant de coder — l'hôte de l'écran :**
-- Les **endpoints Orders sont livrés** (`GET`/`PUT`/`DELETE /personnel/{id}/keycloak`, `GET /keycloak/users`).
-- Le **module Identity possède désormais cette correspondance** : reprise jouée le **23/08/2026**
-  (146 pivots, 105 correspondances) ; Orders doit à terme appeler Identity au lieu d'écrire sa table.
-- L'écran Siège envisagé comme hôte **n'existe plus que dans `Archives/`**.
+**Le problème réel** : Vector résout le compte via Orders (`GET /personnel/by-keycloak/{sub}`), donc
+dans `PER_KEYCLOAK_MAP` — que l'écran d'Employee **n'alimente pas**. Un ambulancier rattaché depuis
+Employee reste **invisible pour Vector** et reçoit un 403 au sélecteur. Les deux référentiels
+divergent : **155 correspondances chez Orders, 116 chez Identity** (mesure d'Orders, 05/09).
+Mesuré côté terrain le 2026-09-13 : **8 membres d'équipage sur 244** sans compte rattaché chez Orders.
 
-→ **Identity** (cohérent avec la cible) **ou** endpoints Orders le temps de la bascule. Dans les deux
-cas : lister les comptes Keycloak, rechercher un `PER_PERSONNEL`, persister **via API** (jamais
-d'écriture directe en base), afficher les garde-fous (compte déjà lié, personnel déjà lié, 409).
-⚠️ Tant que les trois emplacements du rattachement coexistent, ils divergeront — et l'écart se verra
-le jour où un ambulancier ne recevra plus ses missions.
+**Ce qui débloque** — hors de ce dépôt : la **bascule d'Orders sur le carnet** (Identity itération 7,
+Orders itération 24), bloquée par la RH — **273 des 422 personnels actifs d'Orders n'ont pas de fiche
+Employee**, et le lien `EMP_EMPLOYEE.PersonnelId` est vide en production.
 
-### C2 — 🟡 Authentification de service à service (`DEC-6`) — *les deux sens*
+**En attendant — consigne transitoire** :
+[`docs/auth/consigne-rattachement-ambulancier.md`](docs/auth/consigne-rattachement-ambulancier.md).
+Un ambulancier se rattache **aussi côté Orders** (`PUT /personnel/{id}/keycloak`), sans quoi il
+n'accède pas à ses missions.
 
-**Sortant.** `Orders.Api` est appelée **sans jeton** : aucun en-tête `Authorization` sur les deux
-clients HTTP. Cela tient tant qu'Orders.Api n'est pas protégée — vérifié le 2026-08-27, elle ne l'est
-toujours pas (ni `AddJwtBearer`, ni section `Keycloak` dans son `Program.cs`). Un en-tête posé vers
-Orders y sera donc **ignoré, pas rejeté** : toute la série sortante est livrable **sans coordination**
-et sans risque. Le jour où Orders se ferme, il faut un **client credentials Keycloak** (compte de
-service dédié à Vector) avec cache et renouvellement, sur le modèle du module Identity. **Rien ne
-bloque, et c'est à anticiper** : le symptôme sera une série de 401 sur la joblist, en production, sans
-autre indice.
+**Fin** : Orders lit le carnet d'Identity ; `PER_KEYCLOAK_MAP` supprimée ; la consigne tombe.
 
-**Entrant — c'est la moitié qui presse.** L'API a été **fermée par défaut le 2026-08-25** : jusque-là
-aucun contrôleur ne portait d'attribut d'autorisation, si bien que **seuls les cinq endpoints passant
-par `CrewAccess` étaient protégés**. Tout le reste répondait 200 à qui connaissait un identifiant de
-mission — y compris la structure du formulaire, **valeurs comprises** : une date de naissance de
-patient a été relevée servie sans authentification.
+### C2 — 🟡 Authentification de service à service (`DEC-6`) — *partie Vector en production depuis le 2026-09-13*
 
-Il reste **six ouvertures**, de **deux natures différentes** — et il faut les garder distinctes : les
-confondre ferait croire qu'un compte de service les refermera toutes.
+**Fait côté Vector, sans rien fermer** — en production, jetons mobiles admis par la nouvelle politique
+([`delivered.md`](delivered.md)) :
+- **Entrant** — l'authentification accepte les jetons des modules déclarés (`Keycloak:ServiceAzp` =
+  `erp-billinggateway-api`). ⚠️ La **politique de repli exige désormais l'azp mobile** : un jeton de service
+  n'ouvre aucune route du terrain. La politique `ClKeycloakCallers.ServiceOrMobilePolicy` est prête
+  pour les quatre routes ci-dessous, qui restent anonymes.
+- **Sortant** — `ServiceAccountTokenHandler` pose un jeton `client_credentials` sur les appels à
+  Orders.Api **dès que `OrdersApi:ServiceAccount` est renseigné** ; inerte sinon. Un realm
+  indisponible ne bloque pas l'appel (Orders reste anonyme pour le terrain). Pas de référence à
+  `CaSoft.Identity.Client` : il exige le socle 2.8.0.
 
-**Quatre faute de `DEC-6`** : la facturation les tire en serveur-à-serveur, sans jeton.
+**Reste, dans l'ordre — hors code Vector jusqu'à l'étape 4 :**
+1. **Keycloak** — guide : [`docs/deploiement/keycloak-compte-service-vector.md`](docs/deploiement/keycloak-compte-service-vector.md).
+   ✅ **`erp-vector-api` en service** depuis le 2026-09-13 18:59 : Vector obtient son jeton et le pose
+   sur ses appels à Orders ([`delivered.md`](delivered.md)). ⏳ **`erp-billinggateway-api`** : créer
+   le client s'il ne l'est pas encore (la facturation n'en a aucun, `us-facturation` n'a jamais
+   existé) ; son secret ira à BillingGateway. Vector l'accepte déjà (`Keycloak:ServiceAzp`, en
+   production depuis `bc105c1`).
+2. **BillingGateway** (autre dépôt) : poser son jeton de service sur `IVectorFieldDataClient` et
+   `IVectorSignatureClient` — et sur les documents et la carte le jour où il les tire.
+3. **Vérifier** en production que la facturation passe avec son jeton (journal `JWT validé … azp=erp-billinggateway-api`).
+4. **Fermer** : remplacer `[AllowAnonymous]` par `[Authorize(Policy = ClKeycloakCallers.ServiceOrMobilePolicy)]`
+   sur les quatre routes, et vider leurs entrées d'`AnonymousSurfaceTests`.
+5. **Orders** peut alors exiger un jeton du terrain — son plan l'attendait de Vector.
+
+**Les quatre routes encore anonymes**, uniquement parce que la facturation les tire sans jeton :
 
 | Route ouverte | Ce qu'elle expose |
 |---|---|
-| `GET api/missions/{id}/field-data` | le **dossier terrain complet** de la mission |
+| `GET api/missions/{id}/field-data` | le dossier terrain complet |
 | `GET api/Signature/{id}` | l'image de la signature du patient |
 | `GET api/documents/{id}/content` | les octets d'un document |
-| `GET api/mutuelle-card/{id}/image` | ⚠️ **carte mutuelle — donnée de santé** |
+| `GET api/mutuelle-card/{id}/image` | ⚠️ **carte mutuelle — donnée de santé** (maintenue ouverte, `M9`) |
 
-Elles se referment **ensemble**, le jour où Vector saura présenter un jeton de service.
+Elles se referment **ensemble**, avec `DEC-6`. `AnonymousSurfaceTests` fige la liste.
 
-**Deux pour les écrans amont** *(26/08)* : Order et la facturation affichent la carte mutuelle du
-patient par une balise `<img src>`, qui **ne portera jamais de jeton**.
+### C3 — ⛔ 404 du sélecteur avant la composition de l'équipage — *décision*
 
-| Route ouverte | Ce qu'elle expose |
-|---|---|
-| `GET api/beneficiaries/{id}/mutuelle-card/image` | ⚠️ la photo, par son bénéficiaire |
-| `POST api/mutuelle-card/presence` | « ce bénéficiaire a une photo », par lot de 500 max — ni nom de mutuelle, ni code AMC |
+**Diagnostic tranché le 2026-09-13** ([`delivered.md`](delivered.md)) : **ni défaut de code, ni donnée
+fausse chez Orders.** Le 404 « Aucun équipage actif » survient quand l'ambulancier ouvre l'app **avant
+que la régulation ait composé son équipage** ; il passe dès que c'est fait. Mesuré sur les journaux
+du 04/07 au 24/08 : 24 cas, 21 équipages, délai médian de **23 min** entre la tentative et la
+composition, 9 cas au-delà d'une heure. Quand l'équipage entier est composé en retard, **les deux
+membres échouent ensemble** — d'où l'impression d'un « second membre » bloqué.
 
-⚠️ Celles-là **ne se referment pas avec `DEC-6`** : donner un compte de service à Order n'y changerait
-rien, puisque c'est un navigateur qui affiche. Elles attendent que ces écrans passent à un `fetch`
-authentifié — `H1`, tranchée le 26/08 en faveur de la balise.
+1. ⏳ **Le bouton *Réessayer* côté écran.** Les messages du 404 sont en service depuis le 2026-09-13
+   ([`delivered.md`](delivered.md)) ; reste à faire ajouter le bouton par le dev web (contrat :
+   [`docs/ui-web/UI_selection-equipage-multi-crew.md`](docs/ui-web/UI_selection-equipage-multi-crew.md)).
+2. ⛔ **L'organisation de la régulation — à trancher.** Composer les équipages avant la prise de
+   service — sans quoi l'accès anticipé de 30 min (CREW-1) ne sert à rien pour ces équipages.
 
-⚠️ **Garde-fou en place** : `AnonymousSurfaceTests` fige la liste exacte de ce qui répond sans jeton,
-**en deux groupes** — les quatre qui se referment, les deux qui restent. Toute route anonyme ajoutée
-fait échouer la suite : une exception doit être une décision, pas un oubli.
-
-> 🪤 **La leçon de ce chantier, et elle vaut au-delà.** Deux routes avaient été fermées sur le motif
-> « aucun consommateur prouvé ». Le motif a tenu **un jour** : le lendemain, l'écran de capture passait
-> en production et deux navigateurs tiraient l'image. « Aucun consommateur » est un constat **daté**,
-> pas une propriété — toute étape qui ferme une porte sur ce motif doit **revérifier le motif au moment
-> de fermer**. C'est ce que fait `DEC6-E1`, et c'est pourquoi il est le premier.
-
-> ⚠️ **Deux séries d'étapes, `S` et `E`, toutes deux préfixées `DEC6-`.** `DEC6-S0…S5` = le sortant,
-> `DEC6-E1…E5` = l'entrant. Le préfixe n'est pas décoratif : sans lui, `E1` désignerait à la fois la
-> sonde de surface et le kilométrage du chapitre E. Ces références vivent dans les commits
-> (`DEC-6 E1`) — on les garde et on les qualifie, plutôt que de les renuméroter.
-
-**Ordre de livraison.** Les deux séries sont indépendantes l'une de l'autre, et de `DEC-7`.
-
-```
-DEC6-S0 → S1 → S2 → S3 → S4 → [Keycloak] → S5        aucune dépendance externe
-DEC6-E1 → [mesure 7 j] + [réponse dev web] → E2 → E3
-                       E2 → [Keycloak] → [facturation] → E4 → E5
-```
-
-Le seul couplage réel : **`E2` avant `E3` et `E4`**. ⚠️ Le chemin critique de la série `E` est du
-**temps calendaire**, pas du temps de développement — d'où `E1` en premier, qui démarre le compteur.
-
-#### Décisions actées des deux chantiers (`T1`…`T11`) — ne pas les rejouer
-
-*`T2`, `T3`, `T4` concernent `DEC-7` (§3.D) ; les huit autres, `DEC-6`.*
-
-| # | Décision |
-|---|---|
-| **T1** | **`DelegatingHandler`, et ce sera le premier du parc.** Trois raisons indépendantes : *(a)* les deux clients HTTP restent **purs**, donc testables en trois lignes — y injecter un fournisseur de jeton forcerait quatre harnais existants à stuber un jeton pour tester du parsing JSON ; *(b)* le **rejeu sur 401** n'est faisable que là, il faut voir la réponse — depuis les sites d'appel il faudrait le dupliquer dans 14 méthodes ; *(c)* l'**ordre avec Polly devient exprimable** : enregistré *après* les politiques, le handler d'auth est le plus **interne**, donc chaque tentative relit le jeton en cache. Le contre-argument (« aucun `DelegatingHandler` dans le parc ») est réel mais ne pèse pas : 40 lignes, locales à un enregistrement. |
-| **T2** | **Polly, pas `Microsoft.Extensions.Http.Resilience`.** Ce dernier est introuvable dans tout le parc ; l'introduire ferait de Vector le seul module à porter **deux** modèles de résilience. |
-| **T3** | **Fabriques de politiques publiques**, là où celles de la facturation sont privées. C'est le seul moyen de les tester (`DEC7-3`). Écart assumé au modèle maison, pour la raison qui manquait au modèle maison. |
-| **T4** | **Recul 200 ms / 600 ms, pas 2/4/8 s.** Sous un budget de 10 s, un recul de 2+4+8 = 14 s ne produirait **jamais** la troisième tentative. Écrire un réessai qui ne peut pas s'exécuter, c'est fabriquer une illusion de robustesse. Gigue **±50 %**, pour ne pas synchroniser une flotte de mobiles sur le même redémarrage d'Orders. |
-| **T5** | **Le fournisseur de jeton a son propre `HttpClient`**, jamais celui d'Orders — sinon le jeton passerait par le disjoncteur d'Orders, et **une panne d'Orders empêcherait d'obtenir un jeton**. |
-| **T6** | **Le compte de service ne mutualise rien avec `usvector-diag`.** Deux clients Keycloak distincts : le diag porte `realm-management/view-users`, le compte d'API n'en a pas besoin et **ne doit pas les avoir**. Deux durées de vie (quelques fois par mois à la main / toutes les 5 min sous concurrence) et deux rayons d'explosion (une page de diagnostic / la joblist de toute la flotte). On recopie 15 lignes plutôt que de coupler un outil de dev au chemin chaud de production. |
-| **T7** | **Échec d'obtention de jeton = Warning + `null`, jamais une exception.** L'appel part sans en-tête et prendra un 401 le jour où Orders sera protégée — symptôme lisible, plutôt qu'un 500 fabriqué par Vector. |
-| **T8** | **Le handler d'auth est enregistré inconditionnellement, dans tous les environnements.** Le conditionner à `IsConfigured` créerait un câblage qui n'existe qu'en production, donc **jamais exercé avant d'être indispensable**. Non configuré ⇒ trafic **octet pour octet** celui d'aujourd'hui. |
-| **T9** | **Trois notions, pas deux** : jetons *acceptés* à la porte, client *ambulancier* (politique de repli → toute l'API mobile), clients *de service* (politiques nommées → quatre routes et rien d'autre). Copier telle quelle la liste d'`azp` d'`Erp.Identity` ouvrirait **toute l'API mobile** au compte de la facturation — ce serait remplacer une porte ouverte à tous par une porte ouverte à un service qui n'a rien à y faire. |
-| **T10** | **Deux politiques nommées, pas une.** `field-data` est un paquet de transfert qu'aucun écran ne consomme → service-only. Les routes d'octets ont un usage humain plausible — l'ambulancier relit la photo qu'il vient de prendre → `ServiceOuAmbulancier`. Les mettre toutes en service-only casserait une fonctionnalité mobile pour rien. |
-| **T11** | **Le point de jeton est dérivé de `Keycloak:Authority`, pas découvert par OIDC.** Vector valide déjà le format de l'Authority au démarrage, la découverte ajouterait un aller-retour sur le chemin chaud, et `/protocol/openid-connect/token` est déjà écrit en dur à `KeycloakAdminClient.cs:49` — on aligne au lieu de créer une incohérence. |
-
-#### `DEC6-S0` — ⏳ Extraire `ParseAuthority`, et **ne pas** refactorer le reste
-
-`Infrastructure/Security/KeycloakAuthority.cs` : le corps exact de `KeycloakAdminClient.cs:67-74`,
-commentaire compris ; le privé disparaît. On réutilise la **forme** du POST (`l.47-64`) et la **forme**
-de la garde `IsConfigured` (`l.25-29`), sentinelle `__SET_VIA_ENV__` comprise — **recopiées, pas
-partagées** (`T6`). **Fin** : suite verte, aucun changement de comportement. **Risque** : nul.
-
-#### `DEC6-S1` — ⏳ `KeycloakServiceTokenProvider` : cache, marge, sérialisation
-
-Singleton — le cache doit survivre à la requête — avec **son propre `HttpClient`** (`T5`). Surface :
-`GetTokenAsync(ct)` (rend `null` si non configuré ou en échec, `T7`), `Invalidate()`, `IsConfigured`.
-Transposition de `ClMagasinJetonsUtilisateur` (facturation) de `refresh_token` vers
-`client_credentials`, **en plus simple** : un seul jeton, donc pas de dictionnaire, pas de purge, pas
-de rotation. Ce qu'on garde tel quel :
-
-- **marge de 30 s** avant expiration — un jeton qui expire en vol donne un 401 ;
-- **`SemaphoreSlim(1,1)` + double vérification** après acquisition — sans lui, 40 requêtes mobiles au
-  démarrage déclenchent 40 POST vers Keycloak ;
-- **`expires_in` → expiration absolue**, repli à 60 s si absente ou ≤ 0 ;
-- **`[JsonPropertyName("access_token")]`** explicite — `JsonSerializerDefaults.Web` ne ramène pas
-  `access_token` en camelCase.
-
-Configuration : `Keycloak:ServiceAccount` = `{ Enabled: false, ClientId: "usvector-api",
-ClientSecret: "__SET_VIA_ENV__" }`.
-
-**Fin** : tests avec horloge injectable (`Func<DateTimeOffset>`, sinon c'est un `Task.Delay`) — non
-configuré → `null` et **zéro** appel HTTP · 10 appels concurrents → **un seul** POST · `expires_in: 60`
-+ 35 s → **second** POST · `Invalidate()` → POST suivant. **Risque** : nul, rien ne le consomme encore.
-
-#### `DEC6-S2` — ⏳ `ErpApiAuthHandler`, branché et **inerte**
-
-Si `request.Headers.Authorization` est nul, demander un jeton ; sinon, ne rien écraser. Enregistré sur
-les deux clients **après** les `AddPolicyHandler`, donc le plus interne (`T1`, raison *(c)*). Inertie
-assumée : `T8`. ⚠️ Le test `if (Authorization is null)` n'est pas décoratif — aucun appelant ne pose
-d'en-tête aujourd'hui, et l'écrasement silencieux est un piège classique.
-
-**Une ligne au démarrage, et c'est la moitié de la valeur de l'étape** : « appels SANS jeton de service
-(`Keycloak:ServiceAccount` désactivé ou non configuré) », ou « appels AVEC jeton de service (client
-`usvector-api`) ». Le symptôme redouté — une série de 401 sur la joblist, en production, sans autre
-indice — devient **une ligne au démarrage**.
-
-**Fin** : non configuré, aucun en-tête ; configuré, en-tête présent **et présent aussi sur la 2ᵉ
-tentative** d'un réessai — c'est le test qui vérifie l'ordre d'enregistrement.
-
-#### `DEC6-S3` — ⏳ Rejeu unique sur 401
-
-Si la réponse est 401 **et** qu'un jeton avait été posé : `Invalidate()`, reprendre un jeton, renvoyer
-**une seule fois** (drapeau local, pas de boucle). Séparé de `S2` pour pouvoir être abandonné sans rien
-perdre. **Fin** : stub 401→200 → deux appels, deux jetons demandés, réponse 200 ; stub 401 systématique
-→ **exactement deux** appels. *(Le second test existe pour la boucle infinie.)*
-
-#### `DEC6-S4` — ⏳ Garde-fou de démarrage, sur le modèle `KC-1`
-
-`Enabled = true` **et** non configuré ⇒ **refus de démarrer**, message nommant
-`Keycloak__ServiceAccount__ClientSecret`. **Pourquoi** : `appsettings.Production.json` documente déjà
-l'incident — `Keycloak:Enabled` retombé à `false` par perte des variables du `web.config`, et « claim
-sub absent » pendant des heures. Le secret du compte de service vit **au même endroit et se perd de la
-même façon** ; sans garde, l'API devient **silencieusement anonyme** vers Orders.
-
-#### `DEC6-S5` — 🔴 Activation *(action humaine — `H3`)*
-
-Créer `usvector-api` dans le realm, client confidentiel, *Service accounts enabled*, **sans rôle
-`realm-management`** (`T6`). Poser le secret dans le `web.config`, et basculer `Enabled` **par variable
-d'environnement** — ⚠️ **pas** dans `appsettings.Production.json`, shippé par `dotnet publish` et donc
-effacé au déploiement suivant (§5.2, piège déjà rencontré ce mois-ci).
-
-**Fin, mesurable et seulement en production** : le log de démarrage dit « AVEC jeton », et le nombre de
-POST vers le point de jeton Keycloak sur une heure de trafic est de l'ordre de **12** (un toutes les
-5 min) — **pas** plusieurs milliers. C'est le test réel du cache.
-
-#### `DEC6-E1` — 🟢 Mesurer, avant de conclure — *sonde livrée le 2026-08-27, mesure à lancer*
-
-**Deux sources, la seconde seulement se code.**
-
-**(a) Journaux IIS du serveur — gratuits, à demander.** Les journaux W3C portent `c-ip`, `cs-uri-stem`,
-`cs(User-Agent)` : filtrer les six chemins sur 30 jours, grouper par IP + agent. C'est la vérité sans
-écrire une ligne, et la seule source qui porte sur le **passé**.
-
-**(b) Sonde applicative — ✅ livrée.** `Api/Infrastructure/AnonymousSurfaceProbe.cs`, enregistrée
-**après** `UseAuthentication`/`UseAuthorization` — sans quoi l'`azp` serait toujours vide et la mesure
-ne saurait pas distinguer un appel nu d'un appel déjà porteur d'un jeton. Journal dédié
-`Vector.SurfaceAnonyme`, routé par `nlog.config` vers `logs/usvector-surface-anonyme-<date>.log`
-(rétention 90 j, `final` pour ne pas noyer le journal applicatif) : une ligne par appel — action,
-méthode, chemin, statut, IP, `User-Agent`, `Referer`, présence d'un `Authorization`, `azp`.
-
-⚠️ **Elle observe six routes, pas quatre.** Le plan d'exécution disait « ces quatre chemins
-uniquement » ; les deux routes des écrans amont sont arrivées depuis, et ce sont précisément celles
-dont la réponse a changé en un jour. Elles ne se referment pas avec `DEC-6`, mais savoir qui les tire a
-la même valeur.
-
-**Comment elle sait quoi observer.** Elle lit `[AllowAnonymous]` dans les métadonnées de l'endpoint et
-écarte les deux ouvertures de diagnostic : une route anonyme ajoutée demain est mesurée sans que
-personne y pense. `AnonymousSurfaceProbeTests` (10 tests) fige la contrepartie — la surface observée est
-**exactement** celle qu'`AnonymousSurfaceTests` déclare justifiée, la ligne part bien, elle part dans le
-journal dédié, et elle survit à une exception en aval. ⚠️ **Le vide de ce fichier vaut conclusion** : il
-doit être impossible qu'il soit vide **parce que la sonde regardait ailleurs**.
-
-**Ce qui reste, et ce n'est pas du code** : déployer — le compteur ne démarre pas avant —, demander les
-journaux IIS des 30 derniers jours, puis laisser courir **7 jours**.
-
-⛔ **Préalable découvert le 2026-08-28, et il bloque la mesure : la production n'écrit plus aucun
-journal depuis le 24/08** (§3.G9). La sonde emprunte le même tuyau — déployée en l'état, elle
-produirait un fichier vide, c'est-à-dire la conclusion « personne n'appelle », c'est-à-dire la
-fermeture d'une route sur une mesure qui n'a jamais eu lieu. **Rien ne démarre avant que `G9` soit
-levée**, et le premier geste après l'être sera d'écrire une ligne volontairement pour la relire.
-
-**Fin.** Pour chaque route, la liste des IP et des agents. Attendu — `field-data` et `Signature` vus
-depuis l'IP de la facturation ; `documents/content` **jamais** vu ; `mutuelle-card` vu depuis les postes
-web. Si l'attendu n'est pas vérifié, **`E3` s'arrête** et on repart de la mesure.
-
-#### `DEC6-E2` — ⏳ Deux publics sur la même API — *l'étape la plus risquée*
-
-⚠️ **Le vrai piège de `DEC-6` entrant est ici** — motif complet en `T9`. Il faut distinguer **trois**
-choses, pas deux :
-
-| Notion | Config | Portée |
-|---|---|---|
-| Jetons **acceptés** par le pipeline | `Keycloak:Audience` ∪ `Keycloak:ServiceAzp[]` | le jeton n'est pas rejeté à la porte |
-| Client **ambulancier** | `Keycloak:Audience` (`us-ambulance`) | politique de repli → **toute l'API mobile** |
-| Clients **de service** | `Keycloak:ServiceAzp[]` (nouveau) | politiques nommées → **les quatre routes, et rien d'autre** |
-
-1. L'`azp` attendu (`Program.cs:105-124`) devient un `HashSet<string>(Ordinal)`, comme
-   `Identity.Api/Program.cs:68-75`. **Le dépôt du motif dans `HttpContext.Items` est conservé** — il
-   alimente les messages de `CrewAccess` et vaut mieux qu'un `ctx.Fail` nu.
-2. **Politique de repli resserrée** : `RequireAuthenticatedUser()` **+** `azp == Audience`.
-   ⚠️ **À conditionner à `!disableValidation`**, exactement comme la vérification d'`azp` l'est déjà —
-   sinon le poste de développement, où la validation est volontairement désactivée, **ne répond plus
-   rien**, et personne ne comprend pourquoi.
-3. **Deux politiques nommées** : `"ServiceFacturation"` et `"ServiceOuAmbulancier"` (`T10`). La liste
-   d'`azp` est à prévoir **multi-clients dès l'écriture**, pas à rallonger après coup.
-
-> 💡 **Un second garde-fou existe déjà, gratuitement** : un compte de service a un `sub` absent de
-> `PER_KEYCLOAK_MAP`, donc `CrewAccess.ResolvePersonnel` rendrait **403**. Les cinq routes crew-scopées
-> sont **doublement** fermées — par construction, pas par vigilance.
-
-**Fin.** Étape **purement additive** : aucune route ne référence encore les nouvelles politiques. Seul
-changement observable — un jeton de service n'est plus rejeté à la porte, mais reste refusé partout par
-la politique de repli. En dev : jeton ambulancier → tout marche ; jeton de service → 403 partout.
-**Risque** : **le plus élevé des trois séries**, elle touche la politique globale. À déployer **seule**,
-sur le serveur de dev d'abord, avec `api/Auth/WhoAmI` et `api/JobList/…` comme témoins.
-
-#### `DEC6-E3` — ⛔ Fermer `documents/content` — *une seule route*
-
-**Préalable** : `E1` à zéro sur 7 jours pour `documents/content`.
-
-`[AllowAnonymous]` → `[Authorize(Policy = "ServiceOuAmbulancier")]` sur `DocumentController.GetContent`.
-Mettre à jour `AnonymousSurfaceTests`, et remplacer le commentaire « se referme avec DEC-6 » par ce qui
-reste ouvert, et à qui.
-
-⚠️ **Ne pas y rajouter la carte mutuelle par symétrie.** Ses deux routes sont ouvertes **par décision**,
-pas par défaut d'authentification. Les fermer ici casserait les écrans d'Order et de la facturation le
-jour du déploiement, sans erreur console et sans qu'aucun test ne le voie.
-
-**Fin** : les octets d'un document ne sont plus accessibles sans jeton.
-
-#### `DEC6-E4` — ⛔ Fermer `field-data` et `Signature` — *cross-repo, ordre non permutable*
-
-**E4.a — Keycloak (`H2`).** `us-facturation` est déclaré **public** (pas de secret, PKCE) : il ne peut
-**pas** faire de `client_credentials`.
-
-**E4.b — Côté facturation (autre dépôt).** Transposer `S1`+`S2` en VB, branchés sur les **deux seules**
-inscriptions Vector (`ModBillingGatewayInfraExtension.vb:185-204`) — **pas** sur les clients Orders, qui
-appellent une API non protégée. Même politique d'inertie. *Hors périmètre de ce dépôt, mais conditionne
-`E4.c` : mérite sa propre entrée au devplan de la facturation.*
-
-**E4.c — Côté Vector.** `FieldDataController.Get` → `"ServiceFacturation"` ;
-`SignatureController.GetSignature` → `"ServiceOuAmbulancier"`. Et **supprimer l'appel à
-`ClAutorizationCommand.AutorizeJob`** (`SignatureController.cs:23`) : cette méthode **retourne `true` en
-toutes circonstances**, son corps est commenté — une garde décorative que la vraie politique remplace.
-Supprimer le fichier s'il n'a plus d'appelant.
-
-**Fin.** Sur le dev : une publication complète de la facturation réussit **avec** le compte de service ;
-la même **sans** secret rend 401 sur `field-data`, et son journal le nomme. Puis la sonde `E1` montre
-**zéro** appel sans `Authorization`.
-
-**Risque.** **Élevé et concentré** — c'est la chaîne vers la facturation. Vector fermé avant que la
-facturation sache présenter un jeton, et **la publication du jour tombe**. Sur les deux serveurs, **la
-facturation se déploie et se vérifie avant Vector**.
-
-#### `DEC6-E5` — ⛔ Retourner le garde-fou
-
-Le groupe « faute de `DEC-6` » d'`AnonymousSurfaceTests` retombe à **zéro**, et le commentaire est
-réécrit : ces quatre ouvertures ne sont plus « temporaires », elles sont **fermées**, avec la date.
-
-Et `Les_ouvertures_pour_la_facturation_sont_au_nombre_de_quatre` **n'est pas supprimé — il est
-retourné** : un test qui vérifie par réflexion que ces quatre actions portent bien une politique
-**nommée**. Supprimer le test laisserait la politique de repli seule gardienne : elle protège contre
-l'oubli d'attribut, **pas** contre le remplacement d'une politique nommée par un `[Authorize]` nu — qui
-rouvrirait ces quatre routes à l'ambulancier, dont le dossier terrain complet.
-
-#### 🔴 Ce qui appartient à un humain
-
-| # | Décision | Bloque | Enjeu |
-|---|---|---|---|
-| **H2** | Rendre `us-facturation` confidentiel, ou créer `us-facturation-svc` ? | `E4.a` | Le rendre confidentiel **casserait son flux OIDC navigateur**. Recommandation : **client distinct** — un écran et un compte de service ont des cycles de vie et des rayons d'explosion différents. |
-| **H3** | Créer `usvector-api` (sans rôle `realm-management`) et poser son secret. | `S5` | Purement Keycloak + `web.config`. Le code est prêt, et inerte sans. |
-| **H4** | Drapeau de réouverture par variable d'environnement sur `documents/content` ? | `E3` | L'assurance d'un cycle de déploiement, contre une machinerie permanente. **Recommandation : s'en passer** — la route n'a aucun consommateur identifié. |
-| **H6** | Accepter que la politique de repli interdise à tout compte de service d'atteindre l'API mobile. | `E2` | Interdit d'emblée un usage service-à-service futur non prévu, qui devra passer par une politique nommée explicite. **C'est voulu.** |
-| ~~**H1**~~ | ~~`fetch` ou balise directe pour l'image ?~~ | — | ✅ **Tranchée le 26/08 : balise `<img src>`**, pour l'écran ambulancier comme pour ceux d'Order et de la facturation. Conséquence assumée : les deux routes de carte mutuelle **restent ouvertes**. |
-| ~~**H7**~~ | ~~Par quel compte Order et la facturation consultent-ils l'image ?~~ | — | ✅ **Sans objet depuis `H1`** : leurs écrans affichent par balise, donc **aucun compte**. La question renaîtra le jour où l'on voudra fermer ces deux routes. |
-
-⚠️ **Ce que `DEC-6` n'est pas.** Deux publics et deux politiques nommées restent **en deçà d'un modèle
-de droits** : comme le dit `Identity.Api`, une liste d'`azp` « n'est pas une autorisation fine, c'est
-une liste d'appelants reconnus ». À dire, pour que personne ne croie le problème résolu.
-
-### C3 — ⏳ Trancher le 404 du second membre d'équipage
-
-Le diagnostic est **écrit et prêt** ([`docs/auth/diag-404-second-membre-equipage.md`](docs/auth/diag-404-second-membre-equipage.md)) :
-`GET /api/diag/crew-chain` rejoue la vraie règle domaine sans passer par le cache. Le travail restant
-n'est pas du code Vector mais une **exécution** : lancer le diag sur les **deux** membres du même
-équipage **au même instant**, comparer, et ouvrir le ticket Orders correspondant (§3.B3).
-⚠️ Le filtre d'appartenance qui produit le 404 est **volontaire** — il bouche un trou d'autorisation
-réel. Il ne doit pas être retiré pour faire disparaître le symptôme.
+⚠️ Le filtre d'appartenance (`MobileIdentityResolver.cs:35`) est **volontaire** : ne pas le retirer.
 
 ---
 
-## D. Robustesse des appels sortants (`DEC-7`) — ⏳ isolé, attaquable seul
+## D. Robustesse des appels sortants (`DEC-7`) — ⏳ isolé
 
-Les deux clients HTTP sont enregistrés avec la seule `BaseAddress` : **pas de timeout explicite**
-(donc 100 s par défaut, ce qui fait pendre une requête mobile), **pas de retry ni de disjoncteur** sur
-le chemin de **lecture**. L'écriture est couverte (file de projection + worker avec retry).
-
-Trois étapes, dans l'ordre, **sans aucune dépendance externe** : `DEC7-1` → `DEC7-2` → `DEC7-3`. Une
-seule question n'appartient pas au code — les budgets de temps, 🔴 `H5`. Les décisions déjà actées qui
-les concernent sont `T2`, `T3` et `T4` (§3.C2).
-
-> ⚠️ **`DEC7-n`, et non `Dn`.** `D1`…`D16` désignent déjà les **décisions structurantes** du §2. Même
-> document, deux séries : on préfixe plutôt que de laisser « D1 » vouloir dire deux choses.
-
-### `DEC7-1` — ⏳ Timeouts explicites *(🔴 `H5`)*
-
-Une classe `OrdersApiOptions` (`BaseUrl`, `ReadTimeoutSeconds`, `WriteTimeoutSeconds`, `RetryCount`,
-`CircuitBreakerThreshold`, `CircuitBreakerSeconds`) : POCO peuplé à la main, `AddSingleton`, pas
-d'`IOptions`. On y déplace `OrdersBaseUri` (`Program.cs:170-175`) **en gardant son commentaire** sur le
-`/` final — ce piège a déjà coûté une panne. Puis `c.Timeout` sur les deux `AddHttpClient`
-(`Program.cs:179-184`).
-
-**Les valeurs, et pourquoi ce ne sont pas celles de la facturation.** BillingGateway travaille par lot,
-la nuit : 30 s de budget y sont raisonnables. **Ici, un ambulancier attend devant son écran.**
-
-| Client | Budget | Pourquoi |
-|---|---|---|
-| `IErpReadApiClient` | **10 s** | chemin chaud mobile (joblist, détail mission) — 100 s aujourd'hui |
-| `IErpWriteApiClient` | **15 s** | mixte : la sélection du type et la saisie sont sur le chemin humain ; la projection est derrière l'outbox |
-
-⚠️ **Ne pas allonger le budget d'écriture pour l'outbox** : il a déjà son propre recul 2→60 s
-(`OperationalOutboxDispatcher.cs:87-89`), et une tentative avortée est remise en file. Le long horizon
-est déjà à sa place.
-
-⚠️ **Changement de type d'exception** : un dépassement de `HttpClient.Timeout` lève
-`TaskCanceledException`, **pas** `HttpRequestException`. Les deux sites concernés attrapent `Exception`
-(`ContextOrderCatalogService.cs:43`, `OperationalOutboxDispatcher.cs:86`) — ils absorbent le nouveau
-type sans modification. **Aucun `catch (HttpRequestException)` n'existe dans le dépôt** : vérifié.
-C'est la vérification à refaire si quelqu'un en ajoute un.
-
-**Fin.** Orders rendue injoignable : `GET api/JobList/…` échoue en ~10 s au lieu de ~100 s. Au
-chronomètre, sans instrumentation.
-
-**Risque.** Un appel Orders légitimement lent (> 10 s) deviendrait une erreur. Aucun appel unitaire
-connu ne s'en approche — les 14,7 s mesurées côté facturation sont un **cumul de 284 appels**, pas un
-appel. À valider sur le serveur de dev avant la prod.
-
-### `DEC7-2` — ⏳ Réessai et disjoncteur (Polly), en **fabrique publique**
-
-**Paquet** : `Microsoft.Extensions.Http.Polly` **8.0.10** dans
-`CaSoft.Erp.USVector.Infrastructure.csproj` — tout y est déjà pinné en 8.0.10 (`T2`).
-
-`Infrastructure/ErpApi/OrdersApiResilience.cs`, deux fabriques **publiques** (`T3`) —
-`RetryPolicy(options)` et `CircuitBreakerPolicy(options)`, au-dessus de
-`HttpPolicyExtensions.HandleTransientHttpError()`. Recul selon `T4`.
-
-**Ordre** : `.AddPolicyHandler(retry).AddPolicyHandler(breaker)` — réessai à l'extérieur, disjoncteur à
-l'intérieur, comme la facturation. Cet ordre fait compter au disjoncteur **chaque tentative**, donc il
-s'ouvre plus vite quand Orders est réellement tombée.
-
-**Le vrai gain est pour l'outbox** : le dispatcher traite jusqu'à 50 entrées **séquentiellement**.
-Orders tombée sans disjoncteur : 50 × (timeout + réessais). Avec : les 5 premières échouent, les 45
-suivantes échouent instantanément, le cycle se termine et l'outbox repousse.
-
-**Ce qui ne doit pas casser :**
-
-- **La tolérance au 404** (`ListCrewIdsAsync:69`, `ResolvePersonnelIdByKeycloakAsync:83`,
-  `GetOrNullAsync:106`). `HandleTransientHttpError()` couvre 5xx, 408 et `HttpRequestException` — **404
-  n'en fait pas partie**, la réponse traverse intacte.
-  🚫 **La faute à ne pas commettre** : ajouter `.OrResult(r => !r.IsSuccessStatusCode)` « pour être
-  complet ». Chaque 404 deviendrait 3 appels puis un échec, et la joblist d'un ambulancier **sans
-  équipage** tomberait en erreur. **À écrire en commentaire dans le code.**
-- **Les refus métier de l'écriture** (409/400/404 traduits en issues) sont des 4xx : non transitoires,
-  non réessayés, non comptés par le disjoncteur. Un champ verrouillé reste un champ verrouillé.
-- **Les dégradations existantes** attrapent `Exception` : `BrokenCircuitException` y est absorbée.
-
-**Réessai sur PUT/PATCH : sûr, et à écrire.** Les quatre écritures sont **idempotentes par
-construction** — la projection envoie l'état complet (pas un delta), les deux `PATCH` posent des
-valeurs. Rejouer après une coupure survenue *après* traitement serveur ne double rien.
-⚠️ **À vérifier par un test, pas par raisonnement** : Polly renvoie **la même instance** de
-`HttpRequestMessage`. Le renvoi d'un corps `JsonContent` déjà consommé fonctionne depuis .NET Core 3.0,
-mais c'est exactement le genre d'affirmation qui se révèle fausse en production (test 4 de `DEC7-3`).
-
-**Fin.** Orders injoignable : les logs montrent 3 tentatives par appel, puis — après 5 échecs — des
-rejets immédiats pendant 30 s. Et la joblist d'un ambulancier sans équipage rend toujours une **liste
-vide** tant qu'Orders est debout.
-
-### `DEC7-3` — ⏳ Les tests que la fabrique publique rend possibles
-
-`OrdersApiResilienceTests.cs` : monter le pipeline à la main
-(`new HttpClient(new PolicyHttpMessageHandler(OrdersApiResilience.RetryPolicy(opts)) { InnerHandler = … })`),
-avec un `StubHandler` dérivé de celui de `ContextOrderAttributeTests` qui **compte les tentatives** et
-rend une séquence (503, 503, 200). Recul de 1 ms en test, sinon la suite s'allonge.
-
-Quatre tests, quatre affirmations que le code seul ne prouve pas :
-
-| Test | Ce qu'il protège |
-|---|---|
-| `Un_503_est_reessaye_et_finit_par_passer` | 3 appels, 1 succès |
-| `Un_404_n_est_pas_reessaye` | **1 seul** appel ; la liste vide survit. *Protège la tolérance au 404 contre le refactor de demain.* |
-| `Un_409_de_refus_metier_n_est_pas_reessaye` | 1 appel, `FieldLocked` rendu. *Protège la distinction refus / panne.* |
-| `Un_PATCH_reessaye_renvoie_bien_son_corps` | le corps de la 2ᵉ tentative est identique et non vide |
-
-**Fin.** Suite verte, aucun test existant modifié. **Risque** : nul.
-
-> 🔴 **`H5` — arbitrage produit, pas constante technique.** Accepter **10 s** en lecture et **15 s** en
-> écriture, c'est répondre à : *au bout de combien de temps l'ambulancier préfère-t-il une erreur à une
-> attente ?* Tant que la question n'est pas tranchée, `DEC7-1` reste écrit mais pas déployé.
+Les deux clients HTTP n'ont que leur `BaseAddress` : **pas de timeout explicite** (100 s par défaut),
+**pas de retry ni de disjoncteur** en lecture (vérifié le 2026-09-13). L'écriture est couverte par la
+file de projection.
+**Contenu** : timeout court et explicite, puis `AddStandardResilienceHandler` (ou Polly), **en
+gardant** la tolérance au 404 en lecture. **Fin** : aucun appel sortant ne pend au-delà du timeout.
 
 ---
 
 ## E. Chaîne vers la facturation
 
-Le plan d'origine confiait tout l'aval à Certification ; **la réalité livrée est un partage** :
-Certification découvre la file et **écrit le retour** — c'est ce write-back qui arme le gel côté
-Vector ; la facturation tire le paquet terrain, agrège et produit le fichier AidesNSoft. Les deux
-sont livrés. Reste :
-
 ### E1 — ⏳ Le kilométrage dans le paquet (`MOB-10`) — *arbitrage puis code*
 
-Aujourd'hui `kilometers = null`, et la facturation attend ce champ pour activer son contrôle
-« kilométrage absent » (une ligne de configuration chez elle). Le km est aujourd'hui
-**équipage/véhicule-scoped** : il n'existe pas de km **par mission**.
-→ **Arbitrer avec la facturation** : le km véhicule suffit-il, ou faut-il un relevé début/fin par
-mission ? La seconde réponse ouvre une étape complète (table + saisie mobile + alimentation du
-paquet) ; la première se réduit à alimenter le champ.
+`Kilometers = null` (vérifié le 2026-09-13) ; la facturation attend ce champ pour activer son contrôle.
+Le km est **équipage/véhicule-scoped**. → **Arbitrer avec la facturation** : km véhicule suffisant
+(alimenter le champ), ou relevé début/fin par mission (table + saisie mobile + paquet).
 
 ### E2 — ⏳ Horodatages : dire l'heure qu'il est
 
-Deux défauts sur le même sujet, à corriger ensemble :
-- Les jalons Vector sont en **UTC mais ne le déclarent nulle part** — les consommateurs le devinent.
-- **`SIG_DATETIME` est écrit en heure locale** (`DateTime.Now`, deux occurrences), contrairement à
-  tout le reste.
+- Les jalons sont en **UTC sans le déclarer**.
+- **`SIG_DATETIME` est écrit en heure locale** (`DateTime.Now`, `SignatureRepository.cs:34` et `:43`).
+  *Même motif relevé ailleurs, à examiner avec : `ClMarkMissionSeenUseCase` (heure de lecture),
+  `ClSetDriverUseCase`, `ClInsertMechanicLogUseCase`.*
 
-**Fin** : signature en UTC comme le reste, et fuseau **déclaré explicitement** dans le contrat du
-paquet. Rien ne bloque.
+**Fin** : signature en UTC comme le reste, fuseau **déclaré** dans le contrat du paquet.
 
-### E3 — ⏳ `field-data` en lot — *voir §3.B5*, non engagé côté demandeur.
+### E3 — ⏳ `field-data` en lot — *voir B5*, non engagé côté demandeur.
 
-### E4 — ⛔ `Billed` : le faire écrire, ou retirer le palier
+### E4 — ⛔ `Billed` : le faire écrire, ou retirer le palier — *décision*
 
-La facturation est en lecture seule par décision de son module ; le statut `Billed` reste donc
-théorique. **À trancher** : le faire poser par la facturation à la publication d'une journée, ou
-**retirer le palier** de l'énumération. En l'état il n'est ni faux ni utile.
+La facturation est en lecture seule par décision de son module. **À trancher** : le faire poser à la
+publication d'une journée, ou retirer le palier de l'énumération.
+
+### E5 — ⚪ Repère de fraîcheur du paquet
+
+`updatedAt` est servi, aucun consommateur ne s'en sert (la facturation re-tire à chaque construction).
+**À garder, sans y investir** tant qu'un besoin de re-synchronisation n'apparaît pas.
 
 ---
 
-## F. Fonctions terrain restantes — indépendantes les unes des autres
+## F. Fonctions terrain
 
-### F1 — ⏳ Carte mutuelle : débloquer l'adoption *(avant tout le reste)*
+### F1 — 🟡 Carte mutuelle : obtenir les premières cartes *(avant tout le reste)*
 
-Le plan disait **« rien à coder côté API »**. C'était faux, et c'est ce qui a tenu la table vide
-pendant deux mois : les routes de la carte sont indexées par **bénéficiaire** (elle suit le patient),
-l'écran qui capture est celui d'une **mission**, et **aucun endpoint mobile ne rendait
-l'identifiant** — le front ne pouvait pas construire l'URL. ✅ **`beneficiaryId` est servi dans le
-bloc patient du détail mission depuis le 2026-08-26**, `null` quand la mission n'en résout aucun.
+La capture par mission est **en service depuis le 2026-09-13** (cause de la table vide : la route
+demandait un identifiant patient qu'aucun DTO terrain ne porte). Reste :
 
-✅ **L'écran ambulancier est en production depuis le 26/08**, et la carte est **consultable depuis
-les modules amont** : `GET api/beneficiaries/{id}/mutuelle-card/image` (Order, une carte à la fois)
-et `POST api/mutuelle-card/presence` (facturation, une liste de bénéficiaires en un appel).
+1. **Transmettre** [`note_web_alexandre_carte_mutuelle.md`](note_web_alexandre_carte_mutuelle.md) au dev web.
+2. **Mesurer** le remplissage après livraison de l'écran. ⚠️ Le compte `ErpAccount` de
+   `appsettings.json` est refusé depuis le poste de dev : mesurer via `field-data`, ou obtenir un
+   compte de lecture.
+3. **Signaler à BillingGateway** que ses « 401 » du 27/08 portaient sur deux routes inexistantes : la
+   vraie route image est ouverte.
 
-**Reste** : **mesurer le remplissage en production** — c'est la seule preuve que la chaîne est
-débloquée, et elle se lit en une requête. L'extraction automatique n'a aucun intérêt tant qu'aucune
-photo n'arrive.
-
-⚠️ **La carte n'alimente aucune colonne du fichier de facturation** (M7) : c'est un **document
-consultable** par Order et BillingGateway, qu'un opérateur lit et interprète. `C54` n'est donc pas
-sa destination — l'y mapper contredirait « jamais d'écriture aveugle en facturation » (M5).
-
-Détail et contrat : [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) §3.1 et §5.
+Faiblesses connues de la saisie (le `PATCH` remplace les quatre champs et accepte un corps vide ; une
+nouvelle photo repart à vide) : [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) §3.3.
 
 ### F2 — ⏳ Carte mutuelle : extraction automatique (P3)
 
-Seul le **statut** existe en base ; aucun service d'extraction n'est écrit. Pipeline **asynchrone**
-(la capture ne doit jamais attendre l'IA) : `pending` à l'upload → worker → **Claude vision** à sortie
-structurée imposée (quatre champs + confiance, journalisée) → `extracted` → **écran de validation
-humaine** → mêmes champs que la saisie manuelle + `validated`. À cadrer avant de coder : **où tourne
-l'appel au modèle** (worker en DMZ, ou service LAN qui tire l'image — la seconde option évite de
-donner une clé API à un composant exposé), quotas et coût par carte.
-**Préalable** : F1 (§1.8). **Fin** : quatre champs proposés automatiquement, jamais écrits en aveugle.
+Seul le **statut** existe. Pipeline **asynchrone** : `pending` à l'upload → worker → **Claude vision**
+à sortie structurée (quatre champs + confiance journalisée) → `extracted` → **validation humaine** →
+`validated`. À cadrer : **où tourne l'appel au modèle** (DMZ, ou service LAN qui tire l'image), coût
+par carte. Rappel `M7` : même validés, ces champs n'alimentent pas `C54`.
+**Préalable** : F1. **Fin** : quatre champs proposés, jamais écrits en aveugle.
 
-### F3 — ⏳ Trois chantiers hérités, autonomes et sans dépendance entre eux
+### F3 — ⏳ Deux chantiers hérités, autonomes
+
+*(`MOB-14`, logs mécaniques, abandonné le 2026-09-13 : ses routes sont retirées du contrat, cf. [`delivered.md`](delivered.md).)*
 
 | Réf | Objet | Ce qui reste |
 |---|---|---|
-| `MOB-12` | **Fin de service** | Le contrôleur existe mais **vise la mauvaise chose** : `MOB_SESSION` n'est plus la source d'authentification depuis Keycloak — la clôture doit viser la **vacation d'équipage côté Orders**. Le `TODO` sur les permissions de poster une date de fin depuis la régulation reste ouvert. *Re-cadrage avant code.* |
-| `MOB-14` | **Logs mécaniques et analyses** | Trois contrôleurs exposés mais reposant sur des stubs : à faire, les tables `MOB_MECANIQUE_*`, les référentiels (acteurs, natures, contraintes) et les repositories réels. |
-| `MOB-16` | **Connecteurs Sirus / GpsGate** | Portés et injectés, **non recâblés fonctionnellement** : positions d'équipage (GpsGate REST) et statuts véhicule (Sirus UDP). Secrets déjà externalisés. |
+| `MOB-12` | **Fin de service** | Le contrôleur vise `MOB_SESSION`, qui n'est plus la source d'authentification : la clôture doit viser la **vacation d'équipage côté Orders**. `TODO` ouvert sur les permissions. *Re-cadrage avant code.* |
+| `MOB-16` | **Connecteurs Sirus / GpsGate** | Portés et injectés, **non recâblés** : positions (GpsGate REST), statuts véhicule (Sirus UDP). |
 
-### F4 — ⏳ Présence : qui est connecté à Vector — *décision d'abord*
+### F4 — ⛔ Présence : qui est connecté à Vector — *décision d'abord*
 
-Spec complète, **aucun code** : [`feadesc_utilisateurs_connectes_vector.md`](feadesc_utilisateurs_connectes_vector.md).
-L'API est stateless : « connecté » n'est pas une donnée native, il faut la **définir** puis
-l'instrumenter. Retenu (à confirmer) : **activité applicative** comme cœur, croisée avec l'**état de
-service** déjà exposé par Orders.
-**Deux décisions préalables** : la définition retenue, et surtout la **topologie** — un cache par
-process ne convient pas en multi-instance, il faut alors une table dédiée ou Redis.
-**Découpage** : store + estampillage best-effort au point de passage d'identité → endpoint de
-restitution restreint (régulateur/admin) → enrichissement identité + état de service → cadrage
-rétention. ⚠️ Donnée de suivi d'activité d'un salarié : **cadrage RH/RGPD requis**.
+Spec sans code : [`feadesc_utilisateurs_connectes_vector.md`](feadesc_utilisateurs_connectes_vector.md).
+**Deux décisions** : la définition de « connecté » (retenu à confirmer : activité applicative croisée
+avec l'état de service), et la **topologie** (cache par process inadapté en multi-instance).
+**Découpage** : store + estampillage au point de passage d'identité → endpoint restreint →
+enrichissement → rétention. ⚠️ Suivi d'activité d'un salarié : **cadrage RH/RGPD requis**.
 
 ---
 
-## G. Dette & hygiène — refactor, aucun changement de contrat
+## G. Dette & hygiène — aucun changement de contrat
 
-*Chapitre attaquable en continu, par petits lots, entre deux chantiers.*
-
-### G1 — ⏳ Result pattern, vague 2 (retrait de l'échafaudage)
-
-Vague 1 faite (**31/32**). Ordre sûr, chaque type supprimé **uniquement** quand un grep confirme
-0 référence : le straggler `ClSetDriverUseCase` d'abord (→ 32/32), puis `ClUseCaseHandler` (déjà
-0 référence active), puis les contrôleurs en Result direct, puis les services, puis les types de
-transition. ⚠️ `Option Strict Off` : des conversions aujourd'hui implicites deviennent explicites —
-vérifier chaque retour. ⚠️ Re-builder l'Api en **Release** soi-même (les tests ne compilent pas l'Api).
-Détail : [`refactor_result_pattern.md`](refactor_result_pattern.md).
-
-### G2 — ⚠️ Alias de compatibilité — se retirent **sur confirmation du front**, jamais d'office (D14)
+### G2 — ⚠️ Alias de compatibilité — retrait **sur confirmation du front** uniquement
 
 | Réf | Alias conservé | Condition de suppression |
 |---|---|---|
-| C1 | `IsAck`, alias lecture seule de `IsSeen` | UI web migrée sur `IsSeen` |
-| C2 | Champs JobDetail legacy en parallèle des nouveaux (`Schedule`, `TransportMode`, `Departure`/`Arrival`) | UI web basculée sur `ScheduleLabel`, `TransportModeLabel`, `PickupLocation`/`DropoffLocation` |
-| C3 | `SelectedDriver` jamais null (`Guid.Empty` + `""`) | UI web garde-fou le `null` proprement |
-| — | Champs typés des lieux, en parallèle de `PickupDisplay`/`DropoffDisplay` | UI web bascule sur l'affichage piloté serveur |
+| C1 | `IsAck`, alias de `IsSeen` | UI web sur `IsSeen` |
+| C2 | Champs JobDetail legacy (`Schedule`, `TransportMode`, `Departure`/`Arrival`) | UI web sur `ScheduleLabel`, `TransportModeLabel`, `PickupLocation`/`DropoffLocation` |
+| C3 | `SelectedDriver` jamais null | UI web garde-fou le `null` |
+| — | Champs typés des lieux, en parallèle de `PickupDisplay`/`DropoffDisplay` | UI web sur l'affichage piloté serveur |
 
-> ✅ **C4 et C5 sont éteints.** C4 (sur-rapatriement des missions + filtre équipage côté client) est
-> résolu autrement que prévu : la joblist lit la route crew-scopée, et `ListMissionsAsync` **n'a plus
-> aucun appelant** — candidate à la suppression avec G1. C5 (annulation d'un jalon locale seulement)
-> est résolu par `null = effacé` côté Orders.
+`ListMissionsAsync` n'a plus aucun appelant : à supprimer.
 
 ### G3 — ⏳ Suite de smoke `.http` (`MOB-9` résiduel)
 
-Filet de non-régression manquant : couvrir login → joblist → jobdetail → time → signature dans
-`CaSoft.Erp.Mobile.Api.http`.
+`CaSoft.Erp.Mobile.Api.http` ne couvre toujours ni joblist, ni time, ni signature (vérifié le
+2026-09-13). **Fin** : login → joblist → jobdetail → time → signature rejouables.
 
-### G4 — ⏳ Suivi des migrations SQL — *la dette qui a déjà coûté une journée de production*
+### G4 — ⏳ Suivi des migrations SQL
 
-`…/Sql/` n'a **aucune table de suivi de schéma**. Constat de la facturation : les bases de prod et de
-dev ont divergé **en sens inverse** (l'une avait `MOB_006` sans `MOB_004/005`, l'autre l'inverse) —
-résolu pour la production le 06/08/2026, **la cause demeure**. Symptôme : un 500 opaque et une journée
-sans données terrain. → table de suivi (modèle `__BillingGatewaySchema`) + **contrôle au démarrage**.
-À réconcilier au passage : la migration du transfert est référencée `027` dans l'historique et `034`
-dans le dépôt.
+Aucune table de suivi de schéma : prod et dev ont déjà divergé en sens inverse (06/08). → table de
+suivi (modèle `__BillingGatewaySchema`) + **contrôle au démarrage**. À réconcilier : la migration du
+transfert est `027` dans l'historique et `034` dans le dépôt.
 
-⚠️ **Le même écart existe côté Orders, et il est mesuré** : `NIR` est servi en production alors que
-son script `058` est encore marqué « à appliquer », et `NOM_ASSISTANCE` est servi dans un type qui
-n'est pas celui du script (§3.B10). Un catalogue qui ne se déduit plus de ses scripts n'est
-reproductible nulle part.
+### G5 — ⚠️ Dettes de forme, sans urgence
 
-Le besoin s'est révélé plus large que le schéma : voir **G8**, qui le généralise à « quel code
-tourne, sur quelle base ».
+- **Nommage des DTO (`DET-4`)** : suffixes `…DtoIn` / `…DtoOut`. Aucun impact JSON.
+- **Pont sync/async** : `.GetAwaiter().GetResult()` sur joblist / jobdetail / identité.
+- **`IResultUseCase` est synchrone** : les deux cas d'usage asynchrones de la carte mutuelle
+  (`HandleAsync`) n'implémentent aucune interface ; le commentaire de `IResultUseCase.vb` cite encore
+  `ClResultUseCaseAdapter`, supprimé.
 
-### G5 — ⚠️ Deux dettes de forme, sans urgence
+### G6 — ⏳ Documentation à réconcilier
 
-- **Nommage des DTO (`DET-4`)** : suffixe directionnel de la convention (`…DtoIn` / `…DtoOut`) au lieu
-  des noms hérités du portage. **Aucun impact JSON** — le nom du type n'apparaît pas sur le fil.
-  Priorité basse, par lots.
-- **Pont sync/async** : `.GetAwaiter().GetResult()` sur joblist / jobdetail / identité, hérité du
-  contrat legacy synchrone. Se lève avec une refonte des interfaces legacy en async.
-
-### G6 — ⏳ Documentation à réconcilier *(rapide, à faire tôt)*
-
-- **`README.md` décrit un état périmé** : accès ERP **in-process**, références projet vers Orders,
-  sous-app IIS `/mobile`, « prochaine étape MOB-4 ». Tout cela est faux depuis le découplage.
-- **`docs/deploiement/configuration-keycloak-iis.md`** annexe encore « `Authority`/`Audience` codés en
-  dur dans `Program.cs` » : **résolu** (`KC-1`).
-- **`BUG_DISPLAY.MD` §6** présente `DET-1` comme bloqué par le front : **livré et basculé**. Restent
-  ses trois vérifications d'exploitation, elles bien ouvertes : affichage sur une mission **retour**
-  (service non inversé), lieu **non référencé** (service référentiel conservé), et **fraîcheur des
-  coordonnées** — le re-géocodage sur édition d'adresse bénéficiaire n'est pas implémenté, donc un
-  point peut désigner l'ancien bâtiment : **à traiter avant tout usage navigation**.
-- **`endPoint.md` §5** dit encore `engagedOnly` non honoré : c'est fait.
+- **`README.md`** : accès ERP **in-process**, sous-app `/mobile`, « MOB-4 reporté » — faux (vérifié le 2026-09-13).
+- **`docs/deploiement/configuration-keycloak-iis.md`** : « `Authority`/`Audience` codés en dur » — résolu par KC-1.
+- **`BUG_DISPLAY.MD` §6** : DET-1 présenté comme bloquant — livré. Restent trois vérifications
+  d'exploitation : mission **retour**, lieu **non référencé**, **fraîcheur des coordonnées** (pas de
+  re-géocodage sur édition d'adresse : **à traiter avant tout usage navigation**).
+- **`endPoint.md` §5** : `engagedOnly` encore décrit comme une demande — honoré par Orders.
+- **`refactor_result_pattern.md`** : plan terminé, à marquer comme tel.
+- **Deux liens vers `Erp.Order` sont cassés** (constaté le 2026-09-13) : `feature_order_context_devplan.md`
+  (chapitre A) et `note_vector_orderContext_mission.md` (§2) n'existent plus dans ce dépôt.
+- **`MUTUELLE_CARD_devplan.md`** et les autres devplans de fonctionnalité portent encore une section
+  « livré » : à compacter sur le même principe.
 
 ### G7 — ⚠️ RGPD (P4)
 
-Données de santé (documents, carte mutuelle, anomalies) servies par une API exposée : rétention et
-purge (3 ans), chiffrement au repos, contrôle d'accès fin sur l'image de carte, audit des accès. Un
-seul lot pour les trois familles de données.
+Documents, carte mutuelle, anomalies servis par une API exposée : rétention et purge (3 ans),
+chiffrement au repos, contrôle d'accès fin sur l'image de carte, audit des accès. Un seul lot.
 
-### G8 — ⏳ Savoir ce qui est réellement en service — *généralise G4*
+### G8 — ⏳ Savoir ce qui est réellement en service
 
-**Aucun module ne sait dire quel code il exécute ni à quelle base il parle.** Pour l'établir, il faut
-ouvrir le partage de déploiement, lire des horodatages de DLL, empiler trois couches de configuration
-à la main et deviner laquelle gagne. Chaque diagnostic commence par une enquête, et cette enquête
-n'est jamais dans le ticket.
+**Aucun module ne sait dire quel code il exécute ni à quelle base il parle.** Quatre occurrences :
+trois le 2026-08-25, **une le 2026-09-13** (publication avant commit) — cf. [`delivered.md`](delivered.md) §8.
+Le sourcelink du `.pdb` ne suffit pas : il donne le `HEAD`, pas l'état de l'arbre.
 
-**La journée du 2026-08-25 a produit trois occurrences du même manque, en quelques heures :**
+**Contenu** : une route réservée (gated comme `/api/diag`) qui expose le **commit** (SHA + date, et
+**drapeau « arbre modifié »** injecté au build), l'**environnement**, la **base résolue** (serveur +
+nom, jamais d'identifiants) et les **drapeaux** en vigueur. Idéalement, `deploy.ps1 prod` **refuse de
+publier un arbre non commité**.
+**Fin** : une requête dit quel commit tourne et sur quelle base, et une publication non commitée est
+visible — ou impossible.
 
-| Ce qui a divergé | Comment on s'en est aperçu |
-|---|---|
-| Le binaire Vector de production avait été **publié depuis un arbre de travail non commité** | par hasard, en cherchant l'origine d'un champ inattendu dans une réponse |
-| Les drapeaux de bascule étaient **armés sur le serveur, désarmés dans le fichier versionné** — shippé par la publication, donc éteints au déploiement suivant | en lisant le fichier déployé, pas l'application |
-| **Deux bases candidates pour Orders** : la vraie est `BD_ERP_SANITAIRE_DEV` sur `109`, l'autre `BD_ERP_SANITAIRE` sur `115`, schémas différents | par une erreur SQL, après avoir joué un correctif au mauvais endroit |
+---
 
-Le troisième cas est le plus instructif : **la correction n'a rien signalé.** Elle a modifié
-consciencieusement des lignes que personne ne lit. Une opération qui « réussit » sans effet est pire
-qu'une qui échoue — elle ferme le sujet.
+### G9 — ⏳ Le refus d'Orders sur le conducteur arrive à l'ambulancier sous forme de panne
 
-⚠️ **Le manque coûte encore** : vérifier le correctif d'A3 en production commence par
-`GET /order/version`, parce que rien d'autre ne dit quel commit tourne.
+**Constaté le 2026-09-13** : désigner un conducteur après la fin de la vacation est refusé par Orders
+avec un motif clair — « *La vacation s'est terminée le 13/09/2026 à 18:00 : on ne peut pas y désigner
+un conducteur après.* » (400). Vector le traite comme une panne :
 
-**Ce qu'il faut, et rien de plus** : que chaque API expose, sur une route réservée comme l'est déjà le
-diagnostic — le **commit** exécuté (SHA court + date, injecté au build), l'**environnement** retenu,
-la **base réellement résolue** après empilement des trois couches (serveur + nom, **jamais**
-d'identifiants), et l'état des **drapeaux** en vigueur.
+1. `HttpErpWriteApiClient.SetCrewDriverAsync` journalise en **`ERROR`** et lève une exception technique ;
+2. `ClSetDriverUseCase` la convertit en erreur applicative ;
+3. `POST api/driver/{crewId}` répond **400 « Orders.Api PUT crews/…/driver → 400. »** — le motif
+   d'Orders est perdu.
 
-Avec la table de suivi de schéma de **G4**, cela fait deux choses à mettre en place et **une seule
-lecture** pour répondre à « qu'est-ce qui tourne, où, et sur quoi ».
+L'ambulancier ne sait pas pourquoi et réessaie : **5 fois en 35 s** le 13/09, déjà vu les 20 et 21/08.
 
-
-> 🔎 **En attendant, un moyen fiable existe — il est juste manuel.** Le `.pdb` publié porte le
-> sourcelink, donc le **commit exact** du binaire en service :
->
-> ```
-> grep -a -o "esv83/Erp.Vector/[0-9a-f]\{40\}" \\192.168.1.112\prod_api\Vector.Api\CaSoft.Erp.USVector.Api.pdb
-> ```
->
-> C'est ce qui a permis, le 2026-08-26, d'établir que la prod tournait un commit absent de git — puis
-> de vérifier chaque publication. **Les deux modules sont désormais reproductibles depuis git** :
-> Vector à `4e6de8b` et Orders.Api à `28bb9b5`, tous deux vérifiés le 2026-08-27. Cette commande ne
-> remplace pas la route de diagnostic : elle exige un accès au partage, ne dit rien de la base
-> résolue, et personne n'y pense au moment où l'on en a besoin.
-⚠️ **À gated comme `/api/diag`** : nom de serveur et nom de base ne sont pas des secrets, mais ne se
-publient pas non plus sans authentification.
-
-**Fin** : pour chaque module en service, une requête suffit à dire quel commit tourne et sur quelle
-base — et un déploiement dont le code n'est pas commité devient visible au lieu d'être découvert.
-
-### G9 — ⛔ **La production n'écrit plus aucun journal depuis le 2026-08-24** — *à diagnostiquer avant `DEC6-E1`*
-
-**Constaté le 2026-08-28** en cherchant tout autre chose. Dans
-`\\192.168.1.112\prod_api\Vector.Api\logs\`, le fichier le plus récent — tous types confondus — date du
-**24/08 à 02:17** (`stdout_20260823050844_7680.log`) ; le dernier journal NLog est
-`usvector-api-2026-08-24.log`, 93 Ko, arrêté à **00:36**.
-
-**Quatre jours de trafic de production sans une ligne**, alors que les binaires du dossier datent du
-**27/08 à 00:21** — exactement la publication de `4e6de8b`. L'application est déployée là, elle tourne,
-elle ne journalise plus.
-
-**Ce que ce n'est pas.** Le câblage est intact (`Program.cs:317-319`, `ClearProviders()` +
-`UseNLog()`), et le seul commit qui ait jamais touché cette ligne est le rebrand de mai. Le
-`nlog.config` déployé est identique à celui du dépôt — daté du 30/06, `CopyToOutputDirectory` valant
-`PreserveNewest`, il n'est recopié que lorsqu'il change.
-
-**Première hypothèse : le disque.** Ce seul dossier pèse **~920 Mo pour 370 fichiers**, à ~20 Mo par
-jour, alors que `maxArchiveFiles="30"` devrait en garder trente — la purge ne fait donc plus son
-travail depuis longtemps, et huit autres applications partagent ce volume. Avec
-`throwConfigExceptions="false"`, un disque plein produit **exactement** ce symptôme : plus rien, sans
-erreur.
-
-**Trois vérifications, dans cet ordre** — elles demandent la main sur le serveur :
-
-1. L'**espace disque** de `192.168.1.112`, et le poids total de `prod_api`.
-2. Le **journal interne de NLog**, qui dira la cause : il est configuré en `internalLogLevel="Info"`
-   vers `${tempdir}/usvector-nlog-internal.log` — le `%TEMP%` de l'**identité du pool
-   d'applications**, pas celui de l'utilisateur connecté.
-3. Les **droits d'écriture** de cette identité sur `…\Vector.Api\logs`.
-
-⚠️ **Pourquoi c'est bloquant pour `DEC6-E1`, et pas seulement gênant.** La sonde de surface anonyme
-écrit **par le même tuyau**. Déployée en l'état, elle produirait un fichier vide — et le plan pose que
-le vide de ce fichier *vaut conclusion* : « personne n'appelle », donc on ferme `documents/content`.
-`AnonymousSurfaceProbeTests` protège contre une sonde qui regarde ailleurs ; **aucun test ne protège
-contre un pipeline de journalisation mort en production**. La mesure des 7 jours ne peut pas démarrer
-avant que ce point soit levé.
-
-**La leçon, à garder au-delà de ce cas** : une mesure dont l'absence de résultat *est* le résultat doit
-d'abord prouver qu'elle sait écrire. Un canari, pas une supposition.
-
-**Fin** : la cause est nommée, la purge fonctionne, et une ligne écrite volontairement se relit dans le
-fichier du jour.
+**Contenu** — sur le modèle de l'écriture du type de mission (`EnContextOrderWriteOutcome`) :
+`SetCrewDriverAsync` rend un résultat typé pour les refus métier (400, 404, 409) en conservant le
+`detail` d'Orders, journalisé en `WARN` ; le cas d'usage renvoie ce motif tel quel. Même code HTTP pour
+l'app, texte seul (D14). **Fin** : l'écran affiche le motif d'Orders, plus d'`ERROR` pour un refus.
 
 ## H. ⚪ Différé (V2 / hors MVP)
 
-- **`Vd-1` — base `DB_VECTOR` dédiée** (renommage/relogement, secrets séparés) : **pertinent dès
-  maintenant**, seul jalon DMZ non conditionné à la V2.
-- **`CREW-2` — accès anticipé à cheval sur minuit** : à 23:50, une vacation démarrant à 00:15 ne
-  remonte pas. Correctif connu (élargir la requête à J+1 puis dédoublonner), **non prioritaire** —
-  décision métier du 2026-08-02 : les vacations de nuit ne sont pas concernées.
-- **Durcissement DMZ événementiel** (`Vd-2` à `Vd-4`, `Vd-7`, `Vd-8`) : projection poussée, Outbox
-  généralisée + bridge + RabbitMQ, contrats d'événements — et **push temps réel** (SignalR) en
-  remplacement du polling régulateur. *Le socle retenu reste l'API HTTP à travers firewall* :
+- **`Vd-1` — base `DB_VECTOR` dédiée** : **pertinent dès maintenant**, seul jalon DMZ non conditionné à la V2.
+- **`CREW-2` — accès anticipé à cheval sur minuit** : correctif connu (J+1 puis dédoublonner), non
+  prioritaire (vacations de nuit non concernées, décision du 2026-08-02).
+- **Durcissement DMZ événementiel** (`Vd-2` à `Vd-4`, `Vd-7`, `Vd-8`) et **push temps réel** :
   [`spec_architecture_vector_mission_dmz.md`](spec_architecture_vector_mission_dmz.md).
-- **`Vd-6` — photos hors SQL** (base = référence + métadonnées, purge à 3 ans, migration des blobs)
-  et **`Vd-5` — masquage** (NIR partiel, visibilité de l'équipage retour calculée côté interne).
-- **Assembly de contrats partagé `Orders.Contracts`** (option 4b) — anti-dérive du JSON. Le risque de
-  drift est **assumé** : il se manifestera par un champ silencieusement null, pas par une erreur.
-- **Éviction ciblée du cache d'identité**, **mode offline**, **géolocalisation avancée**, et le
-  **renommage** `CaSoft.Erp.USVector.*` → `CaSoft.Erp.Vector.*`.
+- **`Vd-6` — photos hors SQL** et **`Vd-5` — masquage** (NIR partiel, équipage retour).
+- **Assembly de contrats partagé `Orders.Contracts`** (4b) — drift JSON assumé.
+- **Éviction ciblée du cache d'identité**, **mode offline**, **géolocalisation avancée**, **renommage**
+  `CaSoft.Erp.USVector.*` → `CaSoft.Erp.Vector.*`.
 
 ---
 
-# 4. Où vit quoi
-
-| Donnée | Emplacement | Autorité |
-|---|---|---|
-| Missions, commandes, équipages, véhicules, personnel, bénéficiaires | Orders (`BD_ERP_SANITAIRE_DEV`), lu par API HTTP | **Orders** |
-| Jalons terrain détaillés, signature, anomalies, documents, carte mutuelle, file de projection | Base Vector (`BD_ERP_MOBILE_APP`, tables `MOB_*`) | **Vector** |
-| Avancement opérationnel projeté + statut de transfert | Orders (`ORD_MISSION_OPERATIONAL`, `MIS_TRANSFER_STATUS` / `MIS_TRANSFERRED_AT` / `MIS_BILLED_AT`) | **Orders** (Vector pousse, Certification écrit le statut) |
-| Type de mission (contexte) et attributs de facturation | Orders (`ORD_ORDER_CONTEXT*`) — **basculé, en service depuis le 2026-08-25** (§3.A) | **Orders** |
-| Identité patient : `DDN`, `NIR` | Fiche bénéficiaire Orders (`BEN_BIRTH_DATE`, `BEN_NIR`) ; l'attribut de contexte n'est qu'un **canal de collecte** — et il s'arrête à la commande quand la fiche vient du référentiel (§3.A3) | **Orders** |
-| Rattachement compte Keycloak ↔ ambulancier | `PER_KEYCLOAK_MAP` (Orders) → **cible : module Identity** (§3.C1) | **Identity** |
-
-## 4.1 Migrations SQL
-
-| Base | Script | Contenu | État |
-|---|---|---|---|
-| Orders | `026_AddKeycloakMap.sql` | `PER_KEYCLOAK_MAP` | 🟢 appliqué |
-| Orders | `034_AddMissionOperationalAndTransfer.sql` | `ORD_MISSION_OPERATIONAL` + `MIS_TRANSFER_STATUS` | 🟢 appliqué 2026-06-22 ⚠️ *(référencé `027` dans l'historique — cf. §3.G4)* |
-| Orders | `057` / `058` | attributs `DDN` / `NIR` du contexte | 🟠 `057` appliqué 2026-08-22 ; `058` **servi en production mais marqué « à appliquer »** — la base a divergé (§3.B10, §3.G4) |
-| Orders | `063` | `OCT_FIELD_OVERRIDABLE` (surchargeabilité au catalogue) | 🟢 joué 2026-08-25 sur `109` et `118` — *ne pas rejouer `062`* |
-| Orders | `064` | `COMMENTS` / `PHONES` / `MAILS` rendus globaux | ⏳ prêt, non joué (§3.B10) |
-| Vector | `MOB_001` → `MOB_006` | session/timeline/signature · catalogue contrat + overlay · carte mutuelle · anomalies · documents · file de projection | 🟢 appliqués |
-| Vector | `MOB_007` | libellé `ART80` corrigé en « Article 80 » | 🟢 appliqué |
-
-> État **vérifié le 2026-08-24** sur `BD_ERP_MOBILE_APP` (192.168.1.109) : les 13 tables `MOB_*` sont
-> présentes. ⚠️ Rien ne garantit l'alignement des **autres** environnements — il n'existe aucune table
-> de suivi de schéma (§3.G4).
-
----
-
-# 5. Configuration & déploiement
-
-*Procédure complète (IIS, pool, permissions, service account de diag, checklist) :*
-[`docs/deploiement/configuration-keycloak-iis.md`](docs/deploiement/configuration-keycloak-iis.md).
-*Ici, seulement ce qui a déjà cassé la production.*
-
-**Clés lues** : `ConnectionStrings:MobileDb` (`OrdersDb` inutilisé depuis le découplage) ·
-`OrdersApi:BaseUrl` · `AddressApi:BaseUrl` ·
-`Keycloak:{Enabled, Authority, Audience, DisableValidation, RequireHttpsMetadata, AdminClientId, AdminClientSecret}` ·
-`Diagnostics:Enabled` · `MobileIdentityCache:{PersonnelMinutes=30, ActiveCrewsMinutes=15}` · secrets
-GpsGate/Sirus `__SET_VIA_ENV__`.
-
-## 5.1 Les quatre pièges avérés
-
-| Piège | Conséquence | Règle |
-|---|---|---|
-| `OrdersApi:BaseUrl` **sans slash final** | le dernier segment est perdu → 500 sur la joblist (panne réelle, juillet 2026) | terminer par `/`, PathBase IIS inclus |
-| Publication **RID `win-x64`** | `SqlClient` charge sa façade « PlatformNotSupported » → SQL injoignable | publier **portable** (les profils le sont, c'est voulu) |
-| `Keycloak:DisableValidation=true` hors dev | jetons décodés sans vérification | **`false` en prod** ; une `Authority` vide ou restée au placeholder **empêche le démarrage** avec un message explicite, plutôt qu'une série de 401 sans cause lisible |
-| `Diagnostics:Enabled=true` en prod | expose la résolution d'identité et la liste des comptes Keycloak | **dev/staging seulement** ; ailleurs `/api/diag*` rend 404, c'est voulu |
-
-> ℹ️ `Audience` sert aussi d'**`azp` attendu** : l'audience n'est volontairement pas validée (Keycloak
-> émet `aud=account` sans mapper sur le realm) ; c'est l'`azp` qui est contrôlé, signature, issuer et
-> expiration restant validés.
-
-## 5.2 Règle de config des serveurs — trois couches à ne pas confondre
-
-C'est la source des régressions d'authentification et de résolution d'adresses :
-**`web.config`** (serveur, manuel, jamais régénéré, hors git) porte l'environnement et les secrets et
-survit à toute publication · **`appsettings.json`** fait partie de la sortie de publication, donc
-porte la **valeur de référence (celle de la prod)**, jamais une valeur de poste local ·
-**`appsettings.{Environment}.json`** est shippé **et** prioritaire : c'est là qu'on décrit les
-**déviations**.
-
-> Règle : le défaut sûr est dans la base, les écarts dans l'overlay — **jamais** une valeur éditée à
-> la main sur le serveur, qui n'est protégée que par un hasard d'incrémentalité MSBuild.
-
-## 5.3 Déploiement
-
-`.\deploy.ps1 dev` · `.\deploy.ps1 prod` (confirmation à taper ; `-Force` en non-interactif) →
-`\\192.168.1.112\{dev_api,prod_api}\Vector.Api`. Le script fait un **pré-vol** (partage accessible),
-vérifie l'horodatage bin↔UNC et que `appsettings.json` a bien atterri. `app_offline.htm` est posé puis
-retiré → **courte coupure de l'API** à chaque publication.
-Prérequis : `net use \\192.168.1.112\prod_api /user:192.168.1.112\DeployApi *`.
-
-⚠️ **Le script publie l'arbre de travail local, sans référence à un commit** : ce qui tourne est ce
-qui était dans le répertoire au moment du déploiement, pas ce qui est sur la branche. Le vérifier est
-l'objet de **G8**. Quand un correctif touche Vector **et** Orders, déployer **Orders d'abord** : le
-sens inverse laisse Vector servir les anciennes règles, sans casse mais sans effet.
-
----
-
-# 6. Retiré du plan — obsolète ou abandonné
-
-*Conservé uniquement pour ne pas réinstruire ces pistes.*
-
-| Ce qui a disparu | Motif |
-|---|---|
-| **Accès in-process aux projets Orders** (références projet) et **schéma DMZ strict comme cible V1** | Vector consomme `Orders.Api` en HTTP et joint sa base à travers un firewall : isolation de build obtenue, architecture conforme, le durcissement événementiel devient une option V2 (§3.H). `ConnectionStrings:OrdersDb` est devenu inutilisé. |
-| **Traduction des ids de contexte par code** (`OC-4`) | Échafaudage de la bascule : les deux catalogues ne partageaient pas leurs ids (`4` = `ART80` côté Vector, `CENTRE15` côté Order), et relayer l'entier reçu aurait écrit « Centre 15 » là où l'ambulancier cochait « Article 80 ». Depuis A1, l'id reçu est déjà celui d'Order. `STANDARD → CPAM` arbitré le 2026-08-24. |
-| **Préalables d'armement de la bascule** (Order OC-28 déployé, cadenas affiché, ids en dur levés) | Tous levés et mesurés le 2026-08-25 ; l'armement a eu lieu le jour même. |
-| **Table de correspondance `MOB_CREW_MAP`** (équipage `int` ↔ `Guid`) | Tranché : toutes les identités de référence passent en Guid. La table n'a jamais existé. |
-| **Accusé de réception distinct** (`MST_ACK_AT`, `ClAckJobUseCase`) | Remplacé par le marqueur **« Mission vue »**. `MST_ACK_AT` reste dormante ; `IsAck` survit comme alias (§3.G2). |
-| **Login déclaratif `api/login`** et le jeton Guid de `MOB_SESSION` comme source d'authentification | Remplacés par Keycloak. |
-| **Claim `per_id` dans le jeton** | Écarté (2026-07-12) : figé jusqu'au prochain login et non invalidable ; sous turnover, la résolution HTTP cachée est préférée car son cache s'invalide (TTL ramené à 30 min). |
-| **Table `MOB_KM`** telle que planifiée | Le kilométrage est équipage/véhicule-scoped ; il n'y a pas de km par mission. Le besoin réel reste à arbitrer (§3.E1). |
-| **Catalogue autonome de contrats** (`MOB_CONTRACT_*`), son **seed métier** et la **purge des valeurs orphelines** | Le référentiel passe côté Order (§3.A). Le seed provisoire `STANDARD` + `ART80` ne sera jamais complété ; la purge serait au pire un script ponctuel, pas une fonctionnalité. |
-| **Interfaces legacy `IContractTypeRepository` / `IAttributsRepository` / `IInvoicingRepository`** et `JobRepository.UpdateCommande` / `.Invoicing` | Remplacées par un port ciblé, lui-même remplacé par les endpoints ContextOrder. **Retirées le 2026-08-26** (§3.A5). |
-| **`FetchInstructionList` / `AckInstruction` / `GetCrewIdList(date)` / `GetCrewDriver(vehicleId)`** | Aucun équivalent ERP ; hors périmètre, laissés en `NotImplementedException`. |
-| **Blocages levés** : migrations `MOB_003/004/005` « à exécuter en db_owner » · « projection du statut de fin différée, faute de transition côté Orders » | Résolus : tables présentes en base (§4.1) ; la dérivation existe et Vector la pousse — seule la clôture reste la main du régulateur (D11). |
-| **Documents « source PDF ERP »** | Livré autrement : documents et photos stockés côté Vector, servis par Vector.Api. |
-| **Lot Certification TRF-12..15 tel que planifié**, dont la **restitution de la carte mutuelle** | La réalité est un partage Certification / facturation, largement livré (§3.E) ; le bloc mutuelle est tiré via le paquet terrain. |
-| **Arbitrages tranchés** : 4a vs 4b (découplage) · 2a/2b/2c (champs mutuelle) · « défaut = premier contexte actif » | Respectivement **4a**, **2b**, et **supprimé** (« non renseigné » est un état valide). |
-| **Extension de l'écran Siège `UcEmployeeKeycloakAccount`** comme hôte du mapping Keycloak | Le module Siège n'existe plus que dans `Archives/` et la correspondance passe à Identity (§3.C1). |
-| **CORS** — `Program.cs` fait `AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()` | Sujet réel, adjacent aux écrans qui affichent la carte mutuelle, et déjà noté en TODO dans le code — mais le mêler à `DEC-6` rendrait toute régression indémêlable. |
-| **`Microsoft.Extensions.Http.Resilience`** pour `DEC-7` | Introuvable dans tout le parc : l'introduire ferait de Vector le seul module à porter **deux** modèles de résilience (`T2`, §3.C2). |
-| **`DEVPLAN_2.md`**, plan d'exécution séparé de `DEC-6` et `DEC-7` | **Fusionné ici le 2026-08-27** (§3.C2 et §3.D), puis sorti du dépôt. Deux documents pour un même chantier, c'étaient deux états : celui du plan principal, et celui du plan d'exécution — et le second a menti pendant un jour (« aucune étape livrée » alors que `DEC6-E1` l'était). Un seul plan porte l'état. |
-| **Historique de portage legacy** (divergences framework, namespaces, warnings) et **dettes C4, C5, C6, KC-1, DEP-2, DET-1, DET-2, DET-3** | Portage terminé, dettes résolues et vérifiées ; l'information vit dans `git log`. |
-
----
-
-# 7. Documents voisins
+# 2. Documents voisins
 
 | Doc | Genre | Ce qu'il apporte |
 |---|---|---|
-| [`AppMobile_specifications.md`](AppMobile_specifications.md) | Spec fonctionnelle | Le besoin et le vocabulaire (plan de travail, statuts terrain, isolation par équipage, séparation officiel↔terrain) |
-| [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) | Devplan | Carte mutuelle : capture, restitution, OCR (§3.F1-F2) |
-| [`VECTOR_ORDERS_DECOUPLING_devplan.md`](VECTOR_ORDERS_DECOUPLING_devplan.md) | Devplan | Découplage HTTP : contrat consommé, auth de service, résilience (§3.C2, §3.D) |
-| [`PROJECTION_TERRAIN_devplan.md`](PROJECTION_TERRAIN_devplan.md) | Devplan | Projection du terrain vers Order — ce que `field-data` cesserait de composer (§3.A4, §3.E3) |
-| [`refactor_result_pattern.md`](refactor_result_pattern.md) | Devplan refactoring | Result pattern, vague 2 (§3.G1) |
-| [`plan_correctif_vector_fallback_snapshot.md`](plan_correctif_vector_fallback_snapshot.md) | Plan correctif | Repli sur le snapshot `ORD_ORDER` — **à coder dans `Erp.Order`** (§3.B2) |
-| [`feadesc_utilisateurs_connectes_vector.md`](feadesc_utilisateurs_connectes_vector.md) | Spec | Présence des utilisateurs connectés (§3.F4) |
-| [`spec_architecture_vector_mission_dmz.md`](spec_architecture_vector_mission_dmz.md) | Spec architecture | Cible DMZ événementielle (option V2) |
+| [`delivered.md`](delivered.md) | Livré | Ce que le module fait, journal daté, décisions, configuration, pistes retirées, incidents |
+| [`AppMobile_specifications.md`](AppMobile_specifications.md) | Spec fonctionnelle | Le besoin et le vocabulaire |
+| [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) | Devplan | Carte mutuelle (F1-F2) |
+| [`PROJECTION_TERRAIN_devplan.md`](PROJECTION_TERRAIN_devplan.md) | Devplan | Projection du terrain vers Order |
+| [`TRACABILITE_SAISIES_VECTOR_EXPORT.md`](TRACABILITE_SAISIES_VECTOR_EXPORT.md) | Relevé | Des saisies Vector aux 91 colonnes de facturation |
+| [`VECTOR_ORDERS_DECOUPLING_devplan.md`](VECTOR_ORDERS_DECOUPLING_devplan.md) | Devplan | Auth de service, résilience (C2, D) |
+| [`plan_correctif_vector_fallback_snapshot.md`](plan_correctif_vector_fallback_snapshot.md) | Plan correctif | B2, **à coder dans `Erp.Order`** |
+| [`feadesc_utilisateurs_connectes_vector.md`](feadesc_utilisateurs_connectes_vector.md) | Spec | Présence (F4) |
 | [`endPoint.md`](endPoint.md) | Contrat HTTP | Ce que Vector attend d'Orders.Api |
-| [`docs/auth/optimisation-chaine-authentification.md`](docs/auth/optimisation-chaine-authentification.md) · [`docs/auth/diag-404-second-membre-equipage.md`](docs/auth/diag-404-second-membre-equipage.md) | Notes | Chaîne d'identité et caches · procédure de diagnostic (§3.C3) |
-| [`../Erp.Order/note_vector_orderContext_mission.md`](../Erp.Order/note_vector_orderContext_mission.md) | Note d'intégration | ContextOrder : endpoints, attributs, règles DDN/NIR/PMT/BT |
-| [`../Erp.Order/DB_UPDATE.MD`](../Erp.Order/DB_UPDATE.MD) | Exploitation | État des scripts Orders, et **sur quelle base les jouer** (§3.B10, §3.G4) |
-| [`note_web_alexandre_context_mission_dto.md`](note_web_alexandre_context_mission_dto.md) | Contrat front | **Les DTO de la bascule du contexte, tels qu'ils répondent en production** (§3.A1) |
-| `note_ui_alex.md`, `note_web_alexandre_*.md`, `docs/ui-web/*` | Contrats front | Ce qui est promis au dev web |
-| `docs/deploiement/*`, `BUG_DISPLAY.MD`, `README.md` | Exploitation | ⚠️ périmés par endroits — cf. §3.G6 |
+| [`docs/auth/diag-404-second-membre-equipage.md`](docs/auth/diag-404-second-membre-equipage.md) | Procédure | C3 |
+| [`../Erp.Order/note_vector_orderContext_mission.md`](../Erp.Order/note_vector_orderContext_mission.md) | Note d'intégration | ContextOrder : endpoints, attributs, règles |
+| `note_web_alexandre_*.md`, `note_ui_alex.md`, `docs/ui-web/*` | Contrats front | Ce qui est promis au dev web |
 
 ---
 

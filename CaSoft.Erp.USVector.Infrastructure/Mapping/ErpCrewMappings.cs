@@ -23,7 +23,11 @@ internal static class ErpCrewMappings
 
         var crew = new ClCrew(dto.Id, employees, dto.ServiceStart, vehicle, dto.ServiceEnd)
         {
-            HasVehicle = dto.Vehicle is not null
+            HasVehicle = dto.Vehicle is not null,
+            // Clôturé = statut Closed chez Orders, et rien d'autre. La fin de service peut être théorique
+            // (début + 10 h, depuis le 13/09/2026) et dépassée par un équipage encore en route : la lire
+            // comme une clôture a exclu des ambulanciers en plein service le soir même.
+            IsServiceEnded = dto.Status == ErpCrewFullDto.ClosedStatus
         };
 
         // Conducteur actif : uniquement s'il fait partie des membres (cohérence).

@@ -10,8 +10,13 @@ public interface IErpWriteApiClient
     /// <summary>
     /// Projette les jalons opérationnels d'une mission (PUT /missions/{id}/operational, TRF-3).
     /// Jalons cumulatifs : seuls ceux fournis (non null) sont posés côté ERP.
+    /// <para>
+    /// Une mission inconnue d'Orders (404) n'est <b>pas</b> une panne : elle remonte en
+    /// <see cref="EnOperationalProjectionOutcome.MissionNotFound"/>, pour que l'appelant cesse de
+    /// relancer. Seul un échec réellement technique (5xx, réseau) lève.
+    /// </para>
     /// </summary>
-    Task ProjectOperationalAsync(
+    Task<EnOperationalProjectionOutcome> ProjectOperationalAsync(
         Guid missionId,
         DateTime? ackAt, DateTime? readAt, DateTime? goAt,
         DateTime? onsiteAt, DateTime? terminateAt,
@@ -79,6 +84,22 @@ public interface IErpWriteApiClient
 public sealed record ContextOrderValuesWriteResult(
     EnContextOrderValuesWriteOutcome Outcome,
     string? Reason = null);
+
+/// <summary>
+/// Issue d'une projection opérationnelle (TRF-3). Seul le 404 est un refus attendu : tout autre échec
+/// lève, et l'outbox le relance.
+/// </summary>
+public enum EnOperationalProjectionOutcome
+{
+    /// <summary>2xx — jalons projetés.</summary>
+    Applied,
+
+    /// <summary>
+    /// 404 — mission introuvable côté ERP (supprimée, ou jamais connue). Définitif : relancer ne la
+    /// fera pas réapparaître.
+    /// </summary>
+    MissionNotFound
+}
 
 /// <summary>
 /// Issue d'une écriture de valeurs d'attributs (OC-5). Les trois refus sont des cas métier attendus.

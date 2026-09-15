@@ -99,9 +99,21 @@ public sealed class ErpCrewListItemDto
 /// </summary>
 public sealed class ErpCrewFullDto
 {
+    /// <summary>Statut <see cref="Status"/> d'une vacation terminée chez Orders (<c>EnCrewStatus.Closed</c>).</summary>
+    public const int ClosedStatus = 2;
+
     public Guid Id { get; set; }
     public DateTime ServiceStart { get; set; }
+
+    /// <summary>
+    /// Fin de service. ⚠️ <b>Ne dit pas que le service est terminé</b> : depuis le 13/09/2026, Orders pose
+    /// une fin <b>théorique</b> (début + 10 h) dès la création de la vacation. Un équipage qui la
+    /// dépasse est encore en route — seul <see cref="Status"/> dit la clôture.
+    /// </summary>
     public DateTime? ServiceEnd { get; set; }
+
+    /// <summary>Statut de la vacation : 0 = Draft, 1 = Ready, 2 = Closed (<c>EnCrewStatus</c> d'Orders).</summary>
+    public int Status { get; set; }
     public ErpCrewVehicleDto? Vehicle { get; set; }
     /// <summary>Conducteur actif, ou null si aucun n'a encore été désigné.</summary>
     public ErpCrewDriverDto? ActiveDriver { get; set; }

@@ -66,15 +66,28 @@ Public Class ClCrew
     ''' <summary>
     ''' L'équipage est-il sélectionnable par le terrain à l'instant <paramref name="at"/> ? Trois conditions
     ''' cumulatives : <b>ouvert</b> (<see cref="SelectableFrom"/> &lt;= <paramref name="at"/>, soit la prise de
-    ''' service ou les <see cref="EarlyAccessMinutes"/> min qui la précèdent), <b>non clôturé</b> (ni fin de
-    ''' service déclarée, ni fenêtre de vacation dépassée) et <b>non obsolète</b> (durée écoulée &lt;=
+    ''' service ou les <see cref="EarlyAccessMinutes"/> min qui la précèdent), <b>non clôturé</b> (vacation
+    ''' clôturée chez Orders — la fin de service, parfois théorique, n'y entre pas) et <b>non obsolète</b> (durée écoulée &lt;=
     ''' <see cref="MaxServiceDurationHours"/> h — au-delà, vacation probablement oubliée).
     ''' </summary>
     Public Function IsSelectableAt(at As DateTime) As Boolean
-        Dim started = SelectableFrom <= at
-        Dim closed = IsServiceEnded OrElse (_serviceEnd.HasValue AndAlso _serviceEnd.Value < at)
-        Dim obsolete = (at - _serviceStart) > TimeSpan.FromHours(MaxServiceDurationHours)
-        Return started AndAlso Not closed AndAlso Not obsolete
+        Return UnselectableReasonAt(at) = EnCrewUnselectableReason.None
+    End Function
+
+    ''' <summary>
+    ''' Motif pour lequel l'équipage n'est pas sélectionnable à <paramref name="at"/>, ou
+    ''' <see cref="EnCrewUnselectableReason.None"/> s'il l'est. Seule source de la règle de
+    ''' <see cref="IsSelectableAt"/>. Ordre des tests : la clôture d'abord — un service fini ne rouvre
+    ''' pas, même dans la fenêtre d'accès anticipé —, puis l'ouverture à venir, puis l'expiration.
+    ''' </summary>
+    Public Function UnselectableReasonAt(at As DateTime) As EnCrewUnselectableReason
+        ' Clôturé = vacation clôturée chez Orders (IsServiceEnded), JAMAIS « fin de service dépassée » :
+        ' depuis le 13/09/2026, Orders pose une fin théorique (début + 10 h) dès la création, et un
+        ' équipage qui la dépasse est encore en service. L'expiration (> MaxServiceDurationHours) reste le filet.
+        If IsServiceEnded Then Return EnCrewUnselectableReason.Closed
+        If SelectableFrom > at Then Return EnCrewUnselectableReason.NotYetOpen
+        If (at - _serviceStart) > TimeSpan.FromHours(MaxServiceDurationHours) Then Return EnCrewUnselectableReason.Expired
+        Return EnCrewUnselectableReason.None
     End Function
 
 

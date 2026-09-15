@@ -23,7 +23,7 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
         _logger = logger;
     }
 
-    public async Task ProjectOperationalAsync(
+    public async Task<EnOperationalProjectionOutcome> ProjectOperationalAsync(
         Guid missionId,
         DateTime? ackAt, DateTime? readAt, DateTime? goAt,
         DateTime? onsiteAt, DateTime? terminateAt,
@@ -39,9 +39,19 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
             sourceCrewId
         };
         var response = await _http.PutAsJsonAsync($"missions/{missionId}/operational", body, JsonOptions, ct);
-        if (response.IsSuccessStatusCode) return;
+        if (response.IsSuccessStatusCode) return EnOperationalProjectionOutcome.Applied;
 
         var content = await response.Content.ReadAsStringAsync(ct);
+
+        // 404 = mission inconnue d'Orders : définitif, pas une panne. L'outbox abandonne l'entrée au
+        // lieu de la relancer sans fin (55 414 tentatives constatées le 2026-09-13 sur une mission).
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            _logger.LogWarning("Orders.Api PUT missions/{MissionId}/operational : mission introuvable (404) {Body}",
+                missionId, content);
+            return EnOperationalProjectionOutcome.MissionNotFound;
+        }
+
         _logger.LogError("Orders.Api PUT missions/{MissionId}/operational a échoué : {Status} {Body}",
             missionId, (int)response.StatusCode, content);
         throw new HttpRequestException($"Orders.Api PUT missions/{missionId}/operational → {(int)response.StatusCode}.");

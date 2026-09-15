@@ -47,7 +47,8 @@ public sealed class CrewChainDiagnostic
                     crewInfo.ServiceEnd = dto.ServiceEnd;
                     crewInfo.IsMember = dto.Members.Any(m => m.Id == personnelId.Value);
                     crewInfo.Started = dto.ServiceStart.AddMinutes(-ClCrew.EarlyAccessMinutes) <= at;
-                    crewInfo.NotClosed = !(dto.ServiceEnd.HasValue && dto.ServiceEnd.Value < at);
+                    // Statut, pas fin de service : la fin peut être théorique et dépassée (13/09/2026).
+                    crewInfo.NotClosed = dto.Status != ErpCrewFullDto.ClosedStatus;
                     crewInfo.NotObsolete = at - dto.ServiceStart <= TimeSpan.FromHours(ClCrew.MaxServiceDurationHours);
                     crewInfo.Selectable = crew.IsSelectableAt(at); // règle domaine réelle
                     crewInfo.Members = dto.Members
