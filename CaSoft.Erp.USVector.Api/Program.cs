@@ -183,6 +183,10 @@ builder.Services.AddHttpClient<IErpReadApiClient, HttpErpReadApiClient>(c =>
 builder.Services.AddHttpClient<IErpWriteApiClient, HttpErpWriteApiClient>(c =>
     c.BaseAddress = OrdersBaseUri(builder.Configuration));
 
+// Confirmation de prise de service depuis l'application (lecture + confirmation, sans jeton).
+builder.Services.AddHttpClient<IShiftConfirmationService, HttpShiftConfirmationService>(c =>
+    c.BaseAddress = OrdersBaseUri(builder.Configuration));
+
 // Contrat mobile inchangé : PascalCase comme l'ancienne WebApi (pas de camelCase).
 builder.Services.AddControllers()
     .AddJsonOptions(options =>

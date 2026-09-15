@@ -268,6 +268,44 @@ GET /crews/{crewId}/missions?engagedOnly=true
 
 ---
 
+## 6) Confirmation de prise de service depuis l'application — ✅ implémenté 2026-09-15
+
+L'ambulancier voit au lancement de l'application qu'une confirmation l'attend, et confirme sans passer
+par le lien du courriel (utile quand le message n'est jamais arrivé). **Aucun jeton ne circule** : Order
+n'en garde que l'empreinte, et en obtenir un exigerait `POST …/link`, qui tue le lien du courriel,
+repousse l'échéance et inscrit un faux « Envoi » dans l'historique.
+
+### 6.1 `GET /personnel/{personnelId}/shift-confirmations/pending`
+Demandes actives (en attente d'envoi, envoyées, en erreur d'envoi) de cet équipier, **tous équipages
+confondus**, équipier toujours membre, vacation non terminée. Liste vide = rien à confirmer.
+```jsonc
+[ { "requestId": "…", "crewId": "…", "crewLabel": "A601",
+    "proposedLocalTime": "2026-09-16T07:00:00", "status": 1, "sentAtUtc": "2026-09-15T18:00:00" } ]
+```
+> Part du **personnel** et non de l'équipage : une demande part souvent la veille, alors que
+> `CrewAccess` n'ouvre un équipage que 30 min avant sa prise de service.
+
+### 6.2 `POST /crews/{crewId}/shift-confirmations/{requestId}/confirm`
+Corps `{ "personnelId": "…" }` — le PER_ID que **Vector** a résolu du jeton Keycloak. Order enregistre
+`ValideeParAmbulancier`, origine **`Portail`**.
+
+| Code | Corps | Cas |
+|------|-------|-----|
+| `200` | `{ firstName, proposedLocalTime, confirmed, alreadyConfirmed }` | confirmé — ou déjà confirmé (second appel, lien du courriel utilisé avant) |
+| `404` | ProblemDetails | demande inconnue, **ou d'un autre équipage / autre équipier** (indiscernables, volontairement) |
+| `400` | ProblemDetails (`detail` affichable) | demande remplacée, ou déjà validée par le régulateur |
+
+> L'expiration du lien **ne barre pas** ce chemin (§7.7 de la spec Order). ⚠️ Order reçoit l'identité,
+> il ne la prouve pas — même limite que le « régulateur » des routes de régulation (itération 21 d'Order).
+
+### Routes mobiles (Vector)
+| Route | Réponse |
+|-------|---------|
+| `GET api/personnel/me/shift-confirmations/pending` (`me` = porteur du jeton) | `200 { HasPending, Pending: [ { RequestId, CrewId, CrewLabel, ProposedLocalTime } ] }` · `503` si Order ne répond pas |
+| `POST api/ShiftConfirmation/{crewId}/{requestId}/confirm` | `200 { Confirmed, AlreadyConfirmed, ProposedLocalTime }` · `404` · `400` (motif d'Order) · `503` |
+
+---
+
 ## Côté Vector (déjà en place — pour info)
 
 | Élément Vector | Appelle |
@@ -278,6 +316,8 @@ GET /crews/{crewId}/missions?engagedOnly=true
 | `POST /vector/api/Driver/{crewId}` (body = PER_ID) | change le conducteur |
 | `HttpErpWriteApiClient.ProjectOperationalAsync(...)` (worker Outbox) | `PUT missions/{id}/operational` (snapshot complet) |
 | `HttpErpReadApiClient.ListMissionsByCrewAsync(crewId)` (joblist terrain) | `GET crews/{crewId}/missions?engagedOnly=true` (§5 — envoyé d'avance) |
+| `HttpShiftConfirmationService.GetMineAsync(personnelId)` | `GET personnel/{personnelId}/shift-confirmations/pending` (§6.1) |
+| `HttpShiftConfirmationService.ConfirmAsync(crewId, requestId, personnelId)` | `POST crews/{crewId}/shift-confirmations/{requestId}/confirm` (§6.2) |
 
 Une fois §1–§2 livrés, la feature Driver fonctionne de bout en bout. Pour §3, dès qu'Orders.Api
 traite `null = effacé`, le **retour arrière** remonte automatiquement à la régulation, **sans
