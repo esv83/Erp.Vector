@@ -187,10 +187,10 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         }
 
         /// <summary>Octets de l'image d'une carte (Content-Type d'origine).</summary>
-        // ⛔ Octets de la carte mutuelle, annoncés par le paquet terrain (ImageUrl) et tirés par la
-        // facturation sans jeton — D8. ⚠️ Donnée de santé : c'est l'ouverture la plus sensible des
-        // quatre, et la première à refermer avec DEC-6 (§3.C2).
-        [AllowAnonymous]
+        // Octets de la carte mutuelle, annoncés par le paquet terrain (ImageUrl) — D8. ⚠️ Donnée de
+        // santé, anonyme jusqu'au 19/09 faute de DEC-6 : désormais la facturation avec son jeton de
+        // service, ou l'app avec le sien. Les deux routes d'affichage ci-dessus restent ouvertes (M9).
+        [Authorize(Policy = ClKeycloakCallers.ServiceOrMobilePolicy)]
         [HttpGet("mutuelle-card/{cardId:guid}/image")]
         public IActionResult GetImage(Guid cardId)
             => ServirImage(_repository.GetImage(cardId));

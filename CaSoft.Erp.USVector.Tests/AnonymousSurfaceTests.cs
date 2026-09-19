@@ -1,5 +1,6 @@
 using System.Reflection;
 using CaSoft.Erp.USVector.Api.Controllers;
+using CaSoft.Erp.USVector.Api.Infrastructure;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -27,16 +28,16 @@ namespace CaSoft.Erp.USVector.Tests;
 public class AnonymousSurfaceTests
 {
     /// <summary>
-    /// Tirées par la facturation en serveur-à-serveur, sans jeton, faute d'authentification de
-    /// service (DEC-6, devplan §3.C2). C'est leur unique justification, et elle est <b>temporaire</b> :
-    /// ces quatre entrées disparaissent le jour où Vector saura présenter un jeton.
+    /// Les quatre routes que la facturation tire en serveur-à-serveur. <b>Anonymes jusqu'au
+    /// 2026-09-19</b>, faute d'authentification de service (DEC-6) ; fermées le jour où la facturation
+    /// a présenté son jeton. Elles admettent désormais le service <b>ou</b> l'app — pas l'anonyme.
     /// </summary>
-    private static readonly string[] OuverturesFauteDeDec6 =
+    private static readonly string[] FermeesAvecDec6 =
     {
-        "DocumentController.GetContent",      // octets d'un document — tirés par la facturation (D8)
-        "FieldDataController.Get",            // paquet terrain — tiré par la facturation
-        "MutuelleCardController.GetImage",    // ⚠️ donnée de santé — tirée par la facturation (D8)
-        "SignatureController.GetSignature"    // octets de la signature — tirés par la facturation (D8)
+        "DocumentController.GetContent",      // octets d'un document (D8)
+        "FieldDataController.Get",            // paquet terrain
+        "MutuelleCardController.GetImage",    // ⚠️ donnée de santé (D8)
+        "SignatureController.GetSignature"    // octets de la signature (D8)
     };
 
     /// <summary>
@@ -67,7 +68,7 @@ public class AnonymousSurfaceTests
     };
 
     private static IEnumerable<string> SurfaceAttendue
-        => OuverturesFauteDeDec6.Concat(OuverturesPourLesEcransAmont).Concat(OuverturesDeDiagnostic);
+        => OuverturesPourLesEcransAmont.Concat(OuverturesDeDiagnostic);
 
     [Fact]
     public void La_surface_anonyme_est_exactement_celle_qui_est_justifiee()
@@ -78,15 +79,23 @@ public class AnonymousSurfaceTests
     }
 
     /// <summary>
-    /// Le paquet terrain et les trois routes d'octets se referment ensemble, le jour où Vector saura
-    /// présenter un jeton de service. Ce test le rappellera : quand DEC-6 sera fait, ces quatre
-    /// entrées doivent disparaître de la liste.
+    /// Fermées ne suffit pas : sans leur politique, ces routes retomberaient sur la politique de repli,
+    /// qui n'admet que l'app — et la facturation recevrait des 403. Chacune doit porter
+    /// <see cref="ClKeycloakCallers.ServiceOrMobilePolicy"/>, et rien d'anonyme.
     /// </summary>
     [Fact]
-    public void Les_ouvertures_pour_la_facturation_sont_au_nombre_de_quatre()
+    public void Les_routes_de_la_facturation_exigent_un_jeton_de_service_ou_mobile()
     {
-        SurfaceAnonyme().Intersect(OuverturesFauteDeDec6)
-            .Should().HaveCount(4, "elles ne subsistent que faute d'authentification de service (DEC-6)");
+        foreach (var route in FermeesAvecDec6)
+        {
+            var (controleur, action) = (route.Split('.')[0], route.Split('.')[1]);
+            var methode = Controleurs().Single(c => c.Name == controleur)
+                .GetMethod(action, BindingFlags.Public | BindingFlags.Instance)!;
+
+            methode.GetCustomAttribute<AllowAnonymousAttribute>().Should().BeNull(route);
+            methode.GetCustomAttributes<AuthorizeAttribute>().Select(a => a.Policy)
+                .Should().Contain(ClKeycloakCallers.ServiceOrMobilePolicy, route);
+        }
     }
 
     /// <summary>

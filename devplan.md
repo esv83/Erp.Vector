@@ -82,29 +82,40 @@ d'autres dépôts et documents la citent encore.*
 > donnée de santé, l'autre empêche de publier autre chose que ce qu'on croit. Toutes deux sont
 > petites parce que leur préalable est déjà fait.
 
-## Itération 1 — Fermer les quatre routes de la facturation *[ex-C2, DEC-6]*
+## Itération 1 — Fermer les quatre routes de la facturation *[ex-C2, DEC-6]* 🟡 *codée le 19/09 — reste à publier*
 
 | | |
 |---|---|
 | **Nature** | Sécurité — une donnée de santé et le dossier terrain complet lisibles par qui connaît un identifiant |
-| **Effort** | Une petite session : quatre attributs, un test, une publication |
-| **Bloqué par** | **Rien** depuis le 19/09 à 11:48 |
+| **Effort** | Fait — reste la publication, puis le constat |
+| **Bloqué par** | **La publication** |
 
 Le paquet terrain, la signature, les documents et l'image de la carte mutuelle répondaient sans jeton
-**uniquement parce que la facturation n'en avait pas**. Elle en a un.
+**uniquement parce que la facturation n'en avait pas**. Elle en a un depuis le 19/09 à 11:48.
 
-**Le geste** : `[AllowAnonymous]` → `[Authorize(Policy = ClKeycloakCallers.ServiceOrMobilePolicy)]` sur
-les quatre routes, et `OuverturesFauteDeDec6` vidé dans `AnonymousSurfaceTests`. **Avant de publier**,
-relire la sonde (`Vector.SurfaceAnonyme`) : zéro `auth=absent` depuis la veille.
+**Condition vérifiée avant de coder** — la sonde, le 19/09 jusqu'à 15:54 : **zéro `auth=absent`** sur
+la journée. Facturation avec son jeton (615 paquets terrain, 362 signatures après 11:48), app avec le
+sien (signature, image de carte), personne sur `documents/content`.
 
-| Route | Qui l'appelle *(sonde, 15→19/09)* |
+**Codé** : `[AllowAnonymous]` → `[Authorize(Policy = ClKeycloakCallers.ServiceOrMobilePolicy)]` sur les
+quatre routes. `AnonymousSurfaceTests` : la surface anonyme ne compte plus que les deux routes
+d'affichage de la carte (M9) et le diagnostic ; un test fige que les quatre routes portent la politique
+— sans elle, elles retomberaient sur la politique de repli, qui n'admet que l'app, et la facturation
+recevrait des 403. La sonde ne mesure plus que les deux routes d'affichage. 180 tests verts.
+
+| Route | Admet désormais |
 |---|---|
-| `GET api/missions/{id}/field-data` | la facturation, avec jeton |
-| `GET api/Signature/{id}` | la facturation et l'app mobile, avec jeton |
-| `GET api/documents/{id}/content` | **personne** |
-| `GET api/mutuelle-card/{id}/image` | l'app mobile, avec jeton |
+| `GET api/missions/{id}/field-data` | la facturation ou l'app, avec jeton |
+| `GET api/Signature/{id}` | idem |
+| `GET api/documents/{id}/content` | idem |
+| `GET api/mutuelle-card/{id}/image` | idem |
 
-**Ensuite** : Orders pourra exiger un jeton du terrain — son plan l'attend de Vector.
+**Fin** : après publication, aucun 401/403 sur ces routes dans le journal — ni de la facturation
+(`192.168.1.112`), ni de l'app (`192.168.1.113`). ⚠️ **Le jour où la facturation tirera les documents
+ou l'image de carte**, elle devra y poser son jeton comme sur les deux autres.
+
+**Ensuite** : Orders pourra exiger un jeton du terrain — son plan l'attend de Vector, et les trois
+clients de Vector portent le jeton depuis l'itération 8.
 
 ## Itération 2 — Rendre impossible une publication hors de `main` *[ex-G8, partie 1]* 🟡 *codée le 19/09 — reste la première publication*
 

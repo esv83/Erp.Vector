@@ -13,10 +13,10 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         // Le DbContext legacy (BD_REGULATION_PROD) injecté ici n'était pas utilisé :
         // toutes les actions passent par ISignatureRepository ([FromServices]).
 
-        // ⛔ Les octets de la signature, annoncés par le paquet terrain (ImageUrl) et tirés par la
-        // facturation sans jeton — D8. Le POST juste dessous, lui, reste protégé : c'est le geste de
-        // l'ambulancier. Se referme avec DEC-6 (§3.C2).
-        [AllowAnonymous]
+        // Les octets de la signature, annoncés par le paquet terrain (ImageUrl) : tirés par la
+        // facturation avec son jeton de service, et affichés par l'app avec le sien — D8. Anonyme
+        // jusqu'au 19/09 faute de DEC-6. Le POST juste dessous reste réservé à l'app.
+        [Authorize(Policy = ClKeycloakCallers.ServiceOrMobilePolicy)]
         [HttpGet("{gJobId}")]
         public ActionResult<ClSignatureGetModel> GetSignature(Guid gJobId, [FromServices] ISignatureRepository getSignatureRepository)
         {

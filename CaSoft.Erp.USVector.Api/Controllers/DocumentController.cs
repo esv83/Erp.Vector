@@ -59,9 +59,10 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             => Ok(_repository.ListByMission(gJobId).Select(d => d.ToDtoOut()));
 
         /// <summary>Octets d'un document (Content-Type d'origine).</summary>
-        // ⛔ Octets d'un document, annoncés par le paquet terrain (FileUrl) et tirés par la facturation
-        // sans jeton — D8. La liste et le dépôt restent protégés. Se referme avec DEC-6 (§3.C2).
-        [AllowAnonymous]
+        // Octets d'un document, annoncés par le paquet terrain (FileUrl) et tirés par la facturation — D8.
+        // Anonyme jusqu'au 19/09 faute de jeton de service (DEC-6) : la facturation ou l'app, avec
+        // leur jeton. La politique de repli, elle, n'admettrait que l'app.
+        [Authorize(Policy = ClKeycloakCallers.ServiceOrMobilePolicy)]
         [HttpGet("documents/{documentId:guid}/content")]
         public IActionResult GetContent(Guid documentId)
         {

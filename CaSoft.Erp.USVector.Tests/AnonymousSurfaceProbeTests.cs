@@ -30,19 +30,14 @@ namespace CaSoft.Erp.USVector.Tests;
 public class AnonymousSurfaceProbeTests
 {
     /// <summary>
-    /// Les six ouvertures que la mesure doit couvrir : les quatre qui ne subsistent que faute de
-    /// <c>DEC-6</c>, et les deux ouvertes <b>par décision</b> pour les écrans amont — celles-là ne se
-    /// referment pas avec ce chantier, mais on veut savoir qui les tire, précisément parce que la
-    /// dernière fois la réponse a changé en un jour.
+    /// Les ouvertures que la mesure doit couvrir : les deux ouvertes <b>par décision</b> pour les
+    /// écrans amont (M9). Les quatre de la facturation, mesurées du 15 au 19/09, sont fermées depuis
+    /// — c'est la sonde qui a établi qu'elles pouvaient l'être.
     /// </summary>
     private static readonly string[] SurfaceMesuree =
     {
-        "DocumentController.GetContent",
-        "FieldDataController.Get",
         "MutuelleCardController.GetCurrentImage",
-        "MutuelleCardController.GetImage",
-        "MutuelleCardController.ListPresence",
-        "SignatureController.GetSignature"
+        "MutuelleCardController.ListPresence"
     };
 
     [Fact]
