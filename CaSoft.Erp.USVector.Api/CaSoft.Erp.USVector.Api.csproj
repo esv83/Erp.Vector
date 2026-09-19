@@ -11,8 +11,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Config NLog copiée à la sortie (sinon pas de fichiers de logs en publish). -->
-    <None Update="nlog.config" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Config NLog et appsettings : TOUJOURS copiés à la publication. En PreserveNewest (défaut du
+         SDK Web, qui range *.config et *.json en Content), la copie vers le partage se fie aux
+         horodatages et peut sauter un fichier sans un signal : la cible de la sonde de surface
+         (27/08) n'était jamais arrivée en production (constaté le 19/09) ; un appsettings.json
+         périmé fait refuser le démarrage (garde-fou KC-1). deploy.ps1 vérifie les deux après copie.
+         ⚠️ C'est bien « Content » : un « None Update » serait sans effet, vérifié le 19/09. -->
+    <Content Update="nlog.config;appsettings*.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
   </ItemGroup>
 
   <ItemGroup>

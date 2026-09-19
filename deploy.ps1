@@ -18,6 +18,16 @@
   La publication vers PROD demande une confirmation explicite (-Force pour la sauter,
   p.ex. en CI). La publication pose app_offline.htm : l'API est coupee le temps de la copie.
 
+  GARDE DE DEPOT (PROD) : la publication compile l'ARBRE DE TRAVAIL, pas HEAD. On ne publie donc
+  en PROD que depuis `main`, arbre propre (fichiers non suivis compris : le SDK les compile), et
+  HEAD egal a origin/main -- ni en retard, ni en avance (un commit non pousse ne se reproduit pas).
+  Cinq publications de ce qui n'etait pas prevu entre le 25/08 et le 15/09, dont cinq heures sans
+  la capture mutuelle ni le correctif de cloture. -Force ne saute PAS cette garde.
+  -CheckOnly : execute la garde et s'arrete, sans rien publier.
+
+  APRES PUBLICATION : le .pdb de la cible doit annoncer le commit publie (sourcelink), et
+  appsettings*.json + nlog.config doivent etre identiques au depot.
+
   Prerequis (1re fois) : une session ouverte sur le partage cible
     net use \\192.168.1.112\dev_api  /user:192.168.1.112\DeployApi *
     net use \\192.168.1.112\prod_api /user:192.168.1.112\DeployApi *
@@ -27,6 +37,7 @@
   .\deploy.ps1 dev
   .\deploy.ps1 prod       # demande confirmation
   .\deploy.ps1 prod -Force
+  .\deploy.ps1 prod -CheckOnly   # "puis-je publier ?" -- garde seule, rien n'est touche
 #>
 [CmdletBinding()]
 param(
@@ -35,7 +46,11 @@ param(
     [string]$Target = 'dev',
 
     # Saute la confirmation interactive de la cible PROD (usage non-interactif / CI).
-    [switch]$Force
+    # Ne saute PAS la garde de depot.
+    [switch]$Force,
+
+    # Execute la garde de depot et s'arrete, sans rien publier.
+    [switch]$CheckOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -60,10 +75,62 @@ function Confirm-Target($key, $url) {
     if ($answer -ne $key) { throw "Publication $key annulee (confirmation non saisie)." }
 }
 
+function Invoke-Git {
+    $out = & git -C $PSScriptRoot @args
+    if ($LASTEXITCODE) { throw "git $($args -join ' ') a echoue (code $LASTEXITCODE)." }
+    return $out
+}
+
+# Garde de depot (G8). Rend le SHA de HEAD, que la verification finale retrouve dans le .pdb publie.
+# En DEV, simple information : on y essaie justement des branches et des arbres en cours.
+function Assert-PublishableTree($key) {
+    $head = ([string](Invoke-Git rev-parse HEAD)).Trim()
+    $short = $head.Substring(0, 7)
+    $branch = ([string](Invoke-Git rev-parse --abbrev-ref HEAD)).Trim()
+    # Fichiers non suivis compris : le SDK compile tout *.cs / *.vb du dossier, suivi ou non.
+    $dirty = @(Invoke-Git status --porcelain | Where-Object { $_ })
+
+    if ($key -notin $protected) {
+        $state = if ($dirty.Count) { ", arbre modifie ($($dirty.Count) fichier(s))" } else { '' }
+        Write-Host "   Depot : $branch @ $short$state" -ForegroundColor DarkGray
+        return $head
+    }
+
+    if ($branch -ne 'main') {
+        throw "Garde de depot : publication $key refusee depuis la branche '$branch'. " +
+              "La production ne se publie que depuis main (incident du 15/09 : une branche sans " +
+              "les correctifs de main a tourne cinq heures)."
+    }
+    if ($dirty.Count) {
+        throw "Garde de depot : publication $key refusee, l'arbre de travail est modifie -- la " +
+              "publication compilerait ce qui n'est dans aucun commit :`n  " + ($dirty -join "`n  ")
+    }
+
+    Invoke-Git fetch --quiet origin main | Out-Null
+    $remote = ([string](Invoke-Git rev-parse origin/main)).Trim()
+    if ($head -ne $remote) {
+        $ahead = ([string](Invoke-Git rev-list --count 'origin/main..HEAD')).Trim()
+        $behind = ([string](Invoke-Git rev-list --count 'HEAD..origin/main')).Trim()
+        throw "Garde de depot : publication $key refusee, main ($short) n'est pas origin/main " +
+              "($($remote.Substring(0, 7))) -- $ahead commit(s) non pousse(s), $behind en retard. " +
+              "Pousser (ou tirer) avant de publier : ce qui tourne doit se reproduire depuis git."
+    }
+
+    Write-Host "   Depot : main @ $short, propre, egal a origin/main" -ForegroundColor DarkGray
+    return $head
+}
+
 function Publish-Target($key) {
     $profileName = $profileOf[$key]
     Write-Host ""
     Write-Host "-> Publication $($key.ToUpper()) (profil $profileName)" -ForegroundColor Cyan
+
+    # Garde de depot AVANT tout effet : ni pre-vol, ni confirmation, ni app_offline.htm.
+    $head = Assert-PublishableTree $key
+    if ($CheckOnly) {
+        Write-Host "[OK] Garde de depot $($key.ToUpper()) satisfaite -- rien n'a ete publie (-CheckOnly)." -ForegroundColor Green
+        return
+    }
 
     # Cible de copie reelle = publishUrl du profil (UNC). Source unique : le .pubxml.
     $pubxml = Join-Path $PSScriptRoot "CaSoft.Erp.USVector.Api\Properties\PublishProfiles\$profileName.pubxml"
@@ -103,20 +170,34 @@ function Publish-Target($key) {
         throw "Verif KO : $($localNewest.Name) sur $url ($uncWriteUtc) ne correspond pas au build local " +
               "($($localNewest.LastWriteTimeUtc)). La publication est peut-etre partie en local sans atteindre $url."
     }
-    # Verification de la CONFIG (KC-1) : depuis que Keycloak:Authority vient de la config, un binaire
-    # a jour pose sur un appsettings.json perime fait ECHOUER LE DEMARRAGE (garde-fou Program.cs).
-    # MSBuild peut sauter la copie d'un fichier de contenu (incrementalite) : on le verifie donc.
-    $cfgLocal = Join-Path $PSScriptRoot 'CaSoft.Erp.USVector.Api\appsettings.json'
-    $cfgUnc = Join-Path $url 'appsettings.json'
-    if (-not (Test-Path -LiteralPath $cfgUnc)) { throw "Verif KO : appsettings.json absent de $url." }
-    if ((Get-FileHash -LiteralPath $cfgLocal).Hash -ne (Get-FileHash -LiteralPath $cfgUnc).Hash) {
-        throw "Verif KO : appsettings.json de $url differe du depot. La publication ne l'a pas copie " +
-              "(incrementalite MSBuild) : copier le fichier a la main, sinon l'API refusera de demarrer."
+    # Verification du COMMIT : le .pdb publie porte, par sourcelink, le commit compile. C'est lui
+    # qu'on lit pour dire ce qui tourne ; il doit donc annoncer HEAD.
+    $pdbUnc = Join-Path $url 'CaSoft.Erp.USVector.Api.pdb'
+    if (-not (Test-Path -LiteralPath $pdbUnc)) { throw "Verif KO : CaSoft.Erp.USVector.Api.pdb absent de $url." }
+    $pdbText = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($pdbUnc))
+    if ($pdbText -notmatch "esv83/Erp\.Vector/$head") {
+        throw "Verif KO : le .pdb de $url n'annonce pas le commit publie ($($head.Substring(0, 7)))."
+    }
+
+    # Verification de la CONFIG. Un binaire a jour sur un appsettings.json perime fait ECHOUER LE
+    # DEMARRAGE (garde-fou KC-1 de Program.cs) ; un nlog.config perime fait perdre des journaux sans
+    # un signal -- constate le 19/09 : la cible de la sonde de surface (27/08) n'etait jamais arrivee
+    # en production. La copie de publication peut sauter un fichier (horodatages) : on compare tout.
+    $apiDir = Join-Path $PSScriptRoot 'CaSoft.Erp.USVector.Api'
+    $configs = @(Get-ChildItem -LiteralPath $apiDir -Filter 'appsettings*.json' | ForEach-Object Name) + 'nlog.config'
+    foreach ($name in $configs) {
+        $cfgUnc = Join-Path $url $name
+        if (-not (Test-Path -LiteralPath $cfgUnc)) { throw "Verif KO : $name absent de $url." }
+        if ((Get-FileHash -LiteralPath (Join-Path $apiDir $name)).Hash -ne (Get-FileHash -LiteralPath $cfgUnc).Hash) {
+            throw "Verif KO : $name de $url differe du depot. La publication ne l'a pas copie : " +
+                  "copier le fichier a la main (appsettings perime = l'API refuse de demarrer)."
+        }
     }
 
     Write-Host "[OK] $($key.ToUpper()) publie et verifie -> $url" -ForegroundColor Green
+    Write-Host "     Commit verifie   : $($head.Substring(0, 7)) annonce par le .pdb publie" -ForegroundColor DarkGray
     Write-Host "     Assembly verifie : $($localNewest.Name) @ $($localNewest.LastWriteTime)" -ForegroundColor DarkGray
-    Write-Host "     Config verifiee  : appsettings.json identique au depot" -ForegroundColor DarkGray
+    Write-Host "     Config verifiee  : $($configs -join ', ') identiques au depot" -ForegroundColor DarkGray
 }
 
 Publish-Target $Target

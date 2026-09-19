@@ -106,21 +106,36 @@ relire la sonde (`Vector.SurfaceAnonyme`) : zéro `auth=absent` depuis la veille
 
 **Ensuite** : Orders pourra exiger un jeton du terrain — son plan l'attend de Vector.
 
-## Itération 2 — Rendre impossible une publication hors de `main` *[ex-G8, partie 1]*
+## Itération 2 — Rendre impossible une publication hors de `main` *[ex-G8, partie 1]* 🟡 *codée le 19/09 — reste la première publication*
 
 | | |
 |---|---|
 | **Nature** | Garde de déploiement — **cinquième récidive** |
-| **Effort** | Une petite session |
+| **Effort** | Fait — reste à l'éprouver sur une vraie publication |
 | **Bloqué par** | **Rien** |
 
 Trois publications incohérentes le 25/08, une depuis un arbre non commité le 13/09, une depuis une
 branche le 15/09 — **cinq heures** sans la capture mutuelle ni le correctif de clôture. Chaque fois,
 la publication a réussi sans un signal.
 
-⇒ **`deploy.ps1 prod` refuse de publier** un arbre modifié, ou une autre branche que `main`, ou un
-`main` en retard sur `origin/main`. Au passage : **comprendre pourquoi le `nlog.config` du serveur
-n'est pas celui du dépôt**, et l'aligner.
+**Codé dans `deploy.ps1`** :
+- **Garde de dépôt en PROD**, avant tout effet (ni app_offline, ni confirmation) : branche `main`, arbre
+  propre **fichiers non suivis compris** (le SDK les compile), `HEAD` **égal** à `origin/main` — ni en
+  retard, ni en avance : un commit non poussé ne se reproduit pas. `-Force` ne la saute pas. En DEV,
+  simple information. `-CheckOnly` : la garde seule, rien n'est publié.
+- **Après copie** : le `.pdb` publié doit annoncer le commit publié (sourcelink), et **tous** les
+  `appsettings*.json` **et `nlog.config`** doivent être identiques au dépôt — seul `appsettings.json`
+  l'était.
+
+**Cause du `nlog.config` périmé, trouvée** : le SDK Web range `*.config` en `Content`, copié à la
+publication en `PreserveNewest` — la copie se fie aux horodatages et peut sauter le fichier. Le csproj
+force désormais `CopyToPublishDirectory="Always"` sur `nlog.config` et `appsettings*.json` ; vérifié
+par une publication locale sur une cible plus récente et périmée. ⚠️ L'ancien `None Update` du csproj
+était **sans effet** sur ce fichier.
+
+**Éprouvé** : refus d'un arbre modifié, information en DEV, copie forcée, lecture du commit dans le
+`.pdb`. **Pas encore** : le refus d'une autre branche, d'un `main` non poussé, et le chemin qui passe
+— à voir à la prochaine publication, qui recopiera aussi le bon `nlog.config`.
 
 > ⚖️ **La garde vaut mieux que la discipline** : Orders a constaté la même chose sur ses tags. Ce qui
 > est vérifié par une machine tient ; ce qui repose sur un geste se perd.
