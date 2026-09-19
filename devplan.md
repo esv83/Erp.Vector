@@ -96,18 +96,21 @@ numéros changent d'une édition à l'autre — une entrée se cite par son titr
   Constater qu'elles ont disparu.
 - **Les adresses « non structurées »** : chaque cas est journalisé, personne n'a compté.
 
-## Itération 2 — La liste des documents charge leurs contenus *🆕 relevé le 19/09*
+## Itération 2 — La liste des documents charge leurs contenus *[relevé le 19/09]* ✅ *codée le 19/09 — reste à publier*
 
 | | |
 |---|---|
 | **Nature** | Performance — une route de l'app |
-| **Effort** | Une session courte |
-| **Bloqué par** | Rien |
+| **Effort** | Fait |
+| **Bloqué par** | **La publication** |
 
-`GET` documents d'une mission (`DocumentController.cs:59`) passe par `DocumentRepository.ListByMission`,
-qui sort **le contenu de chaque document** de la base pour n'en rendre que les métadonnées. Le même
-défaut vient d'être retiré du paquet terrain (`FieldDataQueryService`) ; la liste de l'app l'a gardé.
-⇒ Une projection sans `DOC_CONTENT`, comme pour la carte mutuelle le 26/08.
+`GET api/missions/{id}/documents` passait par `DocumentRepository.ListByMission`, qui sortait **le
+contenu de chaque document** de la base pour n'en rendre que les métadonnées.
+
+**Codé** : `ListByMission` est une projection nommée **sans `DOC_CONTENT`** (`Content` à Nothing), comme
+`FieldDataQueryService` et la carte mutuelle ; les octets restent servis un par un par `GetById`. Seul
+appelant : la liste de l'app — réponse inchangée. Un test fige que la liste ne porte pas le contenu.
+192 tests verts.
 
 ## Itération 3 — Un jeu de requêtes rejouables *[ex-G3, MOB-9]*
 

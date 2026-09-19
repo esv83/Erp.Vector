@@ -9,7 +9,10 @@ Namespace Port
         ''' <summary>Enregistre un document (l'Id est porté par <paramref name="document"/>).</summary>
         Sub Save(document As ClDocument)
 
-        ''' <summary>Documents d'une mission (métadonnées), du plus récent au plus ancien.</summary>
+        ''' <summary>
+        ''' Documents d'une mission, du plus récent au plus ancien — <b>métadonnées seules</b> :
+        ''' <c>Content</c> vaut Nothing. Les octets se servent un par un, par <see cref="GetById"/>.
+        ''' </summary>
         Function ListByMission(missionId As Guid) As IReadOnlyList(Of ClDocument)
 
         ''' <summary>Document par identifiant (pour servir le binaire), ou Nothing.</summary>

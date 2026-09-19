@@ -59,6 +59,26 @@ public class DocumentRepositoryTests
         list[0].Id.Should().Be(recent.Id);
     }
 
+    /// <summary>
+    /// La liste de l'app n'affiche que des métadonnées : elle ne doit pas sortir les octets de la base.
+    /// Le document entier reste servi, un par un, par GetById.
+    /// </summary>
+    [Fact]
+    public void ListByMission_ne_charge_pas_le_contenu()
+    {
+        using var ctx = NewContext();
+        var sut = new DocumentRepository(ctx);
+        var doc = Doc(EnDocumentCategory.TransportOrder, new DateTime(2026, 9, 19, 8, 0, 0, DateTimeKind.Utc), 1, 2, 3);
+        sut.Save(doc);
+
+        var listed = sut.ListByMission(Mission).Single();
+
+        listed.Content.Should().BeNull();
+        listed.ByteSize.Should().Be(doc.ByteSize);
+        listed.ContentType.Should().Be("application/pdf");
+        sut.GetById(doc.Id)!.Content.Should().Equal(1, 2, 3);
+    }
+
     [Fact]
     public void GetById_returns_null_when_unknown()
     {
