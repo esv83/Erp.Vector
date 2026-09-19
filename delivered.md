@@ -1,7 +1,7 @@
 # Livré — Vector (module terrain ambulanciers)
 
-> **Mis à jour le** 2026-09-19 · **En production** : `dc30612` (`main`), rechargé le 2026-09-15 à 18:31,
-> vérifié par sourcelink le 2026-09-19.
+> **Mis à jour le** 2026-09-19 (seconde édition du jour) · **En production** : `03f9d01` (`main`),
+> rechargé le 2026-09-19 à 16:46:56, vérifié par sourcelink et journal.
 >
 > Ce document porte **ce qui est livré** : ce que le module fait, le journal daté des livraisons,
 > les décisions appliquées, la configuration qui a déjà cassé la production, les pistes retirées.
@@ -52,7 +52,8 @@ Ses missions lui sont visibles **30 minutes avant sa prise de service**. Il ne v
 - Les **cinq jalons de progression**, horodatés, **annulables** — le retour arrière remonte à la
   régulation.
 - La **signature du patient**, avec un indicateur de présence visible dès la liste.
-- Le **conducteur** de l'équipage, consultable et modifiable.
+- Le **conducteur** de l'équipage, consultable et modifiable ; un refus de la régulation arrive
+  **avec son motif** (vacation terminée…), plus sous forme de panne.
 
 Chaque geste est **projeté vers la régulation** en temps quasi réel ; les envois en échec sont mis en
 attente et rejoués automatiquement, sans jamais bloquer la saisie.
@@ -77,26 +78,65 @@ Principe constant : **le terrain n'écrase jamais la donnée officielle de l'ERP
 - Les modules d'aval disposent d'une **file des missions à traiter**.
 - Ils récupèrent **un paquet unique et versionné** (jalons, signature, attributs, mutuelle,
   documents, anomalies) et tirent les **pièces jointes à la demande**. Ce paquet est **réellement
-  consommé** par la facturation, mission par mission.
+  consommé** par la facturation — **en lot** depuis le 19/09 : 200 paquets ou 50 signatures par appel.
 - Une fois la mission transférée, **le dossier est gelé côté terrain**.
 
 ## 1.6 Ce qui tient tout cela debout
 
 - **Un contrat mobile préservé** : les ajouts sont additifs, les anciens champs restent servis.
 - **Une authentification à un seul point de passage**, avec cache.
-- **Une API fermée par défaut** : six sorties anonymes nommées, en deux groupes justifiés et figés par
-  `AnonymousSurfaceTests` ; une **sonde** journalise chaque appel qui les traverse, avec ou sans jeton.
+- **Une API fermée par défaut** : depuis le 19/09, deux sorties anonymes seulement — l'affichage de la
+  carte mutuelle dans les écrans amont — plus le diagnostic, figées par `AnonymousSurfaceTests` ; une
+  **sonde** journalise chaque appel qui les traverse. La facturation entre avec **son jeton de
+  service**, et Vector présente le sien à Orders.
 - **Un outil de diagnostic** de la chaîne d'identité, réservé au dev.
 - **Un code applicatif homogène** : tous les cas d'usage renvoient un `ClResult` typé ; l'ancien
   mécanisme à présentateurs est entièrement retiré.
-- **Un déploiement outillé** : recette et production, confirmation à taper, pré-vol du partage,
-  contrôle de ce qui est arrivé.
+- **Un déploiement outillé** : recette et production, confirmation à taper, pré-vol du partage ;
+  **la production ne se publie que depuis `main` propre et poussé** ; après copie, le commit est lu
+  dans le `.pdb` et la configuration comparée au dépôt.
 
 ---
 
 # 2. Journal des livraisons
 
 *Du plus récent au plus ancien.*
+
+## 2026-09-19 — Publication : routes fermées, lots pour la facturation, garde de déploiement
+
+*En production — `03f9d01` (`main`), rechargé à 16:46:56, vérifié par sourcelink et journal. Publié
+à travers la nouvelle garde : `main` propre et égal à `origin/main`.*
+
+- **Les quatre routes de la facturation exigent un jeton** (`b32be3a`) : `field-data`,
+  `Signature/{id}`, `documents/{id}/content`, `mutuelle-card/{id}/image` admettent la facturation ou
+  l'app, avec leur jeton. Décidé sur la sonde : zéro appel anonyme sur la journée. **Constaté** : 559
+  appels de la facturation en 200 avec son jeton, aucun 401/403 ; l'app passe avec le sien.
+- **Le dossier terrain et les signatures en lot** (`03f9d01`, B5) : `POST api/missions/field-data`
+  (200 au plus, statut `Found`/`NotFound`/`Error` par mission) et `POST api/missions/signatures`
+  (50 au plus). Silos lus en une requête chacun, **sans binaire** — la route unitaire cesse aussi de
+  charger l'image de signature et le contenu des documents ; chaque commande lue une fois chez
+  Orders. **Constaté** : BillingGateway a basculé (`ebec0b0`) ; sa part Vector passe de **12,8 s à
+  6,8 s** par journée, son acquisition de 18,3 s à 12,1 s, résultat identique à l'octet.
+- **Le refus d'Orders sur le conducteur arrive avec son motif** (`c07c832`) : refus métier typé,
+  journalisé en WARN, même code 400 pour l'app. *Aucun refus survenu depuis la publication : pas
+  encore constaté.*
+- **Le jeton de service passe par le paquet `CaSoft.Identity.Client` 1.4.0** (`5a65dfd`), sur les
+  trois clients Orders — dont la confirmation de prise de service, qui n'en portait pas. Configuration
+  inchangée (`OrdersApi:ServiceAccount`, traduite). **Constaté** : « Jeton de service obtenu pour
+  erp-vector-api » une seconde après le démarrage.
+- **`deploy.ps1` refuse de publier en production ce que git ne reproduit pas** (`03edf21`), et vérifie
+  après copie le commit du `.pdb` et tous les fichiers de configuration. **Cause du `nlog.config`
+  périmé trouvée** — le SDK Web le copiait sur horodatage — et corrigée : **constaté identique au
+  dépôt** après publication.
+- 191 tests verts.
+
+## 2026-09-19 — Documentation remise d'équerre (sans code)
+
+*`91bc8f5`.* README réécrit (accès HTTP à Orders, IIS `/vector`) ; guide Keycloak (`Authority` et
+`Audience` lus dans la configuration depuis KC-1) ; `BUG_DISPLAY.MD`, `endPoint.md` §5 (`engagedOnly`
+honoré par Orders depuis le 15/07), plan de découplage, carte mutuelle compactée, deux plans marqués
+terminés ; liens vers `Erp.Order/archive` repointés. Trouvé au passage : `AddressApi:BaseUrl` n'est
+lue par aucun code.
 
 ## 2026-09-19 — La facturation présente son jeton à Vector (C2, étapes 1 à 3)
 
@@ -453,7 +493,9 @@ terrain dans la foulée.*
 | Contexte de mission | 58 tests ; les trois refus constatés en production le 2026-08-24 |
 | Carte mutuelle par mission | 8 tests (2026-09-13) |
 | Prise de service depuis l'app | 9 confirmations servies du 15 au 18/09 |
-| Suite complète | 126 verts (2026-08-25) → 112 (2026-09-13, retrait OC-9) → **172 verts (2026-09-15)**, après la fusion |
+| Lots pour la facturation | 2026-09-19 : bascule de BillingGateway, part Vector 12,8 s → 6,8 s par journée, résultat identique à l'octet |
+| Fermeture des routes de la facturation | 2026-09-19 : 559 appels en 200 avec jeton après publication, aucun 401/403 |
+| Suite complète | 126 verts (2026-08-25) → 112 (2026-09-13) → 172 (2026-09-15) → **191 verts (2026-09-19)** |
 
 ---
 
@@ -507,6 +549,26 @@ terrain dans la foulée.*
   proposition est **perdue** (écrasement en place, aucune trace). **Perte assumée** : aucun audit à
   construire, ni côté Vector ni côté Order.
 
+## 4.3 Décisions du 19/09
+
+- **Fermer les routes sur une mesure, pas sur une hypothèse.** Les quatre routes de la facturation se
+  sont fermées quand la sonde a compté **zéro** appel anonyme sur la journée — et nommé qui appelait,
+  avec quel jeton. La politique `ServiceOrMobile` les ouvre à la facturation et à l'app, pas au-delà.
+- **Les lots se demandent par liste d'identifiants, pas par période** (convenu avec la facturation).
+  Vector ne connaît pas les missions d'une journée sans le demander à Orders ; la facturation les tient
+  déjà. Chaque mission revient avec un statut — `Found`, `NotFound` (l'ancien 404), `Error` (à
+  retenter) — jamais d'absence silencieuse. Plafonds : 200 paquets, 50 signatures.
+- **Pas plus de 8 appels simultanés de Vector vers Orders.** Refusé : laisser la facturation envoyer
+  ses lots en parallèle (16 appels, ~3 s de gain) — Orders sert aussi la régulation. Le levier est une
+  lecture groupée chez Orders.
+- **Le paquet partagé plutôt que la copie locale, sans toucher la configuration.** Le jeton de service
+  passe par `CaSoft.Identity.Client` ; Vector garde `OrdersApi:ServiceAccount` et le traduit — lire la
+  section `Identity` aurait imposé de retoucher le `web.config` de production le jour de la publication.
+  Seul un compte complet est traduit : sinon le paquet, actif sur le seul `TokenEndpoint`, aurait
+  demandé un jeton en erreur à chaque appel en dev.
+- **La production ne se publie que depuis `main`, propre et poussé.** Une machine le vérifie :
+  `-Force` saute la confirmation, jamais la garde.
+
 ---
 
 # 5. Où vit quoi
@@ -544,7 +606,7 @@ RequireHttpsMetadata, AdminClientId, AdminClientSecret}` · `Diagnostics:Enabled
 `MobileIdentityCache:{PersonnelMinutes=30, ActiveCrewsMinutes=15}` · secrets GpsGate/Sirus
 `__SET_VIA_ENV__`.
 
-## 6.1 Les quatre pièges avérés
+## 6.1 Les cinq pièges avérés
 
 | Piège | Conséquence | Règle |
 |---|---|---|
@@ -552,6 +614,7 @@ RequireHttpsMetadata, AdminClientId, AdminClientSecret}` · `Diagnostics:Enabled
 | Publication **RID `win-x64`** | SqlClient « PlatformNotSupported » → SQL injoignable | publier **portable** |
 | `Keycloak:DisableValidation=true` hors dev | jetons décodés sans vérification | **`false` en prod** ; `Authority` vide ou placeholder empêche le démarrage |
 | `Diagnostics:Enabled=true` en prod | expose la résolution d'identité et les comptes Keycloak | dev/staging seulement ; ailleurs `/api/diag*` rend 404 |
+| Fichier de configuration **sauté à la publication** (`PreserveNewest`, copie sur horodatage) | `nlog.config` du 25/06 en production jusqu'au 19/09 : la cible de la sonde n'y est jamais arrivée, sans un signal | `CopyToPublishDirectory="Always"` sur `Content` (un `None Update` est sans effet) ; `deploy.ps1` compare après copie |
 
 > `Audience` sert aussi d'**`azp` attendu** : l'audience n'est volontairement pas validée (Keycloak
 > émet `aud=account`) ; signature, issuer et expiration restent validés.
@@ -566,8 +629,10 @@ Jamais une valeur éditée à la main sur le serveur.
 ## 6.3 Déploiement
 
 `.\deploy.ps1 dev` · `.\deploy.ps1 prod` (confirmation à taper ; `-Force` en non-interactif) →
-`\\192.168.1.112\{dev_api,prod_api}\Vector.Api`. Pré-vol du partage, vérification bin↔UNC et de
-`appsettings.json`. `app_offline.htm` → **courte coupure de l'API** à chaque publication.
+`\\192.168.1.112\{dev_api,prod_api}\Vector.Api`. **Garde de dépôt en PROD** (depuis le 19/09) : `main`,
+arbre propre fichiers non suivis compris, égal à `origin/main` ; `-CheckOnly` l'exécute seule. Pré-vol
+du partage, vérification bin↔UNC, **commit lu dans le `.pdb` publié**, **`appsettings*.json` et
+`nlog.config` comparés au dépôt**. `app_offline.htm` → **courte coupure de l'API** à chaque publication.
 Prérequis : `net use \\192.168.1.112\prod_api /user:192.168.1.112\DeployApi *`.
 
 **Quel commit tourne en production** (sourcelink du `.pdb`) :
@@ -607,6 +672,9 @@ depuis un arbre modifié annonce un commit qui ne contient pas le code servi (§
 | **Trace de la proposition de type écrasée par le terrain** (A0) | Perte assumée le 2026-09-13 (§4.2). |
 | **B2 — attendre d'Orders le repli sur le snapshot `ORD_ORDER`** | Livré chez Orders le 23/07 (`f0cedc1`), relevé le 19/09. |
 | **Déclencher un re-géocodage quand une adresse change** (réserve de G6) | Sans objet : depuis le 06/09, Orders remplace le numéro canonique à l'édition (relevé le 19/09). |
+| **Gestionnaire de jeton de service écrit dans Vector** (`ServiceAccountTokenHandler`, `ServiceAccountTokenProvider`) | Remplacé le 19/09 par celui du paquet `CaSoft.Identity.Client`, où il avait été promu le 13/09. |
+| **`field-data` par période** (B5 tel que demandé à l'origine) | Remplacé le 19/09 par une liste d'identifiants, convenue avec la facturation (§4.3). |
+| **Quatre ouvertures anonymes « faute de DEC-6 »** | Fermées le 19/09 : la facturation présente son jeton. |
 | **Ticket Orders « chaîne équipage du 2ᵉ membre »** (ex-B3 : jointure `crews?personnelId=` ou `Members` incomplet) | Écarté le 2026-09-13 : aucune des deux causes n'existe dans les données ; le 404 vient d'équipages composés après la tentative (C3). |
 
 ---

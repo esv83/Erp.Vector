@@ -2,7 +2,7 @@
 
 > ✅ **TERMINÉ — livré chez Orders le 2026-07-23** (`f0cedc1`, « repli snapshot ORD_ORDER dans
 > /missions/{id}/full (6-B) », relevé le 2026-09-19). Rien n'était à coder dans Vector. Reste à
-> **constater** côté terrain que les étapes vides ont disparu (devplan, itération « Trois mesures en
+> **constater** côté terrain que les étapes vides ont disparu (devplan, itération « Constater et mesurer en
 > production »). Document conservé comme trace.
 
 > **But** : réparer **immédiatement** les ~3883 étapes déjà cassées dans Vector

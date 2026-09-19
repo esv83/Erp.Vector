@@ -101,8 +101,8 @@ n'existe pas — donc rien).
 
 | Étape | Qui | Effet |
 |---|---|---|
-| Déployer Vector (nouveau `ServiceAzp`) | dépôt Vector | Vector reconnaîtra le jeton de la facturation |
-| BillingGateway pose son jeton sur ses appels à Vector | dépôt BillingGateway | aucun tant que les routes restent anonymes |
-| Vérifier en production `JWT validé … azp=erp-billinggateway-api` | journal de Vector | prouve que la facturation passe avec son jeton |
-| Fermer les quatre routes anonymes | dépôt Vector | les données de santé ne sortent plus sans jeton |
+| ✅ Déployer Vector (nouveau `ServiceAzp`) | dépôt Vector | fait le 13/09 |
+| ✅ BillingGateway pose son jeton sur ses appels à Vector | dépôt BillingGateway | fait le 19/09 |
+| ✅ Vérifier en production `JWT validé … azp=erp-billinggateway-api` | journal de Vector | constaté le 19/09 à 11:48 |
+| ✅ Fermer les quatre routes anonymes | dépôt Vector | en production le 19/09 à 16:46, aucun refus constaté |
 | Orders exige un jeton du terrain | dépôt Orders | son plan attendait ce jeton de Vector |

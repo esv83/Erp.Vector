@@ -6,7 +6,7 @@
 >
 > **Mise à jour 2026-09-19** — compacté : ce document ne porte plus que l'ouvert, les décisions et le
 > contrat. Le livré, daté, est dans [`delivered.md`](delivered.md) ; le suivi dans
-> [`devplan.md`](devplan.md) (itérations « Trois mesures en production », « Lire la carte mutuelle
+> [`devplan.md`](devplan.md) (itérations « Constater et mesurer en production », « Lire la carte mutuelle
 > automatiquement », « Protéger les données du patient »).
 
 ---

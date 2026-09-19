@@ -34,7 +34,7 @@ dans `git log`.*
 
 ## 2. Ce qui reste
 
-### 2.1 🟡 DEC-6 — Authentification de service à service — *reste la fermeture*
+### 2.1 ✅ DEC-6 — Authentification de service à service — *côté Vector, fait le 19/09*
 
 **Fait dans les deux sens** ([`delivered.md`](delivered.md)) :
 - **Vector → Orders** : le gestionnaire du paquet `CaSoft.Identity.Client` (`AddCaSoftServiceAccountToken`,
@@ -44,10 +44,10 @@ dans `git log`.*
   admet (`Keycloak:ServiceAzp`) — constaté le **2026-09-19 à 11:48** ; depuis, la sonde de surface ne
   voit plus aucun appel sans jeton de sa part.
 
-**Reste** : fermer les quatre routes ouvertes pour la facturation (`ServiceOrMobilePolicy`), puis
-Orders pourra exiger un jeton du terrain. Suivi : [`devplan.md`](devplan.md), itération « Fermer les
-quatre routes de la facturation ». Les deux routes d'affichage de la carte mutuelle (`<img src>`) ne
-se referment **pas** avec DEC-6 (`M9`).
+**Les quatre routes ouvertes pour la facturation sont fermées** (`ServiceOrMobilePolicy`), en
+production depuis le 2026-09-19 à 16:46 — aucun refus constaté. **Reste chez Orders** : exiger un jeton
+du terrain ; plus rien ne l'en empêche côté Vector. Les deux routes d'affichage de la carte mutuelle
+(`<img src>`) ne se referment **pas** avec DEC-6 (`M9`).
 
 ### 2.2 ⏳ DEC-7 — Résilience des appels sortants
 
