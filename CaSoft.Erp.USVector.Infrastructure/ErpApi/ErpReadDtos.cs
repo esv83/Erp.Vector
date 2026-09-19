@@ -153,7 +153,7 @@ public sealed class ErpMissionStatusDto
 /// MOB-13) est piloté par l'Order : le régulateur peut le fixer (⇒ <see cref="Locked"/>), sinon
 /// l'ambulancier choisit dans <see cref="AvailableContextOrders"/>, <b>déjà filtré</b> par l'agence
 /// et le mode de la commande — Vector ne refait pas ce filtrage.
-/// Contrat décrit dans <c>Erp.Order/note_vector_orderContext_mission.md</c>.
+/// Contrat décrit dans <c>Erp.Order/archive/note_vector_orderContext_mission.md</c>.
 /// </summary>
 public sealed class ErpMissionContextOrderDto
 {

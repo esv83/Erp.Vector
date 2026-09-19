@@ -4,46 +4,23 @@
 > la restituer à la facturation, et à terme en extraire automatiquement les quatre champs utiles :
 > **nom de la mutuelle, n° AMC, concentrateur, n° de télétransmission**.
 >
-> **Mise à jour 2026-09-13** — la cause de la table vide est trouvée (§1) : l'app ne pouvait pas
-> appeler la capture. Capture **par mission** ajoutée (§3.1, §5), décision `M7` de la facturation
-> reportée (§2), fausse mesure « route image fermée » corrigée (§4). Plan du module :
-> [`devplan.md`](devplan.md) (dont le paquet `field-data` qui transporte la carte).
+> **Mise à jour 2026-09-19** — compacté : ce document ne porte plus que l'ouvert, les décisions et le
+> contrat. Le livré, daté, est dans [`delivered.md`](delivered.md) ; le suivi dans
+> [`devplan.md`](devplan.md) (itérations « Trois mesures en production », « Lire la carte mutuelle
+> automatiquement », « Protéger les données du patient »).
 
 ---
 
-## 1. Ce qui est livré
+## 1. Ce qui est livré — en bref
 
-**L'ambulancier photographie la carte mutuelle du patient.** La photo est rattachée au **patient**,
-pas à la mission : elle le suit d'un transport à l'autre. Chaque capture est conservée — on garde
-l'historique, la plus récente fait foi — avec la trace de qui l'a prise et à quelle occasion.
+**L'ambulancier photographie la carte depuis la mission** et saisit ses quatre champs ; la carte suit
+le patient d'un transport à l'autre, historique conservé. **La facturation la reçoit** dans le dossier
+terrain, et **Order comme la facturation peuvent l'afficher** sur leurs écrans. **Elle arrive** : 26
+captures du 13/09 au soir au 15/09, 13 le 16/09 (journaux de production).
 
-**Il peut saisir les informations à la main.** Les quatre champs de facturation se renseignent
-depuis l'app, sans attendre la lecture automatique. Une saisie humaine vaut validation.
-
-**La facturation lit l'ensemble.** Carte et champs partent avec le dossier terrain de la mission ;
-BillingGateway déclare le bloc depuis `d048558` — mais n'en fait rien pour l'instant (§2, `M7`).
-
-*Livré le 2026-06-15 (P1 capture/stockage + P2 restitution et saisie manuelle), 16 tests. Le stockage
-est en base Vector ; le pivot vers la mutuelle du référentiel reste le **code AMC**.*
-
-### ⚠️ Livré mais inatteignable depuis l'app — cause trouvée le 2026-09-13
-
-**Aucune carte en production** : 1 344 paquets terrain sur 1 344 portent `Mutuelle: null` du 24 au
-27/08 (mesure de la facturation, 739 bénéficiaires). **La cause est dans le contrat, pas dans
-l'usage** : la capture était exposée par **bénéficiaire** (`POST api/beneficiaries/{id}/mutuelle-card`),
-et **aucun DTO servi au terrain ne porte l'identifiant du patient** — `ClPatientDto` n'a que nom,
-DDN, âge et téléphones ; `ClMission.ContactId` est calculé mais jamais projeté. Le dev web n'avait
-d'ailleurs reçu aucune note sur la carte, et `AppMobile_specifications.md` ne la mentionne pas.
-
-Deux correctifs ont été écrits en parallèle, sur deux branches. `feat/decouplage-dec6-dec7` a ajouté
-`beneficiaryId` au bloc patient du détail mission (26/08, `null` quand la mission n'en résout aucun) ;
-`main` a ouvert la capture **par mission** (13/09, `M8`). **C'est la seconde que l'app utilise.** Les deux
-branches sont fusionnées depuis le 2026-09-15.
-
-**Incident du 2026-09-15** : la production a été republiée à 13:29 depuis `feat/decouplage-dec6-dec7`,
-qui n'avait pas la route par mission. Les journaux IIS montrent 26 captures en `200` du 13/09 au soir au
-15/09 13:24, puis **17 tentatives en `404`** de 13:45 à 17:53, sur 8 équipages — l'app affichait « Mission
-introuvable ou sans patient ». Corrigé par la fusion des deux branches et une republication.
+*Le récit — la table vide jusqu'au 13/09 parce que l'app ne pouvait pas appeler la capture, la
+capture par mission, les routes des écrans amont, l'incident du 15/09 — est dans
+[`delivered.md`](delivered.md) (journal et §8).*
 
 ---
 
@@ -59,52 +36,25 @@ introuvable ou sans patient ». Corrigé par la fusion des deux branches et une 
 | M6 | **RGPD** : MVP simple d'abord, durcissement en phase suivante (dette assumée, P4). |
 | M7 | *(26-27/08/2026)* **La carte est un document consultable** : elle n'alimente **jamais** la colonne `C54` (ID mutuelle), qui n'accepte qu'un numéro issu de l'attribut `AMC`/`MUTUELLE`. Order et BillingGateway la **consultent**, un opérateur lit et décide — mapper un code AMC lu sur une photo contredirait `M5`. L'écran de consultation facturation est **suspendu** tant qu'aucune carte n'arrive. |
 | M8 | *(2026-09-13)* **L'app capture par mission**, le serveur résout le patient (mission → commande → bénéficiaire). Garde `M4` : la carte reste rattachée au patient. La route par bénéficiaire est conservée, non recommandée. |
-| M9 | *(2026-09-13)* **Les routes image restent ouvertes sans jeton** jusqu'à P4 — `GET api/mutuelle-card/{id}/image`, et depuis la fusion du 15/09 `GET api/beneficiaries/{id}/mutuelle-card/image` et `POST api/mutuelle-card/presence`, affichées par balise `<img src>` dans Order et la facturation. Dette assumée, à refermer avec P4 / DEC-6. |
+| M9 | *(2026-09-13, précisée le 19/09)* **Les routes image sont ouvertes sans jeton**, pour deux raisons distinctes. `GET api/mutuelle-card/{id}/image` l'est faute de jeton de la facturation : **elle se referme avec DEC-6**, maintenant possible (seule l'app mobile l'appelle, avec son jeton). `GET api/beneficiaries/{id}/mutuelle-card/image` et `POST api/mutuelle-card/presence` le sont pour un affichage par `<img src>` dans Order et la facturation, qui ne porte jamais de jeton : **elles se referment avec P4**, quand ces écrans passeront à un appel authentifié. |
 
 ---
 
 ## 3. Ce qui reste
 
-### 3.1 ⏳ Adoption terrain — préalable à tout le reste
+### 3.1 ⏳ Mesurer le remplissage — préalable à P3
 
-La capture par mission est **en production depuis le 2026-09-13** (publication 14:40, constatée dans
-les binaires à 14:46 — `MutuelleCardController` : `POST`/`GET api/missions/{missionId}/mutuelle-card`).
-Détail de la livraison : [`delivered.md`](delivered.md). Retirée par erreur le 15/09 à 13:29, rétablie
-par la fusion des branches (§1).
+L'app capture. Reste à savoir **quelle part des missions** repart avec une carte : c'est ce chiffre qui
+dira si l'extraction automatique (§3.2) et l'écran de consultation facturation (`M7`) valent la peine.
+⚠️ Le compte `ErpAccount` de `appsettings.json` est refusé depuis le poste de dev (2026-09-13, non
+revérifié) : compter en base demande un compte de lecture ; à défaut, les journaux.
 
-1. **Transmettre** [`note_web_alexandre_carte_mutuelle.md`](note_web_alexandre_carte_mutuelle.md) au
-   dev web.
-2. **Mesurer** le remplissage de `MOB_MUTUELLE_CARD`. Premier relevé, dans les journaux IIS : **26
-   captures** du 13/09 au soir au 15/09 13:24, toutes suivies de leur saisie de champs. ⚠️ Le compte
-   `ErpAccount` de `appsettings.json` est refusé depuis le poste de dev (2026-09-13) : compter en base
-   demande un compte de lecture.
+### 3.1.b ⏳ Côté facturation — seulement si elle veut les quatre champs
 
-**C'est le seul point qui débloque de la valeur immédiate** : l'OCR (§3.2) et l'écran de consultation
-facturation (`M7`) n'ont aucun intérêt tant qu'aucune photo n'arrive.
-
-### 3.1.b ✅ Consultation depuis les modules amont *(codée le 26/08, en production depuis la fusion du 15/09)*
-
-**Order affiche une carte à la fois, la facturation une liste de bénéficiaires.** Deux formes, deux
-routes, toutes deux **sans jeton** — cohérent avec l'affichage par balise `<img src>` retenu :
-
-- `GET /api/beneficiaries/{id}/mutuelle-card/image` — Order compose l'URL avec le `BEN_ID` qu'il
-  affiche déjà. **Rien à coder côté Order** : il lui faut seulement la base Vector dans sa config front.
-- `POST /api/mutuelle-card/presence` — la facturation envoie les bénéficiaires de sa page en **un
-  appel** et sait lesquels ont une photo. ⚠️ Le sondage ligne par ligne était l'anti-patron à éviter :
-  c'est la forme qui coûte déjà **14,7 s pour 284 missions** sur le paquet terrain.
-
-**Reste côté facturation, et seulement si elle veut les quatre champs saisis** (nom de mutuelle, AMC,
-concentrateur, télétransmission) : son `ClFieldEnrichmentDto` ne déclare **ni `Mutuelle` ni
-`Documents`**, donc Vector sert le bloc et sa désérialisation le jette. Pour la seule photo, elle n'a
-rien à changer.
-
-**Trois points pour le dev web :**
-- validation à l'upload — `image/*` obligatoire, **8 Mo maximum**, sinon `400` avec le motif ; une
-  photo de smartphone brute peut dépasser, prévoir une compression côté client ;
-- `imageUrl` est un **chemin relatif**, à composer avec la base de l'API ;
-- toutes les routes exigent le jeton Keycloak **sauf l'image**, ouverte — c'est ce qui permet aux
-  autres modules de la consulter sans jeton (M7), et c'est la porte la plus sensible de `DEC-6`
-  puisqu'il s'agit d'une donnée de santé.
+Pour la photo, rien à changer. Pour les champs saisis (nom de mutuelle, AMC, concentrateur,
+télétransmission), son `ClFieldEnrichmentDto` ne déclare **ni `Mutuelle` ni `Documents`** : Vector sert
+le bloc, sa désérialisation le jette. À lui signaler aussi que ses « 401 » du 27/08 portaient sur deux
+routes alors absentes de la production (§4).
 
 ### 3.2 ⏳ P3 — Extraction automatique (Claude vision)
 
@@ -137,9 +87,9 @@ homogène et élevé. Rappel `M7` : même validés, ces champs n'alimentent pas 
 ### 3.4 ⚪ P4 — Durcissement RGPD (différé)
 
 Donnée de santé servie par une API exposée : rétention et purge (3 ans, aligné sur la spec DMZ),
-chiffrement au repos, contrôle d'accès fin sur `GET /api/mutuelle-card/{id}/image` (ouverte sans jeton,
-`M9`), audit des accès. À traiter avec le même lot que documents et anomalies (cf.
-[`devplan.md`](devplan.md) §3.5, ligne RGPD).
+chiffrement au repos, fermeture des deux routes d'affichage (`M9`), audit des accès. À traiter avec le
+même lot que documents et anomalies ([`devplan.md`](devplan.md), itération « Protéger les données du
+patient »).
 
 ### 3.5 ⚪ `Vd-6` — Sortir l'image du SQL (V2)
 
@@ -174,6 +124,7 @@ on reste en blob SQL, le firewall ayant retiré le motif DMZ d'origine.
 | `GET /api/mutuelle-card/{id}/image` | Les octets d'une carte **désignée**, avec le `Content-Type` d'origine. **Anonyme** (`M9`). |
 | `GET /api/beneficiaries/{id}/mutuelle-card/image` | *(codée 26/08, en production depuis le 15/09)* Les octets de la carte **courante** — l'URL stable, qui suit les nouvelles captures. **Anonyme** : Order et la facturation l'affichent par balise `<img src>` (`M9`). |
 | `POST /api/mutuelle-card/presence` | *(codée 26/08, en production depuis le 15/09)* `{ beneficiaryIds: [...] }` → pour ceux qui portent une carte : `{ beneficiaryId, capturedAt, imageUrl }` ; les autres sont absents. **Anonyme**, **500** par appel au plus, ni nom de mutuelle ni code AMC. |
+| *Pour le dev web* | Upload : `image/*` obligatoire, **8 Mo maximum**, sinon `400` avec le motif — prévoir une compression côté client. `imageUrl` est un **chemin relatif**, à composer avec la base de l'API. |
 | `PATCH /api/mutuelle-card/{cardId}` | Saisie manuelle `{ mutuelleName, amcCode, concentrateur, teletransmission }` — remplace les quatre → statut `validated`. |
 | `GET /api/missions/{id}/field-data` | Bloc `mutuelle` du dossier terrain (lu par la facturation, non exploité — `M7`). |
 

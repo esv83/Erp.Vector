@@ -3,8 +3,8 @@
 > Note de reprise. État au 2026-07-15. Concerne l'affichage des lieux de prise en
 > charge / dépose dans `GET /api/JobDetail/{id}` (mobile UsVector).
 >
-> ⚠️ **DET-1 est implémenté côté serveur mais NON DÉPLOYABLE seul** — voir §6.
-> Le déploiement reste **conditionné à l'affichage de la ligne `Service` par Alex**.
+> ✅ **Mis à jour le 2026-09-19** : DET-1 est **en production** (le code tourne sur `main` depuis
+> juillet, cf. [`delivered.md`](delivered.md)). Restent deux vérifications d'exploitation (§8).
 
 ## 1. Contexte
 
@@ -81,22 +81,11 @@ cette ligne, le service est invisible** (il ne transite plus par `BatEtage`) —
 - ✅ **DET-2 — affichage piloté serveur** (`PickupDisplay`/`DropoffDisplay`, `ClLocationDisplayBuilder`).
 - Tests : `JobLocationMappingTests` (12) ; suite Vector verte.
 
-## 6. DET-1 — implémenté, déploiement conditionné à Alex 🚧
+## 6. DET-1 — ✅ en production
 
-Le code est fait des deux côtés du mapping (`ClJobLocation`, `ClJobLocationDto`, `ToJobLocation`,
-`ToLocationDto`, `ErpStageDto`). **Il reste le contrat UI.**
-
-⚠️ **Le service ne transite plus par `BatEtage`.** Déployer Vector avant qu'Alex n'affiche la
-ligne `Service` ferait **disparaître le service** de l'écran. Séquence obligatoire :
-
-1. **Alex d'abord** : ajoute la ligne `Service` après `Nom`, affichée si non vide. Déployable
-   immédiatement et **visuellement neutre** (le serveur n'envoie pas encore le champ → vide → rien
-   ne s'affiche). Aucun risque, aucune fenêtre de régression.
-2. **Vector ensuite** : déployer. Le service saute de « Bât./Étage » à sa propre ligne. Rien ne
-   disparaît à aucun moment.
-
-Message rédigé pour Alex (ordre legacy `ClHelper.GetSiteString` : Site → Service → lignes → CP/Commune,
-+ contrat `DisplayLines` / `*Display`) — en attente de sa réponse.
+Le service médical a sa propre ligne (`db949e9`, juillet 2026). La séquence de déploiement qui
+figurait ici (le front d'abord, Vector ensuite) n'a plus d'objet. ⚠️ La confirmation par le dev web
+de l'affichage de la ligne `Service` n'est pas tracée dans ce dépôt.
 
 ## 7. Fichiers clés
 
@@ -118,9 +107,9 @@ Message rédigé pour Alex (ordre legacy `ClHelper.GetSiteString` : Site → Ser
 
 - [x] Décider si on implémente DET-1 (champ `Service` dédié) → **DET-1**, implémenté (+ `Coordinates` + `DisplayLines` + DET-2).
 - [x] Implémenter côté serveur (Domain / DTO / adapter / mapping).
-- [ ] 🚧 **Bloquant** — Alex : confirmer + déployer la ligne `Service` (§6 étape 1) **avant** de déployer Vector.
+- [x] Déployer DET-1 — en production (§6).
 - [ ] Vérifier l'affichage sur une mission **retour** (service non inversé).
 - [ ] Vérifier un lieu **non référencé** (FreeText) : service référentiel conservé.
-- [ ] Fraîcheur des coordonnées : le re-géocodage sur **édition d'adresse bénéficiaire** n'est
-      pas implémenté (module Beneficiary — cf. `Erp.Order/docs/features/featDesc_AddressHandling_Order.md:106`).
-      Un `Coordinates` peut donc pointer l'ancien bâtiment → à traiter **avant** tout usage navigation.
+- [x] Fraîcheur des coordonnées — **sans objet depuis le 06/09** (relevé chez Orders le 19/09) :
+      modifier une adresse de bénéficiaire **remplace** son numéro canonique, et la position se lit
+      par ce numéro. Elle suit l'édition sans re-géocodage à déclencher.

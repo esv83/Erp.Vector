@@ -1,11 +1,12 @@
 # 🔌 Découplage Vector ↔ Orders — accès HTTP
 
-> **Objet** : Vector ne compile plus Orders depuis les sources ; il consomme `Orders.Api` en REST,
-> comme il consomme déjà `Address.Api`. Décision du 2026-06-14, **direction 4a** (DTO miroir côté
-> Vector, sans toucher Orders sauf un endpoint additif).
+> **Objet** : Vector ne compile plus Orders depuis les sources ; il consomme `Orders.Api` en REST.
+> Décision du 2026-06-14, **direction 4a** (DTO miroir côté Vector, sans toucher Orders sauf un
+> endpoint additif).
 >
-> **Mise à jour 2026-08-24** — livré résumé en prose, reste détaillé techniquement, pistes
-> abandonnées listées au §4.
+> **Mise à jour 2026-09-19** — l'authentification de service est faite dans les deux sens, reste la
+> fermeture des routes (§2.1). Le suivi vit dans [`devplan.md`](devplan.md) ; ce document garde le
+> contrat et le raisonnement.
 
 ---
 
@@ -16,8 +17,9 @@ compilation de Vector, et les deux modules se déploient séparément. L'isolati
 reconstruction complète ne compile plus que Vector et ses connecteurs.
 
 **Tout l'ERP se consomme de la même façon.** Missions, commandes, patients, équipages, véhicules et
-personnel sont lus par appels HTTP, au même titre que les adresses — plus aucune référence de projet
-ni de chaîne de connexion vers la base d'Orders.
+personnel sont lus par appels HTTP ; les adresses arrivent **déjà résolues** par Orders — plus aucune
+référence de projet ni de chaîne de connexion vers la base d'Orders. *(La clé `AddressApi:BaseUrl`
+subsiste dans la configuration, mais aucun code ne la lit — constaté le 2026-09-19.)*
 
 **Le seul manque côté Orders a été comblé** : la résolution d'un compte Keycloak vers un ambulancier,
 ajoutée en tant qu'endpoint additif, sans rien casser d'existant.
@@ -32,14 +34,19 @@ dans `git log`.*
 
 ## 2. Ce qui reste
 
-### 2.1 🟡 DEC-6 — Authentification de service à service
+### 2.1 🟡 DEC-6 — Authentification de service à service — *reste la fermeture*
 
-**Codé le 2026-09-13, inerte jusqu'à configuration** : les deux `HttpClient` d'Orders.Api portent
-`ServiceAccountTokenHandler`, qui pose un jeton `client_credentials` (cache, renouvellement avant
-expiration, oubli sur 401) dès que `OrdersApi:ServiceAccount` est renseigné. Reste le **geste
-d'administration** : créer le client de service de Vector dans Keycloak et poser son secret dans le
-`web.config`. Orders peut ensuite fermer son API au terrain — son plan attend précisément ce jeton.
-Suivi et séquence complète : [`devplan.md`](devplan.md) §C2.
+**Fait dans les deux sens** ([`delivered.md`](delivered.md)) :
+- **Vector → Orders** : `ServiceAccountTokenHandler` pose le jeton `client_credentials` du client
+  `erp-vector-api` sur les appels à Orders.Api, en service depuis le 2026-09-13 à 18:59.
+- **Facturation → Vector** : BillingGateway présente le jeton de `erp-billinggateway-api`, que Vector
+  admet (`Keycloak:ServiceAzp`) — constaté le **2026-09-19 à 11:48** ; depuis, la sonde de surface ne
+  voit plus aucun appel sans jeton de sa part.
+
+**Reste** : fermer les quatre routes ouvertes pour la facturation (`ServiceOrMobilePolicy`), puis
+Orders pourra exiger un jeton du terrain. Suivi : [`devplan.md`](devplan.md), itération « Fermer les
+quatre routes de la facturation ». Les deux routes d'affichage de la carte mutuelle (`<img src>`) ne
+se referment **pas** avec DEC-6 (`M9`).
 
 ### 2.2 ⏳ DEC-7 — Résilience des appels sortants
 
@@ -94,7 +101,8 @@ côté Vector sont en `int`.
 |---|---|
 | Détail mission complet | `GET /missions/{id}/full` |
 | Commande / bénéficiaire | `GET /orders/{id}` · `GET /beneficiaries/{id}` |
-| Missions du jour | `GET /missions?from=&to=&unassignedOnly=&includeCancelled=&take=` |
+| Missions de l'équipage | `GET /crews/{id}/missions?engagedOnly=true` |
+| Confirmation de prise de service | `GET /personnel/{id}/shift-confirmations/pending` · `POST /crews/{id}/shift-confirmations/{requestId}/confirm` |
 | Équipages | `GET /crews?personnelId=&date=&take=` · `GET /crews/{id}` · `PUT /crews/{id}/driver` |
 | Véhicule / personnel | `GET /vehicles/{id}` · `GET /personnel/{id}` |
 | **Keycloak → ambulancier** | `GET /personnel/by-keycloak/{sub}` *(endpoint additif livré pour Vector)* |
@@ -104,9 +112,8 @@ côté Vector sont en `int`.
 final, le dernier segment est perdu à la résolution d'URI relative et tout part en 500. Cause d'une
 panne réelle en juillet 2026.
 
-Attente côté Orders, encore non honorée : le filtre `assignedCrewId` sur `GET /missions` (Vector
-l'envoie, Orders l'ignore → toute la journée est rapatriée puis filtrée en mémoire). Contrat détaillé
-dans [`endPoint.md`](endPoint.md).
+La liste des missions du terrain lit `GET /crews/{id}/missions?engagedOnly=true`, honoré par Orders
+depuis le 2026-07-15. Contrat détaillé dans [`endPoint.md`](endPoint.md).
 
 ---
 
@@ -122,6 +129,7 @@ dans [`endPoint.md`](endPoint.md).
 | **Risque « parité des DTO »** | Levé : formes vérifiées à la migration, puis en service réel. |
 | **Risque « perf : 3 appels HTTP au lieu de 3 requêtes in-process »** | Accepté et mesuré en service ; pas d'endpoint agrégé « job detail » à demander à Orders. |
 | **DET-1 — champ `Service` concaténé dans `BatEtage`** | Résolu le 2026-07-14 : champ `Service` dédié, contrat UI basculé. |
+| **Attente du filtre `assignedCrewId` sur `GET /missions`** | Sans objet (relevé le 2026-09-19) : la liste du terrain lit la route de l'équipage, et `ListMissionsAsync`, seul émetteur du filtre, n'a plus d'appelant. |
 
 ---
 

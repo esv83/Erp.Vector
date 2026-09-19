@@ -6,7 +6,7 @@
 > Deux changements d'écran : (1) la **liste est filtrée serveur** (agence/mode), (2) un **verrou** peut la mettre en **lecture seule**.
 > **Statut** : le **back Order est prêt** (endpoints OC-9). La **bascule côté API Vector est à venir (Phase 2)** — cette note
 > te permet de **préparer l'UI** dès maintenant. Rien n'est cassé tant que la bascule n'est pas livrée.
-> **Voir aussi** : `note_vector_orderContext_mission.md` (côté intégrateur Vector) et `Erp.Order/note_front_jules_order_context.md` (côté régulateur).
+> **Voir aussi** : `Erp.Order/archive/note_vector_orderContext_mission.md` (côté intégrateur Vector) et `Erp.Order/archive/note_front_jules_order_context.md` (côté régulateur).
 
 > 🔤 **Vocabulaire harmonisé (important)** — on parlait de « type de mission » / « contrat » ; on dit désormais **« context de la mission »**.
 > Son identifiant s'appelle **`contextOrderId`** (côté code : `ContextOrder` / `ContextOrderId`). Dans cette note, « context » = ce que

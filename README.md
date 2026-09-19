@@ -1,58 +1,56 @@
-# CaSoft.Erp.USVector
+# CaSoft.Erp.USVector — Vector
 
-API mobile ambulanciers (terrain ↔ régulation), **reconnectée à l'ERP** après la perte de
-la base legacy `BD_REGULATION_prod`. Remplace l'ancienne `WebApi` de la solution
-`E:\VB_Projects\MobileApp` en préservant le contrat (routes + DTOs) → l'app mobile est
-re-pointée sans modification.
+API du **module terrain des ambulanciers** : l'application mobile y lit ses missions et y écrit ce que
+l'équipage fait sur le terrain. Reconstruite sur l'ERP après la perte de la base historique, **sans
+changer le contrat consommé par l'application** — mêmes routes, mêmes formats.
 
-> Plan de développement : `devplan.md` (plan unique du module — livré, reste, décisions).
+> **Ce qui reste à faire** : [`devplan.md`](devplan.md) · **Ce qui est livré, les décisions, la
+> configuration, les incidents** : [`delivered.md`](delivered.md).
 
 ## Architecture (Clean Architecture, .NET 8)
 
 | Projet | Langage | Rôle |
 |---|---|---|
-| `CaSoft.Erp.USVector.Domain` | VB | Entités métier mobile (← `MobApp.Domaine`) |
-| `CaSoft.Erp.USVector.Contracts` | VB | DTOs = contrat mobile (← `MobApp.Modeles`) |
-| `CaSoft.Erp.USVector.Application` | VB | Use cases, services, **interfaces repos** (← `MobApp.Application`) |
-| `CaSoft.Erp.USVector.Infrastructure` | C# | Couche data : `MobileDbContext` (BD Mobile `MOB_*`) + repos lisant l'ERP **in-process** + mapping |
-| `CaSoft.Erp.USVector.Api` | C# | API REST (controllers) — sous-app IIS `/mobile` |
-| `CaSoft.Erp.USVector.Framework` | VB | Socle legacy (`ClBusinessBase`, use cases, presenters — ← `0-Framework`, RootNamespace `CaSoft.Framework`) |
-| `GpsGate.Connector` | VB | Client REST GpsGate (géoloc) — porté tel quel |
-| `EmergencyPlatformConnector` | VB | Orchestration Sirus (UDP régulation) + GpsGate — porté tel quel |
+| `CaSoft.Erp.USVector.Domain` | VB | Entités métier du terrain |
+| `CaSoft.Erp.USVector.Contracts` | VB | DTO du contrat mobile |
+| `CaSoft.Erp.USVector.Application` | VB | Cas d'usage (`ClResult` typé), interfaces des dépôts et des clients ERP |
+| `CaSoft.Erp.USVector.Infrastructure` | C# | `MobileDbContext` (base Vector, tables `MOB_*`), clients HTTP vers Orders.Api, mappings |
+| `CaSoft.Erp.USVector.Api` | C# | Contrôleurs REST, authentification Keycloak, worker de projection vers Orders |
+| `CaSoft.Erp.USVector.Framework` | VB | Socle local (`IResultUseCase`, outils) |
+| `CaSoft.Erp.USVector.Tests` | C# | xUnit + FluentAssertions |
+| `GpsGate.Connector`, `EmergencyPlatformConnector` | VB | Connecteurs géolocalisation et régulation Sirus — portés, **non recâblés** |
 
-### Flux de données
-- **Données de référence** (missions, équipages, véhicules, personnel, bénéficiaires) :
-  lues **in-process** via références projet vers `Orders.Application` / `Orders.Infrastructure`
-  (ERP), **pas** via `Orders.Api` HTTP.
-- **Données purement mobiles** (timeline statuts opérationnels, signature, kilométrage,
-  logs mécaniques) : **BD Mobile dédiée** (`MOB_*`), référencent les entités ERP par id.
-- **Sirus** (régulation UDP) + **GpsGate** (géoloc REST) : statu quo, connecteurs portés tels quels.
+## Flux de données
 
-## Références ERP (in-process)
-`CaSoft.Erp.USVector.Infrastructure` référence :
-- `..\..\Erp.Orders\Orders.Application\Orders.Application.vbproj`
-- `..\..\Erp.Orders\Orders.Infrastructure\Orders.Infrastructure.csproj`
+- **Données de référence** (missions, commandes, équipages, véhicules, personnel, bénéficiaires, type
+  de mission et attributs de facturation) : lues chez **Orders.Api, en HTTP** (`OrdersApi:BaseUrl`).
+  Aucune référence de projet vers les autres modules : Vector se construit et se déploie seul.
+- **Données propres au terrain** (étapes horodatées, signature, anomalies, documents, carte mutuelle,
+  file de projection) : **base Vector** `BD_ERP_MOBILE_APP`, tables `MOB_*`.
+- **Vers la régulation** : chaque geste est projeté sur Orders par une file rejouée
+  (`OperationalOutboxDispatcher`) ; un envoi en échec ne bloque jamais la saisie.
+- **Vers la facturation** : elle tire le dossier terrain et les pièces jointes depuis Vector.
 
-## État
-**MOB-0 → MOB-3 + MOB-5 livrés** (MOB-4 reporté) :
-- BD dédiée `BD_ERP_MOBILE_APP` (serveur dev `192.168.1.109,1440`), tables `MOB_SESSION` /
-  `MOB_MISSION_STATE` / `MOB_SIGNATURE`, entités Database First + `MobileDbContext`.
-- Legacy intégralement porté : Framework (`CaSoft.Erp.USVector.Framework`), Domain, Contracts,
-  Application, connecteurs (`GpsGate.Connector`, `EmergencyPlatformConnector` avec Sirus),
-  16 controllers. Secrets en config (`__SET_VIA_ENV__`, user-secrets en dev).
-- Repos BD Mobile **réels** : signature, timeline statuts, sessions ; le reste stubbé (MOB-4+).
-- **Identités de référence (crew/vehicle/personnel) en Guid**, alignées sur l'ERP (décision MOB-3a,
-  pas de table de correspondance). Mappings ERP→mobile (`ErpReferenceMappings`) consommant les DTO
-  d'Orders.Application.
-- **Accès ERP in-process** câblé (`AddOrdersInfrastructure`) : `GET api/joblist/{crewId}` renvoie
-  les missions du jour de l'équipage (ERP) avec flags ack/terminé overlay depuis la BD Mobile —
-  validé sur données réelles.
-- L'API expose les **25 routes du contrat legacy** ; `api/Signature`, `api/Time`, `api/joblist`
-  validés de bout en bout.
+## Authentification
 
-Prochaine étape : **MOB-4** (Login — résolution équipage ERP + token `MOB_SESSION`), puis MOB-6 (détail mission).
+- **Ambulancier** : jeton Keycloak du client mobile (`azp` = `Keycloak:Audience`). L'équipage est
+  résolu côté serveur, jamais fourni par l'app.
+- **Service à service** : Vector accepte les modules déclarés dans `Keycloak:ServiceAzp` et présente
+  son propre jeton à Orders (`erp-vector-api`).
+- **Fermée par défaut** : les seules routes anonymes sont nommées et justifiées dans
+  `AnonymousSurfaceTests`.
 
-## Build
+Guides : [`docs/deploiement/configuration-keycloak-iis.md`](docs/deploiement/configuration-keycloak-iis.md),
+[`docs/deploiement/keycloak-compte-service-vector.md`](docs/deploiement/keycloak-compte-service-vector.md).
+
+## Build, tests, déploiement
+
 ```powershell
 dotnet build USVector.sln
+dotnet test USVector.sln
+.\deploy.ps1 dev     # \\192.168.1.112\dev_api\Vector.Api
+.\deploy.ps1 prod    # \\192.168.1.112\prod_api\Vector.Api — IIS /vector, confirmation à taper
 ```
+
+⚠️ **Publier depuis `main`, arbre propre** : le script ne l'impose pas encore (devplan, itération 2).
+Pièges de configuration avérés : [`delivered.md`](delivered.md) §6.

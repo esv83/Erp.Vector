@@ -13,7 +13,7 @@ namespace CaSoft.Erp.USVector.Tests;
 /// Épingle la route, le verbe, le corps envoyé, et surtout la **traduction des refus métier** :
 /// verrou régulateur (409) et context non applicable (400) sont des issues normales du terrain,
 /// pas des pannes — elles ne doivent jamais remonter en exception.
-/// Contrat : <c>Erp.Order/note_vector_orderContext_mission.md</c> §2.
+/// Contrat : <c>Erp.Order/archive/note_vector_orderContext_mission.md</c> §2.
 /// </summary>
 public class ErpContextOrderWriteClientTests
 {

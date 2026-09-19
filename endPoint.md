@@ -229,7 +229,11 @@ Effet : payload réduit à la poignée de missions de l'équipage, plafond `take
 
 ---
 
-## 5) `GET /crews/{crewId}/missions` — filtre `engagedOnly` (ne montrer au terrain que les missions **engagées**)
+## 5) `GET /crews/{crewId}/missions` — filtre `engagedOnly` (ne montrer au terrain que les missions **engagées**) — ✅ implémenté 2026-07-15
+
+> ✅ **Honoré par Orders depuis le 2026-07-15** (`b194c3c`, « joblist terrain — ne remonter que les
+> missions engagées », vérifié dans `CrewsEndpoints.cs` le 2026-09-19). La demande ci-dessous est
+> gardée comme contrat.
 
 ### Problème
 L'ambulancier voit **toutes les missions qui lui sont affectées** (équipage assigné), alors qu'il ne
@@ -263,8 +267,7 @@ GET /crews/{crewId}/missions?engagedOnly=true
 > non engagées pour les filtrer ensuite. (Variante B — exposer `isEngaged` dans le DTO — resterait
 > possible si un besoin d'affichage/diagnostic client de l'état d'engagement apparaissait.)
 
-> Vector envoie **déjà** `engagedOnly=true` (`HttpErpReadApiClient.ListMissionsByCrewAsync`). Sans effet
-> tant qu'Orders.Api l'ignore ; dès qu'il l'honore, la visibilité se corrige **sans redéploiement Vector**.
+> Vector envoie `engagedOnly=true` (`HttpErpReadApiClient.ListMissionsByCrewAsync`), et Orders l'honore.
 
 ---
 

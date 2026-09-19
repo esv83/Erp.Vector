@@ -1,393 +1,407 @@
-# 📱 devplan — Vector (module terrain ambulanciers)
+# Plan de développement — Erp.Vector
 
-> **Ne porte que les sujets ouverts** : en attente, bloqué, envisagé, décidé mais pas fait. Ce que le
-> module fait, le journal daté, les décisions appliquées, la configuration et les pistes retirées sont
-> dans [`delivered.md`](delivered.md).
+> **Édition du** 2026-09-19 · **En production** `dc30612` *(`main`, publié le 15/09 à 18:31, constaté
+> par sourcelink le 19/09)* · **172 tests verts** · Dépôt `github.com/esv83/Erp.Vector`
+> (`USVector.sln`) · Prod `\\192.168.1.112\prod_api\Vector.Api` (IIS `/vector`)
 >
-> **Prod** : `\\192.168.1.112\prod_api\Vector.Api` (IIS `/vector`) · **Dépôt** :
-> `github.com/esv83/Erp.Vector` (`USVector.sln`) · **137 tests verts** (2026-09-13).
-> **Régénéré le** 2026-09-13 (compact devplan).
+> 🔴 **Le 15/09, la production a tourné cinq heures sur une branche au lieu de `main`** — cinquième
+> publication de ce qui n'était pas prévu. La capture de carte mutuelle a disparu *(17 échecs sur 8
+> équipages)*, le correctif de clôture du 13/09 avec elle. Rien dans `deploy.ps1` ne l'empêche
+> ⇒ *itération 2*.
+>
+> ✅ **La facturation présente son jeton depuis le 19/09 à 11:48** : plus un seul appel anonyme de sa
+> part. Les quatre routes ouvertes pour elle — dont l'image de la carte mutuelle, donnée de santé —
+> peuvent se fermer ⇒ *itération 1*.
+>
+> Ce document se régénère sur demande — prompt **« compact devplan »** — et il est **relevé sur l'état
+> réel du dépôt, de la production et des modules voisins**. **Il ne porte que l'ouvert** : le livré,
+> daté, vit dans [`delivered.md`](delivered.md).
 >
 > **Règle de travail** : on code neutre ou additif, jamais de rupture du contrat consommé par l'app
-> web (D14, [`delivered.md`](delivered.md) §4).
+> web — elle n'est pas déployée en même temps que l'API (D14).
 
-| | Sens |
+**Cinq rubriques, communes à tous les dépôts de l'ERP.** Le format est partagé ; les données ne le
+sont jamais.
+
+## 📍 Point de reprise — 19/09, la sonde a répondu
+
+**La sonde posée le 15/09 sur les routes ouvertes sans jeton a servi dès sa première semaine.** Du 16
+au 18/09, elle a compté jusqu'à **7 662 appels anonymes par jour** — tous de la facturation, depuis
+`192.168.1.112`. Depuis le 19/09 à 11:48, **zéro** : la facturation passe avec son jeton.
+
+> ⚖️ **Elle dit aussi ce que la fermeture ne cassera pas.** L'app mobile tire déjà la signature et
+> l'image de la carte **avec son propre jeton** ; la politique prévue admet les deux. Un seul appel
+> sans jeton venu de l'app en quatre jours *(18/09, et il a reçu un 404)*.
+
+**La confirmation de prise de service depuis l'app est adoptée** : 40 à 90 consultations par jour,
+9 confirmations du 15 au 18/09. **La carte mutuelle arrive** : 26 captures du 13 au 15/09, 13 le 16/09.
+
+⚠️ **Le `nlog.config` du serveur n'est pas celui du dépôt** *(constaté le 19/09)* : la sonde écrit
+dans le journal général faute de son fichier dédié. La mesure reste lisible ; la configuration a dérivé
+sans que rien le signale.
+
+---
+# 1. Fonctionnalités livrées
+
+*Ce que le module sait faire **en production**, en une page. Le récit de chaque livraison vit dans
+[`delivered.md`](delivered.md), **à jour au 19/09**. Ce qui est écrit mais pas déployé n'est pas ici.*
+
+| Domaine | Ce que le module apporte aujourd'hui |
 |---|---|
-| ⏳ | à faire, rien ne bloque |
-| 🟡 | engagé, reste une partie |
-| ⛔ | bloqué (décision, contenu métier, ou livrable d'un autre module) |
-| ⚪ | différé V2 |
-| ⚠️ | dette / garde-fou |
+| **Se connecter** | L'ambulancier entre avec son **compte d'entreprise** · l'app retrouve seule son ou ses équipages du jour et lui fait choisir celui qu'il occupe · ses missions sont visibles **30 minutes avant sa prise de service** · quand l'accès est refusé, **le message dit pourquoi et quoi faire** — équipage pas encore composé, service pas encore ouvert, service clôturé |
+| **Confirmer sa prise de service** | L'app lui dit **qu'une confirmation l'attend**, même la veille, et il confirme **sans passer par le courriel** — utile quand le message n'est jamais arrivé |
+| **Voir son travail du jour** | La liste des missions **engagées** par la régulation · le détail : patient, adresses, horaires, sens, service destinataire · l'affichage des lieux est composé par le serveur, identique partout |
+| **Faire avancer la mission** | Cinq étapes horodatées, **annulables** · « mission vue », dont la régulation voit l'heure · signature du patient · choix du conducteur · **tout remonte à la régulation en quasi temps réel**, et un envoi en échec est rejoué sans jamais bloquer la saisie |
+| **Compléter le dossier** | Type de mission et informations de facturation, **servis par la régulation** : les champs dépendent du type, ceux que la fiche patient connaît arrivent **remplis et verrouillés** · un refus arrive **avec son motif**, dit pour le terrain · anomalies, documents et photos |
+| **Photographier la carte mutuelle** | Depuis la mission, avec ses quatre champs · la régulation et la facturation peuvent **l'afficher** sur leurs écrans |
+| **Passer à la facturation** | Une mission clôturée par le régulateur devient transférable d'elle-même · la facturation tire **un dossier unique** et les pièces à la demande · une fois transmis, **le dossier est gelé** côté terrain |
+| **Tenir debout** | **Le terrain n'écrase jamais la donnée officielle** · l'API est fermée par défaut, chaque exception nommée et justifiée · Vector présente son identité de service à la régulation |
+
+### Les réserves à ne pas perdre de vue
+
+- 🔴 **Quatre routes répondent encore sans jeton**, dont l'image de la carte mutuelle — plus pour
+  longtemps *(itération 1)*. Deux autres, pour les écrans de la régulation et de la facturation,
+  resteront ouvertes plus longtemps *(rubrique 3)*.
+- ⚠️ **Un ambulancier rattaché depuis l'écran d'Employee seul n'entre pas** : 8 membres d'équipage sur
+  244 sans compte reconnu *(13/09 — non remesuré)*. Une consigne transitoire existe *(itération 18)*.
+- ⚠️ **Ouvrir l'app avant que la régulation ait composé l'équipage échoue** — 23 min d'attente
+  médiane, 9 cas au-delà d'une heure *(mesuré sur juillet-août)*. Le message dit désormais quoi faire.
+- ⚠️ **Les 7 types de mission sont proposés partout**, faute de règle d'applicabilité *(25/08)*.
+- ⚠️ **Un n° de sécurité sociale mal tapé part en facturation** : aucun module ne permet de le
+  corriger, et l'écran ne le fait pas relire *(demandé au dev web le 26/08)*.
 
 ---
+# 2. Code bloqué, manquant ou en attente
 
-# 0. À faire en premier
+*Classé par itération de session de codage, **du plus simple au plus complexe**. Une itération = une
+session de travail réaliste. **L'ordre est un ordre de difficulté, pas de priorité** — on prend ce qui
+rentre dans le temps disponible. Chaque itération porte entre crochets son **ancienne référence** :
+d'autres dépôts et documents la citent encore.*
 
-| # | Action | Pourquoi maintenant |
-|---|---|---|
-| 1 | **Transmettre à la régulation et à la RH** la [consigne de rattachement](docs/auth/consigne-rattachement-ambulancier.md) (§C1) | Un ambulancier rattaché depuis l'écran d'Employee seul est invisible pour Vector (403) |
-| 2 | **Transmettre au dev web** : [carte mutuelle](note_web_alexandre_carte_mutuelle.md) (§F1), [routes retirées](note_web_alexandre_routes_retirees.md), [sélecteur d'équipage](docs/ui-web/UI_selection-equipage-multi-crew.md) (bouton *Réessayer*, §C3) | Les routes mutuelle sont en service ; tant que l'écran ne les appelle pas, aucune carte n'arrive. |
+> ⚖️ **Les deux premières sont aussi les plus urgentes**, et ce n'est pas un hasard : l'une ferme une
+> donnée de santé, l'autre empêche de publier autre chose que ce qu'on croit. Toutes deux sont
+> petites parce que leur préalable est déjà fait.
 
----
+## Itération 1 — Fermer les quatre routes de la facturation *[ex-C2, DEC-6]*
 
-# 1. Chapitres
+| | |
+|---|---|
+| **Nature** | Sécurité — une donnée de santé et le dossier terrain complet lisibles par qui connaît un identifiant |
+| **Effort** | Une petite session : quatre attributs, un test, une publication |
+| **Bloqué par** | **Rien** depuis le 19/09 à 11:48 |
 
-| Chapitre | Nature | Attaquable maintenant ? |
-|---|---|---|
-| **A** — Contexte de mission | suites de la bascule vers Order | A3 en attente du dev web |
-| **B** — Dépendances amont Orders | rien à coder ici : suivre, réclamer | — |
-| **C** — Identité & authentification | sécurité, chaîne de connexion | C2 : Vector prêt, reste Keycloak et facturation ; C1 dépendance amont ; C3 sur décision |
-| **D** — Robustesse des appels sortants | plomberie HTTP | **oui, isolé** |
-| **E** — Chaîne facturation | contrat du paquet terrain | oui (E2) ; E1 après arbitrage |
-| **F** — Fonctions terrain | features indépendantes | oui |
-| **G** — Dette & hygiène | refactor, zéro changement de contrat | **oui, en continu** |
-| **H** — Différé V2 | — | non |
+Le paquet terrain, la signature, les documents et l'image de la carte mutuelle répondaient sans jeton
+**uniquement parce que la facturation n'en avait pas**. Elle en a un.
 
----
+**Le geste** : `[AllowAnonymous]` → `[Authorize(Policy = ClKeycloakCallers.ServiceOrMobilePolicy)]` sur
+les quatre routes, et `OuverturesFauteDeDec6` vidé dans `AnonymousSurfaceTests`. **Avant de publier**,
+relire la sonde (`Vector.SurfaceAnonyme`) : zéro `auth=absent` depuis la veille.
 
-## A. Contexte de mission — suites de la bascule vers Order
+| Route | Qui l'appelle *(sonde, 15→19/09)* |
+|---|---|
+| `GET api/missions/{id}/field-data` | la facturation, avec jeton |
+| `GET api/Signature/{id}` | la facturation et l'app mobile, avec jeton |
+| `GET api/documents/{id}/content` | **personne** |
+| `GET api/mutuelle-card/{id}/image` | l'app mobile, avec jeton |
 
-> ⚠️ **Deux numérotations `OC-` coexistent.** Un `OC-x` nu désigne la tâche **Vector** ; la tâche
-> Order s'écrit `Order OC-x` ([plan Order](../Erp.Order/feature_order_context_devplan.md) §7).
+**Ensuite** : Orders pourra exiger un jeton du terrain — son plan l'attend de Vector.
 
-> **En deux phrases.** Depuis le 25/08, le type de mission et le questionnaire d'attributs viennent
-> d'Order, qui peut **refuser** une saisie ou **verrouiller** un champ. Vector transmet déjà tout
-> cela ; l'écran affiche les refus (confirmé le 2026-09-13), A3 attend encore deux améliorations
-> d'affichage — rien à coder ici.
+## Itération 2 — Rendre impossible une publication hors de `main` *[ex-G8, partie 1]*
 
-### A3 — ⏳ Deux améliorations d'écran demandées — *attente dev web*
+| | |
+|---|---|
+| **Nature** | Garde de déploiement — **cinquième récidive** |
+| **Effort** | Une petite session |
+| **Bloqué par** | **Rien** |
 
-L'API envoie déjà l'information ; c'est l'affichage qui manque.
+Trois publications incohérentes le 25/08, une depuis un arbre non commité le 13/09, une depuis une
+branche le 15/09 — **cinq heures** sans la capture mutuelle ni le correctif de clôture. Chaque fois,
+la publication a réussi sans un signal.
 
-1. **Dire pourquoi un champ est grisé.** Un champ verrouillé arrive avec son motif (par exemple
-   « déjà renseignée sur la fiche »). Sans ce texte, l'ambulancier voit un champ bloqué sans savoir
-   pourquoi ni à qui s'adresser.
-2. **Faire relire le n° de sécurité sociale avant d'enregistrer.** La fiche patient ne le fournit
-   presque jamais (0 fois sur 40 missions mesurées le 26/08) : c'est l'ambulancier qui le tape. Une
-   fois enregistré, **aucun module ne permet de le corriger** — une faute de frappe part en
-   facturation. Un écran de confirmation suffit.
+⇒ **`deploy.ps1 prod` refuse de publier** un arbre modifié, ou une autre branche que `main`, ou un
+`main` en retard sur `origin/main`. Au passage : **comprendre pourquoi le `nlog.config` du serveur
+n'est pas celui du dépôt**, et l'aligner.
 
-Demandé au dev web le 26/08. **Fin** : les deux constatés sur l'app.
+> ⚖️ **La garde vaut mieux que la discipline** : Orders a constaté la même chose sur ses tags. Ce qui
+> est vérifié par une machine tient ; ce qui repose sur un geste se perd.
 
+## Itération 3 — Remettre la documentation d'équerre *[ex-G6]* ✅ *close le 19/09 — sort du plan à la prochaine édition*
 
----
+| | |
+|---|---|
+| **Nature** | Documentation fausse — et elle oriente du travail |
+| **Effort** | Fait, sans code |
+| **Bloqué par** | — |
 
-## B. Dépendances amont — rien à coder dans ce dépôt
+| Document | Ce qui a été corrigé, et ce qui l'établit |
+|---|---|
+| `README.md` | Réécrit : accès **HTTP** à Orders (aucune référence de projet dans les `.csproj`), IIS `/vector`, authentification, déploiement. Il décrivait l'accès in-process, `/mobile` et « MOB-4 reporté » |
+| `docs/deploiement/configuration-keycloak-iis.md` | `Authority`/`Audience` **lus dans la configuration** (`Program.cs:28-60`, KC-1) — la « limitation connue » et le placeholder sont retirés ; `Audience` et `ServiceAzp` ajoutés au récapitulatif |
+| `BUG_DISPLAY.MD` §6, §8 | DET-1 en production ; fraîcheur des coordonnées sans objet (Orders, 06/09). Restent les deux vérifications d'exploitation : mission **retour**, lieu **non référencé** |
+| `endPoint.md` §5 | `engagedOnly` **honoré par Orders depuis le 15/07** (`b194c3c`, `CrewsEndpoints.cs:500`) |
+| `refactor_result_pattern.md`, `plan_correctif_vector_fallback_snapshot.md` | Marqués **terminés**, avec leurs commits |
+| `VECTOR_ORDERS_DECOUPLING_devplan.md` | DEC-6 fait dans les deux sens ; attente `assignedCrewId` sans objet (`ListMissionsAsync` n'a plus d'appelant) ; contrat consommé à jour |
+| `MUTUELLE_CARD_devplan.md` | Compacté : le livré renvoie à `delivered.md`, « transmettre la note » retiré, `M9` distingue la route qui se ferme avec DEC-6 des deux qui attendent P4 |
+| Liens vers `Erp.Order` | `note_vector_orderContext_mission.md` et `note_front_jules_order_context.md` sont dans `Erp.Order/archive/` : liens repointés (3 commentaires de code, 1 note). `feature_order_context_devplan.md` n'existe plus nulle part ; plus aucun lien n'y mène |
 
-| Réf | Ce qui manque | Effet visible côté terrain | État |
+> 🪤 **Trouvé en corrigeant** : `AddressApi:BaseUrl` était configurée, listée comme « clé lue »… et
+> **aucun code ne la lit** — les adresses arrivent résolues par Orders. Signalé dans le guide et dans
+> `delivered.md` §6 ; son retrait rejoint les dettes de forme *(itération 12)*.
+
+## Itération 4 — Dire à l'ambulancier pourquoi le conducteur est refusé *[ex-G9 du 13/09]*
+
+| | |
+|---|---|
+| **Nature** | Un refus clair d'Orders arrive au terrain sous forme de panne |
+| **Effort** | Une session courte — le modèle existe |
+| **Bloqué par** | Rien |
+
+Désigner un conducteur après la fin de la vacation est refusé par Orders avec un motif lisible
+*(« La vacation s'est terminée à 18:00 … »)*. Vector le journalise en erreur, le perd, et répond un
+message technique. L'ambulancier réessaie — **5 fois en 35 secondes** le 13/09.
+
+⇒ Le même traitement que les refus du formulaire de facturation *(livré le 15/09)* : refus métier
+typé, motif d'Orders rendu tel quel, journalisé en avertissement. Même code HTTP pour l'app.
+
+## Itération 5 — Trois mesures en production *[ex-F1, B2, B8]*
+
+| | |
+|---|---|
+| **Nature** | Mesures — aucun code |
+| **Effort** | Une petite session |
+| **Bloqué par** | ⚠️ Un **compte de lecture** : `ErpAccount` est refusé depuis le poste de dev *(13/09 — non revérifié)*. À défaut, les journaux et le paquet terrain |
+
+- **Taux de remplissage de la carte mutuelle** (cartes / missions) — c'est lui qui dira si l'extraction
+  automatique *(itération 14)* vaut la peine.
+- **Les étapes de mission vides** : ~3 883 annoncées tant qu'Orders n'avait pas son repli — il l'a
+  depuis le 23/07. Constater qu'elles ont disparu.
+- **Les adresses « non structurées »** : chaque cas est journalisé, personne n'a compté.
+
+## Itération 6 — Un jeu de requêtes rejouables *[ex-G3, MOB-9]*
+
+| | |
+|---|---|
+| **Nature** | Outil de vérification |
+| **Effort** | Une session |
+| **Bloqué par** | Rien |
+
+Le fichier `.http` ne couvre ni la liste, ni les étapes, ni la signature *(13/09)*. **Fin** : connexion
+→ liste → détail → étapes → signature, rejouables après chaque publication.
+
+## Itération 7 — Des appels sortants qui ne pendent pas *[ex-D, DEC-7]*
+
+| | |
+|---|---|
+| **Nature** | Robustesse |
+| **Effort** | Une session |
+| **Bloqué par** | Rien |
+
+Les deux clients vers Orders n'ont **ni délai court, ni nouvelle tentative, ni disjoncteur** en
+lecture — 100 secondes par défaut *(13/09)*. L'écriture est couverte par la file de projection.
+⇒ Délai explicite, puis `AddStandardResilienceHandler`, **en gardant** la tolérance au 404.
+
+## Itération 8 — Prendre le gestionnaire de jeton du paquet partagé *[ex-C2, reliquat]*
+
+| | |
+|---|---|
+| **Nature** | Doublon — une source de vérité au lieu de cinq |
+| **Effort** | Une session courte |
+| **Bloqué par** | Rien — `CaSoft.Identity.Client` ≥ 1.2.0 ne dépend que de `CaSoft.Framework.Security` 2.8.0, pas du socle |
+
+Le gestionnaire écrit ici le 13/09 a été promu dans le paquet le jour même, mêmes règles. Retirer la
+copie locale.
+
+## Itération 9 — Dire l'heure qu'il est *[ex-E2]*
+
+| | |
+|---|---|
+| **Nature** | Données ambiguës transmises à la facturation |
+| **Effort** | Une session, **à coordonner avec la facturation** |
+| **Bloqué par** | Rien |
+
+Les étapes sont en UTC **sans le déclarer** ; l'heure de signature est écrite **en heure locale**
+(`SignatureRepository.cs:34`, `:43`). Même motif à examiner dans `ClMarkMissionSeenUseCase`,
+`ClSetDriverUseCase`. **Fin** : tout en UTC, fuseau **déclaré** dans le contrat du paquet.
+
+## Itération 10 — Savoir ce qui tourne *[ex-G8, partie 2]*
+
+| | |
+|---|---|
+| **Nature** | Traçabilité d'exploitation |
+| **Effort** | Une session |
+| **Bloqué par** | Rien — l'itération 2 d'abord |
+
+Le `.pdb` donne le commit, **pas l'état de l'arbre** ; rien ne dit la base à laquelle l'API parle. Un
+correctif a déjà été joué sur la mauvaise base Orders sans erreur *(25/08)*. ⇒ Une route réservée
+qui expose commit, drapeau « arbre modifié », environnement, **base résolue** (sans identifiants) et
+drapeaux en vigueur.
+
+## Itération 11 — Suivre les migrations SQL *[ex-G4]*
+
+| | |
+|---|---|
+| **Nature** | Divergence de schéma — **a déjà coûté une journée sans données terrain** *(06/08)* |
+| **Effort** | Une session, plus une réconciliation |
+| **Bloqué par** | Rien |
+
+Aucune table de suivi : prod et dev ont divergé en sens inverse. ⇒ Table de suivi (modèle
+`__BillingGatewaySchema`) et **contrôle au démarrage**. À réconcilier : la migration du transfert est
+`027` dans l'historique, `034` dans le dépôt.
+
+## Itération 12 — Les dettes de forme *[ex-G2, G5]*
+
+| | |
+|---|---|
+| **Nature** | Hygiène — aucun changement de contrat |
+| **Effort** | Plusieurs petites sessions, à piocher |
+| **Bloqué par** | Rien, sauf les alias *(le front)* |
+
+- `ListMissionsAsync` n'a plus aucun appelant : à supprimer.
+- `AddressApi:BaseUrl` : configurée, lue par aucun code — la retirer des `appsettings` *(19/09)*.
+- Nommage des DTO en `…DtoIn` / `…DtoOut` — aucun impact JSON.
+- Pont synchrone/asynchrone (`.GetAwaiter().GetResult()`) sur liste, détail et identité.
+- `IResultUseCase` est synchrone : les cas d'usage asynchrones n'implémentent aucune interface.
+- **Alias de compatibilité** (`IsAck`, champs historiques du détail, `SelectedDriver` jamais nul,
+  champs typés des lieux) — retrait **sur confirmation du front uniquement**.
+
+## Itération 13 — Le kilométrage dans le dossier transmis *[ex-E1, MOB-10]*
+
+| | |
+|---|---|
+| **Nature** | Champ attendu par la facturation, toujours vide |
+| **Effort** | Une session si le km véhicule suffit ; **plusieurs** s'il faut un relevé par mission |
+| **Bloqué par** | 🔴 **Un arbitrage avec la facturation** |
+
+Le kilométrage appartient à l'équipage et au véhicule, pas à la mission. Km du véhicule, ou relevé
+début/fin par mission (table, saisie mobile, paquet) ?
+
+## Itération 14 — Lire la carte mutuelle automatiquement *[ex-F2, P3]*
+
+| | |
+|---|---|
+| **Nature** | Fonctionnalité neuve |
+| **Effort** | Plusieurs sessions |
+| **Bloqué par** | **La mesure du remplissage** *(itération 5)* — inutile si aucune carte n'arrive |
+
+Extraction **asynchrone** par un modèle de vision, quatre champs proposés avec leur confiance, puis
+**validation humaine** — jamais d'écriture aveugle. À cadrer : où tourne l'appel (DMZ ou LAN), le coût
+par carte. Rappel : même validés, ces champs **n'alimentent pas** la colonne mutuelle de facturation.
+
+## Itération 15 — La fin de service *[ex-F3, MOB-12]*
+
+| | |
+|---|---|
+| **Nature** | Code hérité qui vise la mauvaise cible |
+| **Effort** | Un recadrage, puis une ou deux sessions |
+| **Bloqué par** | **Le recadrage** |
+
+Le contrôleur vise une session mobile qui n'est plus la source d'authentification : la clôture doit
+viser **la vacation côté Orders** — dont la règle est que **le régulateur** connaît l'heure de fin.
+
+## Itération 16 — Positions et statuts des véhicules *[ex-F3, MOB-16]*
+
+| | |
+|---|---|
+| **Nature** | Connecteurs portés, jamais recâblés |
+| **Effort** | Plusieurs sessions |
+| **Bloqué par** | Rien de connu — non réexaminé depuis juillet |
+
+GpsGate (positions, REST) et Sirus (statuts, UDP) sont injectés mais ne servent à rien.
+
+## Itération 17 — Protéger les données du patient *[ex-G7, P4]*
+
+| | |
+|---|---|
+| **Nature** | RGPD — dette assumée |
+| **Effort** | Plusieurs sessions, un seul lot |
+| **Bloqué par** | Rien ; gagne à suivre l'itération 1 |
+
+Documents, carte mutuelle et anomalies servis par une API exposée : **rétention et purge** (3 ans),
+chiffrement au repos, accès fin à l'image de la carte, **audit des accès**.
+
+## Itération 18 — Ce qui attend ailleurs *[ex-A3, B, C1, C3, E3, E4, F4]*
+
+*Rien à coder ici tant que l'autre partie n'a pas bougé. Non revérifié à cette édition sauf mention,
+et **c'est dit**.*
+
+| Entrée | Qui doit bouger | Dernier relevé | En deux mots |
 |---|---|---|---|
-| **B2** | ~~**Repli sur le snapshot `ORD_ORDER`**~~ | — | ✅ **Livré chez Orders le 23/07/2026** *(`f0cedc1`, « repli snapshot ORD_ORDER dans /missions/{id}/full »)* — **vérifié le 19/09**. Ce plan l'attendait depuis **huit semaines** : à reconstater côté terrain, les ~3 883 étapes vides devraient avoir disparu |
-| **B4** | `Billed` n'a **aucun écrivain** | palier théorique | ⛔ décision (E4) |
-| **B5** | **`field-data` par période** (à l'image de `for-export`) | 14,7 s pour 284 missions, sur un clic | ⏳ non engagé côté demandeur |
-| **B6** | **Tests xUnit du transfert côté Orders** : dérivation `MIS_STATUS`, pose de `Transferable`, garde-fous de `MarkTransferred` / `MarkBilled` | aucun filet aujourd'hui | ⏳ |
-| **B7** | **Relance de clôture** des missions terminées non clôturées | dossiers qui n'arrivent jamais en facturation | ⏳ piste : tableau de bord `?status=Done` |
-| **B8** | **Adresses « non structurées »** (`DET-3`) côté Orders / Address.Api | repli mono-ligne, WARNING journalisé | ⏳ mesurer l'ampleur d'abord |
-| **B9** | **Applicabilité agence/mode non configurée** : `ORD_ORDER_CONTEXT_AGENCE` et `_MODE` vides → les 7 types proposés partout (mesuré le 2026-08-25) | « Secours sur piste » proposé sur des missions sans rapport | ⛔ décision métier : la **matrice**. ⚠️ la première liaison posée sur un type le restreint aux seules valeurs liées. Aucun écran ne gère ces liaisons |
-| **B10** | ~~Attributs rattachés à rien~~ — **relevé dans la base de production le 19/09** : `COMMENTS`, `PHONES` et `MAILS` sont **globaux et actifs**, donc servis sur **toutes** les missions sans liaison à poser ; `PMT`, `SMUR_DE`, `COMMUNE`, `NOM_CENTRALE` et `NOM_ASSISTANCE` portent **un type lié chacun** | Le commentaire libre et l'ajout téléphone/e-mail **sont revenus** | 🟡 **Presque clos.** Restent **`REFERENCE` et `URGENT`**, absents du catalogue — à arbitrer. ⚠️ *La mesure du 25/08 portait sur 30 formulaires servis ; celle-ci lit le catalogue lui-même. Reconstater côté terrain avant de clore* |
-
-> Contrat détaillé de ce que Vector attend d'Orders : [`endPoint.md`](endPoint.md).
+| **Écran : dire pourquoi un champ est grisé, faire relire le n° de sécurité sociale** *[A3]* | dev web | 26/08 | L'API envoie déjà le motif du verrou ; le NIR n'est **jamais** corrigeable après coup |
+| **Écran : bouton *Réessayer* au sélecteur** *[C3]* | dev web | 13/09 | Contrat : [`docs/ui-web/UI_selection-equipage-multi-crew.md`](docs/ui-web/UI_selection-equipage-multi-crew.md). Note des [routes retirées](note_web_alexandre_routes_retirees.md) à transmettre aussi |
+| **Composer les équipages avant la prise de service** *[C3]* | 🔴 régulation — décision | 13/09 | Sans quoi l'accès anticipé de 30 min ne sert à rien. ⚠️ Le filtre d'appartenance (`MobileIdentityResolver.cs:35`) est **volontaire** |
+| **Rattachement des comptes** *[C1]* | Orders, Identity, **RH** | 13/09 | Vector lit `PER_KEYCLOAK_MAP`, que l'écran d'Employee n'alimente pas. Débloqué par la bascule d'Orders sur le carnet d'Identity, elle-même bloquée par **273 personnels sans fiche Employee**. En attendant : [consigne](docs/auth/consigne-rattachement-ambulancier.md) **à transmettre à la régulation et à la RH** |
+| **Règle d'applicabilité des types** *[B9]* | Orders *(itération « Restreindre un type »)* + décision métier | 19/09 | Les 7 types proposés partout. Orders l'a placée en tête par priorité **parce que Vector s'y déclare bloqué** |
+| **`REFERENCE` et `URGENT`** *[B10]* | décision métier | 19/09 | Absents du catalogue ; tout le reste est servi. Reconstater sur le terrain avant de clore |
+| **`Billed` : l'écrire, ou retirer le palier** *[B4, E4]* | 🔴 décision | 13/09 | La facturation est en lecture seule par décision de son module |
+| **Dossier terrain par période** *[B5, E3]* | la facturation, si elle le demande | 13/09 | 14,7 s pour 284 missions sur un clic. Non engagé côté demandeur |
+| **Tests du transfert côté Orders** *[B6]* | Orders | 13/09 | Aucun filet sur la dérivation du statut et les gardes du transfert |
+| **Relance des missions terminées non clôturées** *[B7]* | Orders | 13/09 | Des dossiers n'arrivent jamais en facturation |
+| **Présence : qui est connecté** *[F4]* | 🔴 décision + cadrage **RH/RGPD** | 13/09 | Spec sans code : [`feadesc_utilisateurs_connectes_vector.md`](feadesc_utilisateurs_connectes_vector.md). Définir « connecté », choisir la topologie |
+| **Signaler à la facturation** que ses « 401 » du 27/08 portaient sur deux routes alors absentes | nous | 19/09 | Elles sont en service, anonymes, depuis le 15/09 |
 
 ---
+# 3. Fonctionnalités envisagées en Vn
 
-## C. Identité & authentification
+*Non engagé, non planifié — avec la condition qui les remettrait sur la table.*
 
-### C1 — ⛔ Rattachement des comptes : Vector lit un référentiel que plus aucun écran n'alimente — *dépendance amont*
+| Sujet | En deux mots | Ce qui la rouvrirait |
+|---|---|---|
+| **Fermer les routes d'affichage de la carte** *[M9]* | L'image courante et la présence restent anonymes : une balise `<img src>` ne porte pas de jeton. **Aucun appel constaté** en 4 jours | Les écrans d'Order et de la facturation passent à un appel authentifié |
+| **Base Vector dédiée** *[Vd-1]* | Seul jalon DMZ non conditionné à la V2 | Pertinent dès maintenant ; personne ne l'a porté |
+| **Accès anticipé à cheval sur minuit** *[CREW-2]* | Correctif connu | Les vacations de nuit ne sont pas concernées *(décision du 02/08)* |
+| **Durcissement DMZ événementiel, push temps réel** *[Vd-2 à Vd-4, Vd-7, Vd-8]* | [`spec_architecture_vector_mission_dmz.md`](spec_architecture_vector_mission_dmz.md) | Une exigence d'exposition, ou le polling qui ne suffit plus |
+| **Photos hors SQL, masquage** *[Vd-6, Vd-5]* | NIR partiel, équipage retour | Le volume, ou l'itération 17 |
+| **Contrats partagés avec Orders** *[4b]* | Écart JSON assumé | Une rupture de contrat constatée |
+| **Repère de fraîcheur du dossier** *[E5]* | `updatedAt` est servi, personne ne s'en sert | Un besoin de resynchronisation |
+| **Éviction ciblée du cache d'identité, mode hors ligne, géolocalisation avancée, renommage `USVector` → `Vector`** | — | Une demande |
 
-**Tranché le 2026-09-13** ([`delivered.md`](delivered.md) §4) : pas de code dans Vector, pas d'écran
-de plus. **La question « quel hôte pour l'écran » est dépassée** : l'écran de rattachement existe dans
-**Employee** et écrit dans le **carnet d'Identity**.
+---
+# 4. Décisions tranchées — ne pas les rejouer
 
-**Le problème réel** : Vector résout le compte via Orders (`GET /personnel/by-keycloak/{sub}`), donc
-dans `PER_KEYCLOAK_MAP` — que l'écran d'Employee **n'alimente pas**. Un ambulancier rattaché depuis
-Employee reste **invisible pour Vector** et reçoit un 403 au sélecteur. Les deux référentiels
-divergent : **155 correspondances chez Orders, 116 chez Identity** (mesure d'Orders, 05/09).
-Mesuré côté terrain le 2026-09-13 : **8 membres d'équipage sur 244** sans compte rattaché chez Orders.
+*Les décisions appliquées vivent dans [`delivered.md`](delivered.md) §4 — structurantes (D1-D15) et
+bascule du contexte. **Aucune décision nouvelle à cette édition.** Ce qui suit est la façon dont ce
+plan se tient.*
 
-**Ce qui débloque** — hors de ce dépôt : la **bascule d'Orders sur le carnet** (Identity itération 7,
-Orders itération 24), bloquée par la RH — **273 des 422 personnels actifs d'Orders n'ont pas de fiche
-Employee**, et le lien `EMP_EMPLOYEE.PersonnelId` est vide en production.
-
-**En attendant — consigne transitoire** :
-[`docs/auth/consigne-rattachement-ambulancier.md`](docs/auth/consigne-rattachement-ambulancier.md).
-Un ambulancier se rattache **aussi côté Orders** (`PUT /personnel/{id}/keycloak`), sans quoi il
-n'accède pas à ses missions.
-
-**Fin** : Orders lit le carnet d'Identity ; `PER_KEYCLOAK_MAP` supprimée ; la consigne tombe.
-
-### C2 — 🟡 Authentification de service à service (`DEC-6`) — *partie Vector en production depuis le 2026-09-13*
-
-**Fait côté Vector, sans rien fermer** — en production, jetons mobiles admis par la nouvelle politique
-([`delivered.md`](delivered.md)) :
-- **Entrant** — l'authentification accepte les jetons des modules déclarés (`Keycloak:ServiceAzp` =
-  `erp-billinggateway-api`). ⚠️ La **politique de repli exige désormais l'azp mobile** : un jeton de service
-  n'ouvre aucune route du terrain. La politique `ClKeycloakCallers.ServiceOrMobilePolicy` est prête
-  pour les quatre routes ci-dessous, qui restent anonymes.
-- **Sortant** — `ServiceAccountTokenHandler` pose un jeton `client_credentials` sur les appels à
-  Orders.Api **dès que `OrdersApi:ServiceAccount` est renseigné** ; inerte sinon. Un realm
-  indisponible ne bloque pas l'appel (Orders reste anonyme pour le terrain).
-
-> 🔴 **CORRECTION DU 13/09/2026 — la raison de ne pas prendre le paquet était fausse.** Ce plan
-> affirmait : *« Pas de référence à `CaSoft.Identity.Client` : il exige le socle 2.8.0 »*. Son nuspec
-> ne dépend que de **`CaSoft.Framework.Security` 2.8.0**, pas du socle — et Orders en fait la preuve
-> **en production** : socle `2.5.0`, client d'identité référencé, build propre. La demi-journée
-> passée à réécrire ce gestionnaire l'a été pour contourner un obstacle qui n'existait pas.
->
-> ⚖️ **Ce code a été promu dans le paquet** *(`CaSoft.Identity.Client` **1.2.0**, 13/09)* :
-> `ClServiceAccountTokenHandler` + `AddCaSoftServiceAccountToken`, avec les quatre règles figées par
-> des tests — inerte sans compte, un realm muet ne bloque pas l'appel, un en-tête déjà posé n'est pas
-> écrasé, et un 401 **sur notre propre jeton** l'oublie. ⇒ *Vector peut retirer son implémentation
-> locale et prendre celle du paquet : même comportement, une source de vérité au lieu de cinq. Ce
-> n'est pas urgent — ce qui l'était, c'était d'empêcher les quatre autres modules de la réécrire.*
-
-**Reste, dans l'ordre — hors code Vector jusqu'à l'étape 4 :**
-1. **Keycloak** — guide : [`docs/deploiement/keycloak-compte-service-vector.md`](docs/deploiement/keycloak-compte-service-vector.md).
-   ✅ **`erp-vector-api` en service** depuis le 2026-09-13 18:59 : Vector obtient son jeton et le pose
-   sur ses appels à Orders ([`delivered.md`](delivered.md)). ⏳ **`erp-billinggateway-api`** : créer
-   le client s'il ne l'est pas encore (la facturation n'en a aucun, `us-facturation` n'a jamais
-   existé) ; son secret ira à BillingGateway. Vector l'accepte déjà (`Keycloak:ServiceAzp`, en
-   production depuis `bc105c1`).
-2. **BillingGateway** (autre dépôt) : poser son jeton de service sur `IVectorFieldDataClient` et
-   `IVectorSignatureClient` — et sur les documents et la carte le jour où il les tire.
-3. **Vérifier** en production que la facturation passe avec son jeton (journal `JWT validé … azp=erp-billinggateway-api`).
-4. **Fermer** : remplacer `[AllowAnonymous]` par `[Authorize(Policy = ClKeycloakCallers.ServiceOrMobilePolicy)]`
-   sur les quatre routes, et vider leurs entrées d'`AnonymousSurfaceTests`.
-5. **Orders** peut alors exiger un jeton du terrain — son plan l'attendait de Vector.
-
-**Les quatre routes encore anonymes**, uniquement parce que la facturation les tire sans jeton :
-
-| Route ouverte | Ce qu'elle expose |
+| Date | Décision, et pourquoi |
 |---|---|
-| `GET api/missions/{id}/field-data` | le dossier terrain complet |
-| `GET api/Signature/{id}` | l'image de la signature du patient |
-| `GET api/documents/{id}/content` | les octets d'un document |
-| `GET api/mutuelle-card/{id}/image` | ⚠️ **carte mutuelle — donnée de santé** (maintenue ouverte, `M9`) |
+| 2026-08-24 | **D14 — on code neutre ou additif.** L'app web n'est pas déployée avec l'API |
+| 2026-09-13 | **Le livré sort du plan et entre, daté, dans `delivered.md`** au prompt « compact devplan » |
+| 2026-09-19 | **Une attente envers l'amont se vérifie chez l'amont avant d'être reconduite.** Ce plan a attendu d'Orders pendant **huit semaines** un repli livré le 23/07 |
+| 2026-09-19 | **Une entrée se cite par son titre**, l'ancienne référence entre crochets : les numéros d'itération changent d'une édition à l'autre |
+| 2026-09-19 | **Une édition qui n'a pas tout revérifié le dit**, avec la date du dernier relevé |
 
-Elles se referment **ensemble**, avec `DEC-6`. `AnonymousSurfaceTests` fige la liste.
+---
+# 5. Journal des livraisons
 
-### C3 — ⛔ 404 du sélecteur avant la composition de l'équipage — *décision*
+*Le journal daté vit dans [`delivered.md`](delivered.md) §2, les incidents au §8.*
 
-**Diagnostic tranché le 2026-09-13** ([`delivered.md`](delivered.md)) : **ni défaut de code, ni donnée
-fausse chez Orders.** Le 404 « Aucun équipage actif » survient quand l'ambulancier ouvre l'app **avant
-que la régulation ait composé son équipage** ; il passe dès que c'est fait. Mesuré sur les journaux
-du 04/07 au 24/08 : 24 cas, 21 équipages, délai médian de **23 min** entre la tentative et la
-composition, 9 cas au-delà d'une heure. Quand l'équipage entier est composé en retard, **les deux
-membres échouent ensemble** — d'où l'impression d'un « second membre » bloqué.
+## Ce qui a quitté la rubrique 2 à cette édition
 
-1. ⏳ **Le bouton *Réessayer* côté écran.** Les messages du 404 sont en service depuis le 2026-09-13
-   ([`delivered.md`](delivered.md)) ; reste à faire ajouter le bouton par le dev web (contrat :
-   [`docs/ui-web/UI_selection-equipage-multi-crew.md`](docs/ui-web/UI_selection-equipage-multi-crew.md)).
-2. ⛔ **L'organisation de la régulation — à trancher.** Composer les équipages avant la prise de
-   service — sans quoi l'accès anticipé de 30 min (CREW-1) ne sert à rien pour ces équipages.
+| Entrée sortie | Pourquoi |
+|---|---|
+| **Keycloak et BillingGateway pour l'authentification de service** *[C2, étapes 1 à 3]* | ✅ Client créé, jeton posé, constaté le 19/09 à 11:48. Reste la fermeture *(itération 1)* |
+| **Repli sur le snapshot `ORD_ORDER`** *[B2]* | ✅ Livré chez Orders le 23/07. Reste une mesure *(itération 5)* |
+| **Attributs « rattachés à rien »** *[B10]* | 🟡 Tous servis sauf `REFERENCE` et `URGENT` *(itération 18)* |
+| **Fraîcheur des coordonnées** *[G6]* | ✅ Orders remplace le numéro d'adresse à l'édition depuis le 06/09 |
+| **Transmettre la note carte mutuelle au dev web** *[F1]* | ✅ Sans objet : l'app capture depuis le 13/09 |
 
-⚠️ Le filtre d'appartenance (`MobileIdentityResolver.cs:35`) est **volontaire** : ne pas le retirer.
+**Restructuration** : le plan passe des chapitres par thème (A à H) aux itérations par difficulté,
+sur le format d'Orders. Les anciennes références restent entre crochets.
 
 ---
 
-## D. Robustesse des appels sortants (`DEC-7`) — ⏳ isolé
+## Annexe — documents voisins
 
-Les deux clients HTTP n'ont que leur `BaseAddress` : **pas de timeout explicite** (100 s par défaut),
-**pas de retry ni de disjoncteur** en lecture (vérifié le 2026-09-13). L'écriture est couverte par la
-file de projection.
-**Contenu** : timeout court et explicite, puis `AddStandardResilienceHandler` (ou Polly), **en
-gardant** la tolérance au 404 en lecture. **Fin** : aucun appel sortant ne pend au-delà du timeout.
-
----
-
-## E. Chaîne vers la facturation
-
-### E1 — ⏳ Le kilométrage dans le paquet (`MOB-10`) — *arbitrage puis code*
-
-`Kilometers = null` (vérifié le 2026-09-13) ; la facturation attend ce champ pour activer son contrôle.
-Le km est **équipage/véhicule-scoped**. → **Arbitrer avec la facturation** : km véhicule suffisant
-(alimenter le champ), ou relevé début/fin par mission (table + saisie mobile + paquet).
-
-### E2 — ⏳ Horodatages : dire l'heure qu'il est
-
-- Les jalons sont en **UTC sans le déclarer**.
-- **`SIG_DATETIME` est écrit en heure locale** (`DateTime.Now`, `SignatureRepository.cs:34` et `:43`).
-  *Même motif relevé ailleurs, à examiner avec : `ClMarkMissionSeenUseCase` (heure de lecture),
-  `ClSetDriverUseCase`, `ClInsertMechanicLogUseCase`.*
-
-**Fin** : signature en UTC comme le reste, fuseau **déclaré** dans le contrat du paquet.
-
-### E3 — ⏳ `field-data` en lot — *voir B5*, non engagé côté demandeur.
-
-### E4 — ⛔ `Billed` : le faire écrire, ou retirer le palier — *décision*
-
-La facturation est en lecture seule par décision de son module. **À trancher** : le faire poser à la
-publication d'une journée, ou retirer le palier de l'énumération.
-
-### E5 — ⚪ Repère de fraîcheur du paquet
-
-`updatedAt` est servi, aucun consommateur ne s'en sert (la facturation re-tire à chaque construction).
-**À garder, sans y investir** tant qu'un besoin de re-synchronisation n'apparaît pas.
-
----
-
-## F. Fonctions terrain
-
-### F1 — 🟡 Carte mutuelle : obtenir les premières cartes *(avant tout le reste)*
-
-La capture par mission est **en service depuis le 2026-09-13** (cause de la table vide : la route
-demandait un identifiant patient qu'aucun DTO terrain ne porte). Reste :
-
-1. **Transmettre** [`note_web_alexandre_carte_mutuelle.md`](note_web_alexandre_carte_mutuelle.md) au dev web.
-2. **Mesurer** le remplissage après livraison de l'écran. ⚠️ Le compte `ErpAccount` de
-   `appsettings.json` est refusé depuis le poste de dev : mesurer via `field-data`, ou obtenir un
-   compte de lecture.
-3. **Signaler à BillingGateway** que ses « 401 » du 27/08 portaient sur deux routes inexistantes : la
-   vraie route image est ouverte.
-
-Faiblesses connues de la saisie (le `PATCH` remplace les quatre champs et accepte un corps vide ; une
-nouvelle photo repart à vide) : [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) §3.3.
-
-### F2 — ⏳ Carte mutuelle : extraction automatique (P3)
-
-Seul le **statut** existe. Pipeline **asynchrone** : `pending` à l'upload → worker → **Claude vision**
-à sortie structurée (quatre champs + confiance journalisée) → `extracted` → **validation humaine** →
-`validated`. À cadrer : **où tourne l'appel au modèle** (DMZ, ou service LAN qui tire l'image), coût
-par carte. Rappel `M7` : même validés, ces champs n'alimentent pas `C54`.
-**Préalable** : F1. **Fin** : quatre champs proposés, jamais écrits en aveugle.
-
-### F3 — ⏳ Deux chantiers hérités, autonomes
-
-*(`MOB-14`, logs mécaniques, abandonné le 2026-09-13 : ses routes sont retirées du contrat, cf. [`delivered.md`](delivered.md).)*
-
-| Réf | Objet | Ce qui reste |
-|---|---|---|
-| `MOB-12` | **Fin de service** | Le contrôleur vise `MOB_SESSION`, qui n'est plus la source d'authentification : la clôture doit viser la **vacation d'équipage côté Orders**. `TODO` ouvert sur les permissions. *Re-cadrage avant code.* |
-| `MOB-16` | **Connecteurs Sirus / GpsGate** | Portés et injectés, **non recâblés** : positions (GpsGate REST), statuts véhicule (Sirus UDP). |
-
-### F4 — ⛔ Présence : qui est connecté à Vector — *décision d'abord*
-
-Spec sans code : [`feadesc_utilisateurs_connectes_vector.md`](feadesc_utilisateurs_connectes_vector.md).
-**Deux décisions** : la définition de « connecté » (retenu à confirmer : activité applicative croisée
-avec l'état de service), et la **topologie** (cache par process inadapté en multi-instance).
-**Découpage** : store + estampillage au point de passage d'identité → endpoint restreint →
-enrichissement → rétention. ⚠️ Suivi d'activité d'un salarié : **cadrage RH/RGPD requis**.
-
----
-
-## G. Dette & hygiène — aucun changement de contrat
-
-### G2 — ⚠️ Alias de compatibilité — retrait **sur confirmation du front** uniquement
-
-| Réf | Alias conservé | Condition de suppression |
-|---|---|---|
-| C1 | `IsAck`, alias de `IsSeen` | UI web sur `IsSeen` |
-| C2 | Champs JobDetail legacy (`Schedule`, `TransportMode`, `Departure`/`Arrival`) | UI web sur `ScheduleLabel`, `TransportModeLabel`, `PickupLocation`/`DropoffLocation` |
-| C3 | `SelectedDriver` jamais null | UI web garde-fou le `null` |
-| — | Champs typés des lieux, en parallèle de `PickupDisplay`/`DropoffDisplay` | UI web sur l'affichage piloté serveur |
-
-`ListMissionsAsync` n'a plus aucun appelant : à supprimer.
-
-### G3 — ⏳ Suite de smoke `.http` (`MOB-9` résiduel)
-
-`CaSoft.Erp.Mobile.Api.http` ne couvre toujours ni joblist, ni time, ni signature (vérifié le
-2026-09-13). **Fin** : login → joblist → jobdetail → time → signature rejouables.
-
-### G4 — ⏳ Suivi des migrations SQL
-
-Aucune table de suivi de schéma : prod et dev ont déjà divergé en sens inverse (06/08). → table de
-suivi (modèle `__BillingGatewaySchema`) + **contrôle au démarrage**. À réconcilier : la migration du
-transfert est `027` dans l'historique et `034` dans le dépôt.
-
-### G5 — ⚠️ Dettes de forme, sans urgence
-
-- **Nommage des DTO (`DET-4`)** : suffixes `…DtoIn` / `…DtoOut`. Aucun impact JSON.
-- **Pont sync/async** : `.GetAwaiter().GetResult()` sur joblist / jobdetail / identité.
-- **`IResultUseCase` est synchrone** : les deux cas d'usage asynchrones de la carte mutuelle
-  (`HandleAsync`) n'implémentent aucune interface ; le commentaire de `IResultUseCase.vb` cite encore
-  `ClResultUseCaseAdapter`, supprimé.
-
-### G6 — ⏳ Documentation à réconcilier
-
-- **`README.md`** : accès ERP **in-process**, sous-app `/mobile`, « MOB-4 reporté » — faux (vérifié le 2026-09-13).
-- **`docs/deploiement/configuration-keycloak-iis.md`** : « `Authority`/`Audience` codés en dur » — résolu par KC-1.
-- **`BUG_DISPLAY.MD` §6** : DET-1 présenté comme bloquant — livré. Restent **deux** vérifications
-  d'exploitation : mission **retour** et lieu **non référencé**.
-  ✅ **La fraîcheur des coordonnées n'en est plus une** *(vérifié chez Orders le 19/09)* : depuis le
-  06/09, **modifier une adresse de bénéficiaire REMPLACE son numéro canonique** — jamais ne le
-  complète, y compris par rien : un texte modifié dont le module Adresse ne rend aucun numéro voit le
-  sien **effacé**, plutôt que de garder celui d'une autre adresse. Et si le texte est **inchangé**,
-  rien n'est redemandé : corriger un libellé n'exige pas que le module Adresse soit joignable. ⇒ *La
-  position se lit par le numéro ; elle suit donc l'édition sans re-géocodage à déclencher.*
-- **`endPoint.md` §5** : `engagedOnly` encore décrit comme une demande — honoré par Orders.
-- **`refactor_result_pattern.md`** : plan terminé, à marquer comme tel.
-- **Deux liens vers `Erp.Order` sont cassés** (constaté le 2026-09-13) : `feature_order_context_devplan.md`
-  (chapitre A) et `note_vector_orderContext_mission.md` (§2) n'existent plus dans ce dépôt.
-- **`MUTUELLE_CARD_devplan.md`** et les autres devplans de fonctionnalité portent encore une section
-  « livré » : à compacter sur le même principe.
-
-### G7 — ⚠️ RGPD (P4)
-
-Documents, carte mutuelle, anomalies servis par une API exposée : rétention et purge (3 ans),
-chiffrement au repos, contrôle d'accès fin sur l'image de carte, audit des accès. Un seul lot.
-
-### G8 — ⏳ Savoir ce qui est réellement en service
-
-**Aucun module ne sait dire quel code il exécute ni à quelle base il parle.** Quatre occurrences :
-trois le 2026-08-25, **une le 2026-09-13** (publication avant commit) — cf. [`delivered.md`](delivered.md) §8.
-Le sourcelink du `.pdb` ne suffit pas : il donne le `HEAD`, pas l'état de l'arbre.
-
-**Contenu** : une route réservée (gated comme `/api/diag`) qui expose le **commit** (SHA + date, et
-**drapeau « arbre modifié »** injecté au build), l'**environnement**, la **base résolue** (serveur +
-nom, jamais d'identifiants) et les **drapeaux** en vigueur. Idéalement, `deploy.ps1 prod` **refuse de
-publier un arbre non commité**.
-**Fin** : une requête dit quel commit tourne et sur quelle base, et une publication non commitée est
-visible — ou impossible.
-
----
-
-### G9 — ⏳ Le refus d'Orders sur le conducteur arrive à l'ambulancier sous forme de panne
-
-**Constaté le 2026-09-13** : désigner un conducteur après la fin de la vacation est refusé par Orders
-avec un motif clair — « *La vacation s'est terminée le 13/09/2026 à 18:00 : on ne peut pas y désigner
-un conducteur après.* » (400). Vector le traite comme une panne :
-
-1. `HttpErpWriteApiClient.SetCrewDriverAsync` journalise en **`ERROR`** et lève une exception technique ;
-2. `ClSetDriverUseCase` la convertit en erreur applicative ;
-3. `POST api/driver/{crewId}` répond **400 « Orders.Api PUT crews/…/driver → 400. »** — le motif
-   d'Orders est perdu.
-
-L'ambulancier ne sait pas pourquoi et réessaie : **5 fois en 35 s** le 13/09, déjà vu les 20 et 21/08.
-
-**Contenu** — sur le modèle de l'écriture du type de mission (`EnContextOrderWriteOutcome`) :
-`SetCrewDriverAsync` rend un résultat typé pour les refus métier (400, 404, 409) en conservant le
-`detail` d'Orders, journalisé en `WARN` ; le cas d'usage renvoie ce motif tel quel. Même code HTTP pour
-l'app, texte seul (D14). **Fin** : l'écran affiche le motif d'Orders, plus d'`ERROR` pour un refus.
-
-## H. ⚪ Différé (V2 / hors MVP)
-
-- **`Vd-1` — base `DB_VECTOR` dédiée** : **pertinent dès maintenant**, seul jalon DMZ non conditionné à la V2.
-- **`CREW-2` — accès anticipé à cheval sur minuit** : correctif connu (J+1 puis dédoublonner), non
-  prioritaire (vacations de nuit non concernées, décision du 2026-08-02).
-- **Durcissement DMZ événementiel** (`Vd-2` à `Vd-4`, `Vd-7`, `Vd-8`) et **push temps réel** :
-  [`spec_architecture_vector_mission_dmz.md`](spec_architecture_vector_mission_dmz.md).
-- **`Vd-6` — photos hors SQL** et **`Vd-5` — masquage** (NIR partiel, équipage retour).
-- **Assembly de contrats partagé `Orders.Contracts`** (4b) — drift JSON assumé.
-- **Éviction ciblée du cache d'identité**, **mode offline**, **géolocalisation avancée**, **renommage**
-  `CaSoft.Erp.USVector.*` → `CaSoft.Erp.Vector.*`.
-
----
-
-# 2. Documents voisins
-
-| Doc | Genre | Ce qu'il apporte |
-|---|---|---|
-| [`delivered.md`](delivered.md) | Livré | Ce que le module fait, journal daté, décisions, configuration, pistes retirées, incidents |
-| [`AppMobile_specifications.md`](AppMobile_specifications.md) | Spec fonctionnelle | Le besoin et le vocabulaire |
-| [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) | Devplan | Carte mutuelle (F1-F2) |
-| [`PROJECTION_TERRAIN_devplan.md`](PROJECTION_TERRAIN_devplan.md) | Devplan | Projection du terrain vers Order |
-| [`TRACABILITE_SAISIES_VECTOR_EXPORT.md`](TRACABILITE_SAISIES_VECTOR_EXPORT.md) | Relevé | Des saisies Vector aux 91 colonnes de facturation |
-| [`VECTOR_ORDERS_DECOUPLING_devplan.md`](VECTOR_ORDERS_DECOUPLING_devplan.md) | Devplan | Auth de service, résilience (C2, D) |
-| [`plan_correctif_vector_fallback_snapshot.md`](plan_correctif_vector_fallback_snapshot.md) | Plan correctif | B2, **à coder dans `Erp.Order`** |
-| [`feadesc_utilisateurs_connectes_vector.md`](feadesc_utilisateurs_connectes_vector.md) | Spec | Présence (F4) |
-| [`endPoint.md`](endPoint.md) | Contrat HTTP | Ce que Vector attend d'Orders.Api |
-| [`docs/auth/diag-404-second-membre-equipage.md`](docs/auth/diag-404-second-membre-equipage.md) | Procédure | C3 |
-| [`../Erp.Order/note_vector_orderContext_mission.md`](../Erp.Order/note_vector_orderContext_mission.md) | Note d'intégration | ContextOrder : endpoints, attributs, règles |
-| `note_web_alexandre_*.md`, `note_ui_alex.md`, `docs/ui-web/*` | Contrats front | Ce qui est promis au dev web |
-
----
+| Doc | Ce qu'il apporte |
+|---|---|
+| [`delivered.md`](delivered.md) | Ce que le module fait, journal daté, décisions, configuration, pistes retirées, incidents |
+| [`AppMobile_specifications.md`](AppMobile_specifications.md) | Le besoin et le vocabulaire |
+| [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) | Carte mutuelle (itérations 5, 14) |
+| [`PROJECTION_TERRAIN_devplan.md`](PROJECTION_TERRAIN_devplan.md) | Projection du terrain vers Orders |
+| [`TRACABILITE_SAISIES_VECTOR_EXPORT.md`](TRACABILITE_SAISIES_VECTOR_EXPORT.md) | Des saisies Vector aux 91 colonnes de facturation |
+| [`VECTOR_ORDERS_DECOUPLING_devplan.md`](VECTOR_ORDERS_DECOUPLING_devplan.md) | Authentification de service, résilience (itérations 1, 7) |
+| [`endPoint.md`](endPoint.md) | Ce que Vector attend d'Orders.Api |
+| [`docs/auth/diag-404-second-membre-equipage.md`](docs/auth/diag-404-second-membre-equipage.md) | Diagnostic du sélecteur |
+| `note_web_alexandre_*.md`, `note_ui_alex.md`, `docs/ui-web/*` | Ce qui est promis au dev web |
 
 **Fin du document**

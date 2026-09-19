@@ -1,5 +1,11 @@
 # Refactor — Result pattern sur la couche Application
 
+> ✅ **TERMINÉ** — vague 1 (31 cas d'usage, `2b2743a` → `958bf35`) et vague 2 (`b29e974`, `49c3cf3`)
+> livrées le 2026-07-05 ; constaté dans le code le 2026-09-13 : plus aucune référence à `ClUseCaseBase`
+> ni aux présentateurs d'exécution. Document conservé comme trace ; le livré est dans
+> [`delivered.md`](delivered.md). Reliquat ouvert : `IResultUseCase` reste synchrone (devplan,
+> itération « Les dettes de forme »).
+
 Branche : `ImplementCaSoftFramework`. Objectif : migrer **tous les use cases** du pattern legacy
 (`Execute(presenter)` + `ClUseCaseResponseBase` non typé) vers le **Result pattern** du framework
 (`Handle() As ClResult(Of T)` + `IError`), de façon **itérative et non cassante** (code en prod).

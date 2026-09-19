@@ -12,7 +12,7 @@ namespace CaSoft.Erp.USVector.Tests;
 /// Ces tests <b>épinglent le contrat HTTP</b> (route, casse JSON camelCase, types) : c'est la
 /// contrepartie du découplage 4a, où les DTO sont recopiés côté Vector et peuvent dériver en
 /// silence si Orders change sa réponse. Les charges utiles ci-dessous sont celles de la note
-/// d'intégration <c>Erp.Order/note_vector_orderContext_mission.md</c>.
+/// d'intégration <c>Erp.Order/archive/note_vector_orderContext_mission.md</c>.
 /// </summary>
 public class ErpContextOrderClientTests
 {

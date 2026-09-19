@@ -23,11 +23,13 @@ La configuration se lit dans cet ordre (le dernier gagne) :
 |---|---|---|---|
 | `ConnectionStrings:MobileDb` | **env** (secret) | `Server=192.168.1.109,1440;Database=BD_ERP_MOBILE_APP;User Id=ErpAccount;Password=***;TrustServerCertificate=True` | BD Mobile (sessions, timeline, signatures) |
 | `OrdersApi:BaseUrl` | env / appsettings | `https://.../order/` | ERP lu en HTTP. **⚠ doit finir par `/`** |
-| `AddressApi:BaseUrl` | appsettings | `http://localhost:5100/api/v1/` | API adresses |
+| `AddressApi:BaseUrl` | appsettings | `http://localhost:5100/api/v1/` | ⚠ **Lue par aucun code** (constaté le 2026-09-19) : les adresses arrivent résolues par Orders |
 | `Keycloak:Enabled` | env / appsettings | `true` | Active la validation JWT |
 | `Keycloak:RequireHttpsMetadata` | appsettings | `true` | Exige HTTPS pour les métadonnées OIDC |
 | `Keycloak:DisableValidation` | **dev only** | `false` | ⚠ décode sans vérifier signature — **jamais en prod** |
-| `Keycloak:Authority` | **env** | `https://auth.ade-dev.fr/realms/delesse` | Realm — **utilisé par la recherche par username** (voir §1.3) |
+| `Keycloak:Authority` | appsettings | `https://auth.ade-dev.fr/realms/delesse` | Realm — validation JWT **et** recherche par username (§1.3). Vide ou placeholder hors mode dégradé → l'API **refuse de démarrer** (KC-1) |
+| `Keycloak:Audience` | appsettings | `us-ambulance` | `azp` attendu du client mobile (§1.2) |
+| `Keycloak:ServiceAzp` | appsettings | `[ "erp-billinggateway-api" ]` | `azp` des modules admis en service à service |
 | `Keycloak:AdminClientId` | env / appsettings | `usvector-diag` | Service account (recherche username) |
 | `Keycloak:AdminClientSecret` | **env** (secret) | `***` | Secret du service account |
 | `MobileIdentityCache:PersonnelMinutes` | appsettings | `30` | TTL cache `sub→PER_ID` |
@@ -58,8 +60,8 @@ USVector.Api valide chaque token porté par `Authorization: Bearer …` :
 
 | Paramètre attendu | Valeur | Où c'est vérifié |
 |---|---|---|
-| **Authority (issuer)** | `https://auth.ade-dev.fr/realms/delesse` | `Program.cs` (voir ⚠ ci-dessous) |
-| **Audience (`aud`)** | `us-ambulance` | `Program.cs` |
+| **Authority (issuer)** | `https://auth.ade-dev.fr/realms/delesse` | `Keycloak:Authority`, lu par `Program.cs` |
+| **`azp` attendu** | `us-ambulance` | `Keycloak:Audience`, lu par `Program.cs` |
 | **Signature** | JWKS du realm (récupéré via l'Authority) | middleware JwtBearer |
 | **Claim `sub`** | l'ID utilisateur Keycloak (= le sub) | lu par l'app (résolution PER_ID) |
 
@@ -79,12 +81,10 @@ est donc rejeté (`azp '…' non autorisé`). Cf. `Program.cs`, `OnTokenValidate
 1. `RequireHttpsMetadata = true` en prod → l'Authority **doit** être joignable en HTTPS par le
    serveur (le middleware récupère la config OIDC + les clés JWKS au démarrage / à la volée).
 
-> ⚠ **Limitation connue** : dans `Program.cs`, `options.Authority` et `options.Audience` sont
-> **codés en dur** (`https://auth.ade-dev.fr/realms/delesse` et `us-ambulance`) — les clés
-> `Keycloak:Authority` / `Keycloak:Audience` d'`appsettings.json` sont commentées pour ces deux
-> réglages. Changer de realm/audience pour la **validation JWT** nécessite donc aujourd'hui une
-> modif de code. (Recommandation : re-brancher ces deux options sur la configuration.)
-> À l'inverse, la **recherche par username** (§1.3) lit bien `Keycloak:Authority` **depuis la config**.
+> ✅ **Piloté par la configuration depuis le 2026-08-02 (KC-1)** : `options.Authority` et
+> `options.Audience` sont lus dans `Keycloak:Authority` / `Keycloak:Audience`. Changer de realm ne
+> demande plus de code. Garde-fou au démarrage : une `Authority` vide ou placeholder, ou une
+> `Audience` absente, **empêche l'API de démarrer** (hors `DisableValidation`).
 
 #### Mode dev sans Keycloak joignable
 
@@ -114,7 +114,7 @@ un client *service account* dédié.
 4. Renseigner côté serveur (§2) :
    - `Keycloak__AdminClientId = usvector-diag`
    - `Keycloak__AdminClientSecret = <secret copié>`
-   - `Keycloak__Authority = https://auth.ade-dev.fr/realms/delesse` *(indispensable : la valeur d'`appsettings.json` est un placeholder)*
+   - `Keycloak__Authority` : inutile de le poser, `appsettings.json` porte la valeur du realm
 
 > Tant que ce n'est pas configuré, l'endpoint `/api/diag/resolve-user` répond **501** avec un message
 > explicite, et on peut toujours coller un `sub` à la main dans la page de diag.
@@ -250,7 +250,6 @@ Le serveur ne tourne pas en `ASPNETCORE_ENVIRONMENT=Development` → activer exp
 
 ```
 Diagnostics__Enabled = true
-Keycloak__Authority  = https://auth.ade-dev.fr/realms/delesse   (pour la recherche par username)
 Keycloak__AdminClientId / Keycloak__AdminClientSecret            (service account §1.3)
 ```
 
@@ -277,10 +276,5 @@ Accès (attention au **sous-chemin `/vector`**) :
 
 ## Annexe — Limitations connues / à améliorer
 
-- **JWT `Authority`/`Audience` codés en dur** dans `Program.cs` (cf. §1.2) — à re-brancher sur
-  `Keycloak:Authority` / `Keycloak:Audience` pour rendre la config pleinement pilotable par
-  environnement.
-- **`Keycloak:Authority` dans `appsettings.json` est un placeholder** (`keycloak.placeholder`) : la
-  recherche par username **ne marche que si on surcharge cette clé** par la vraie valeur (env).
 - Le `web.config` étant hors git, **documenter/versionner un `web.config.template`** (sans secrets)
   faciliterait les redéploiements.

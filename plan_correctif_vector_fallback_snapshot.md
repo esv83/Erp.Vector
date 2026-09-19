@@ -1,5 +1,10 @@
 # 🚑 Plan correctif 6‑B — Vector : fallback sur le snapshot `ORD_ORDER`
 
+> ✅ **TERMINÉ — livré chez Orders le 2026-07-23** (`f0cedc1`, « repli snapshot ORD_ORDER dans
+> /missions/{id}/full (6-B) », relevé le 2026-09-19). Rien n'était à coder dans Vector. Reste à
+> **constater** côté terrain que les étapes vides ont disparu (devplan, itération « Trois mesures en
+> production »). Document conservé comme trace.
+
 > **But** : réparer **immédiatement** les ~3883 étapes déjà cassées dans Vector
 > (`GET /missions/{id}/full`), **sans migration de données**. Quand le référentiel vivant lu par Vector
 > est **vide/orphelin** (cas des saisies libres type 3), retomber sur le **snapshot `ORD_ORDER`**, qui

@@ -1,7 +1,7 @@
 # Livré — Vector (module terrain ambulanciers)
 
-> **Mis à jour le** 2026-09-13 · **En production** : `c5eedca` (`main`), rechargé le 2026-09-13 à 20:04,
-> vérifié par sourcelink.
+> **Mis à jour le** 2026-09-19 · **En production** : `dc30612` (`main`), rechargé le 2026-09-15 à 18:31,
+> vérifié par sourcelink le 2026-09-19.
 >
 > Ce document porte **ce qui est livré** : ce que le module fait, le journal daté des livraisons,
 > les décisions appliquées, la configuration qui a déjà cassé la production, les pistes retirées.
@@ -36,6 +36,10 @@ il fait partie ce jour-là, lui fait **choisir celui qu'il occupe** quand il y e
 lui montre que les missions de cet équipage — celle d'un autre est refusée. Un compte non rattaché
 reçoit un message explicite l'invitant à contacter la régulation.
 
+Il **confirme sa prise de service depuis l'application** : au lancement, elle lui dit qu'une
+confirmation l'attend — même la veille, avant que son équipage ne s'ouvre — et il confirme sans passer
+par le lien du courriel.
+
 Ses missions lui sont visibles **30 minutes avant sa prise de service**. Il ne voit que les missions
 **engagées** par la régulation : une mission simplement affectée au planning ne remonte pas.
 
@@ -57,11 +61,13 @@ attente et rejoués automatiquement, sans jamais bloquer la saisie.
 
 - **Type de mission et attributs de facturation**, servis par Order : formulaire dynamique dont le jeu
   de champs dépend du type ; champs pré-remplis et verrouillés quand la fiche patient les connaît ;
-  saisie validée par Order, tout ou rien.
+  saisie validée par Order, tout ou rien. Un refus d'Order arrive à l'ambulancier **avec son motif**,
+  reformulé pour le terrain quand il s'adresse à la régulation.
 - **Anomalies** constatées en mission : non bloquantes, arbitrées par la facturation.
 - **Documents et photos** rattachés à la mission.
 - **Carte mutuelle** du patient — photo **depuis la mission** et saisie des quatre champs
-  ([`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md)).
+  ([`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md)). Les écrans d'Order et de la facturation
+  peuvent l'**afficher** (carte courante d'un bénéficiaire, présence sur une liste).
 
 Principe constant : **le terrain n'écrase jamais la donnée officielle de l'ERP.**
 
@@ -78,8 +84,8 @@ Principe constant : **le terrain n'écrase jamais la donnée officielle de l'ERP
 
 - **Un contrat mobile préservé** : les ajouts sont additifs, les anciens champs restent servis.
 - **Une authentification à un seul point de passage**, avec cache.
-- **Une API fermée par défaut** : quatre sorties anonymes nommées, justifiées et figées par
-  `AnonymousSurfaceTests`.
+- **Une API fermée par défaut** : six sorties anonymes nommées, en deux groupes justifiés et figés par
+  `AnonymousSurfaceTests` ; une **sonde** journalise chaque appel qui les traverse, avec ou sans jeton.
 - **Un outil de diagnostic** de la chaîne d'identité, réservé au dev.
 - **Un code applicatif homogène** : tous les cas d'usage renvoient un `ClResult` typé ; l'ancien
   mécanisme à présentateurs est entièrement retiré.
@@ -91,6 +97,57 @@ Principe constant : **le terrain n'écrase jamais la donnée officielle de l'ERP
 # 2. Journal des livraisons
 
 *Du plus récent au plus ancien.*
+
+## 2026-09-19 — La facturation présente son jeton à Vector (C2, étapes 1 à 3)
+
+*Constaté dans le journal de production — aucun code Vector : le client Keycloak et le jeton sont chez
+BillingGateway (`edb7cb0`, `CaSoft.Identity.Client` 1.2.1).*
+
+- **Client `erp-billinggateway-api`** créé le 19/09 ; BillingGateway pose son jeton sur le paquet
+  terrain et la signature.
+- **Constaté** : « JWT validé … azp=erp-billinggateway-api » à 11:48:31. Depuis, la sonde compte
+  **342** paquets terrain et **217** signatures tirés par la facturation, **tous avec jeton**, tous
+  servis. Avant (16→18/09) : jusqu'à **7 662 appels sans jeton par jour**, tous depuis `192.168.1.112`.
+- Documents et image de carte mutuelle : la facturation ne les tire pas — aucun appel à constater.
+- Reste la fermeture des routes (devplan C2).
+
+## 2026-09-19 — Trois attentes envers Orders qui n'en étaient plus (plan)
+
+*Relevé dans le code et la base de production d'Orders — aucun code Vector (`a5072d7`).*
+
+- **B2 — repli sur le snapshot `ORD_ORDER`** : **livré chez Orders le 23/07** (`f0cedc1`). Le plan
+  l'attendait depuis huit semaines.
+- **B10 — attributs « rattachés à rien »** : `COMMENTS`, `PHONES`, `MAILS` sont globaux et actifs,
+  `PMT`, `SMUR_DE`, `COMMUNE`, `NOM_CENTRALE`, `NOM_ASSISTANCE` liés à un type chacun. Restent
+  `REFERENCE` et `URGENT` (devplan B10).
+- **Fraîcheur des coordonnées (ex-réserve G6)** : depuis le 06/09, modifier une adresse de
+  bénéficiaire **remplace** son numéro canonique chez Orders ; la position suit l'édition sans
+  re-géocodage.
+
+## 2026-09-15 — Fusion de la branche de découplage : prise de service, motifs de refus, carte consultable
+
+*En production — `dc30612` (`main` après fusion), rechargé à 18:31, vérifié par sourcelink le 19/09.
+Code écrit du 26/08 au 15/09 sur `feat/decouplage-dec6-dec7`, jamais publié avant — sauf par l'incident
+du jour (§8).*
+
+- **Confirmation de prise de service depuis l'app** (`eb7ce15`) : `GET api/personnel/me/shift-confirmations/pending`
+  (tous équipages confondus, une demande partant souvent la veille) et
+  `POST api/ShiftConfirmation/{crewId}/{requestId}/confirm`, relayé à Order, origine `Portail`. **Aucun
+  jeton de lien ne circule** : en obtenir un tuerait celui du courriel. Contrat : [`endPoint.md`](endPoint.md) §6.
+  **Constaté** : 40 à 90 consultations servies par jour, **9 confirmations** en 200 du 15 au 18/09.
+- **Le motif d'un refus d'Order remonte au mobile** (`3713e4a`) : jusque-là lu, journalisé puis jeté.
+  Servi dans le corps du 409/400, texte simple (D14) ; `ModTerrainLockWording` réadresse au terrain
+  les motifs écrits pour la régulation (DDN, NIR, référentiel).
+- **`BeneficiaryId` dans le bloc patient du détail mission** (`5042249`), additif et nullable.
+- **Carte mutuelle consultable par les écrans amont** (`c08df67`) : `GET api/beneficiaries/{id}/mutuelle-card/image`
+  (carte courante, URL stable) et `POST api/mutuelle-card/presence` (500 bénéficiaires au plus, ni nom
+  ni code AMC) — **anonymes**, affichées par `<img src>` (`M9`). Au passage, les lectures ne
+  matérialisent plus le binaire (jusqu'à 8 Mo sortis de la base pour un nom de mutuelle).
+- **Sonde de surface anonyme** (`9dfc1c3`, DEC-6 E1) : une ligne par appel aux routes anonymes —
+  route, statut, IP, agent, jeton présent, `azp`. ⚠️ Le `nlog.config` du serveur **n'a pas la cible
+  dédiée** : les lignes partent dans le journal applicatif (`Vector.SurfaceAnonyme`). La mesure est
+  exploitable ; c'est elle qui a constaté le jeton de la facturation.
+- 172 tests verts.
 
 ## 2026-09-13 — Carte mutuelle : la capture passe par la mission
 
@@ -395,7 +452,8 @@ terrain dans la foulée.*
 | Consommation réelle du paquet terrain | 2026-08-06 : 284 missions acquises par la facturation |
 | Contexte de mission | 58 tests ; les trois refus constatés en production le 2026-08-24 |
 | Carte mutuelle par mission | 8 tests (2026-09-13) |
-| Suite complète | 126 verts (2026-08-25) → **112 verts (2026-09-13)**, après le retrait OC-9 et l'ajout mutuelle |
+| Prise de service depuis l'app | 9 confirmations servies du 15 au 18/09 |
+| Suite complète | 126 verts (2026-08-25) → 112 (2026-09-13, retrait OC-9) → **172 verts (2026-09-15)**, après la fusion |
 
 ---
 
@@ -478,8 +536,10 @@ terrain dans la foulée.*
 
 *Procédure complète :* [`docs/deploiement/configuration-keycloak-iis.md`](docs/deploiement/configuration-keycloak-iis.md).
 
-**Clés lues** : `ConnectionStrings:MobileDb` (`OrdersDb` inutilisé) · `OrdersApi:BaseUrl` ·
-`AddressApi:BaseUrl` · `Keycloak:{Enabled, Authority, Audience, DisableValidation,
+> ⚠️ `AddressApi:BaseUrl` figure dans les `appsettings` mais **aucun code ne la lit** (constaté le 2026-09-19) ; retirée de cette liste.
+
+**Clés lues** : `ConnectionStrings:MobileDb` (`OrdersDb` inutilisé) · `OrdersApi:BaseUrl` (et
+`OrdersApi:ServiceAccount`) · `Keycloak:{Enabled, Authority, Audience, ServiceAzp, DisableValidation,
 RequireHttpsMetadata, AdminClientId, AdminClientSecret}` · `Diagnostics:Enabled` ·
 `MobileIdentityCache:{PersonnelMinutes=30, ActiveCrewsMinutes=15}` · secrets GpsGate/Sirus
 `__SET_VIA_ENV__`.
@@ -545,6 +605,8 @@ depuis un arbre modifié annonce un commit qui ne contient pas le code servi (§
 | **Result pattern, vague 2** (G1 du devplan) | Livrée le 2026-07-05 ; le plan ne l'avait pas enregistré. |
 | **`MOB-14` — logs mécaniques et analyses** (tables `MOB_MECANIQUE_*`, référentiels, repositories) | Abandonné le 2026-09-13 avec A5 : les routes sortent du contrat mobile au lieu d'être implémentées. |
 | **Trace de la proposition de type écrasée par le terrain** (A0) | Perte assumée le 2026-09-13 (§4.2). |
+| **B2 — attendre d'Orders le repli sur le snapshot `ORD_ORDER`** | Livré chez Orders le 23/07 (`f0cedc1`), relevé le 19/09. |
+| **Déclencher un re-géocodage quand une adresse change** (réserve de G6) | Sans objet : depuis le 06/09, Orders remplace le numéro canonique à l'édition (relevé le 19/09). |
 | **Ticket Orders « chaîne équipage du 2ᵉ membre »** (ex-B3 : jointure `crews?personnelId=` ou `Members` incomplet) | Écarté le 2026-09-13 : aucune des deux causes n'existe dans les données ; le 404 vient d'équipages composés après la tentative (C3). |
 
 ---
@@ -553,6 +615,7 @@ depuis un arbre modifié annonce un commit qui ne contient pas le code servi (§
 
 | Date | Incident | Ce qui l'a révélé | Suite |
 |---|---|---|---|
+| **2026-09-15** *(13:29 → 18:31)* | **Production republiée depuis une branche, pas depuis `main`** (`feat/decouplage-dec6-dec7`, sans les 22 commits du 13/09) : la capture mutuelle par mission disparaît — 17 tentatives en 404 sur 8 équipages, « Mission introuvable ou sans patient » — et le correctif de clôture, C2, C3 et G9 sont retirés du même coup | journaux IIS, en cherchant pourquoi les captures s'arrêtaient | fusion `dc30612`, republiée à 18:31 ; cinquième occurrence de G8 |
 | **2026-09-13** *(18:00 → 20:04)* | **Ambulanciers en service exclus de l'application** (« Votre service est clôturé ») : 9 personnels, 125 refus en une heure. Orders pose désormais une fin théorique à chaque vacation (`7984ec0`), que Vector lisait comme une clôture | appels des utilisateurs ; le refus du conducteur disait déjà « vacation terminée à 18:00 » | clôture lue sur le statut (`c5eedca`), publié à 20:04 |
 | **2026-09-13** | **Publication en production depuis un arbre non commité** : binaires à 14:40, commit `e942967` à 14:42. Le `.pdb` annonce `86b5b28`, qui ne contient pas la capture par mission. | comparaison des horodatages et des chaînes des DLL au moment de rédiger ce document | republié depuis `main` à 15:05 (`a6c2aba`), vérifié par sourcelink ; blocage des publications non commitées au plan (G8) |
 | 2026-08-24 → 2026-09-13 | **Journaux de production muets** : NLog et stdout arrêtés le 24/08 vers 02:17, l'API servant normalement | en cherchant les 404 du sélecteur pour C3 | rétablis le 13/09 à 16:18, côté serveur |
