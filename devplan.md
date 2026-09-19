@@ -39,7 +39,13 @@ plus, 12,8 s sur 18,3 s d'acquisition. Deux itérations neuves *(13 et 14)*.
 **La confirmation de prise de service depuis l'app est adoptée** : 40 à 90 consultations par jour,
 9 confirmations du 15 au 18/09. **La carte mutuelle arrive** : 26 captures du 13 au 15/09, 13 le 16/09.
 
-⚠️ **Le `nlog.config` du serveur n'est pas celui du dépôt** *(constaté le 19/09)* : la sonde écrit
+✅ **Publié le 19/09 à 16:46** (`03f9d01`, vérifié par le `.pdb`) — itérations 1, 2, 4, 8, 13 et 14.
+Constaté : la facturation passe sur les routes fermées avec son jeton (559 appels en 200, aucun
+401/403) ; l'app avec le sien ; jeton de service de Vector obtenu par le paquet ; `nlog.config` enfin
+identique au dépôt ; aucune erreur. **La facturation a basculé sur le lot** : sa part Vector passe de
+**12,8 s à 6,8 s** par journée, résultat identique à l'octet (son relevé, recoupé dans le journal).
+
+⚠️ **Le `nlog.config` du serveur n'était pas celui du dépôt** *(constaté le 19/09)* : la sonde écrit
 dans le journal général faute de son fichier dédié. La mesure reste lisible ; la configuration a dérivé
 sans que rien le signale.
 
@@ -85,7 +91,7 @@ d'autres dépôts et documents la citent encore.*
 > donnée de santé, l'autre empêche de publier autre chose que ce qu'on croit. Toutes deux sont
 > petites parce que leur préalable est déjà fait.
 
-## Itération 1 — Fermer les quatre routes de la facturation *[ex-C2, DEC-6]* 🟡 *codée le 19/09 — reste à publier*
+## Itération 1 — Fermer les quatre routes de la facturation *[ex-C2, DEC-6]* ✅ *en production le 19/09 à 16:46 — sort du plan à la prochaine édition*
 
 | | |
 |---|---|
@@ -120,7 +126,7 @@ ou l'image de carte**, elle devra y poser son jeton comme sur les deux autres.
 **Ensuite** : Orders pourra exiger un jeton du terrain — son plan l'attend de Vector, et les trois
 clients de Vector portent le jeton depuis l'itération 8.
 
-## Itération 2 — Rendre impossible une publication hors de `main` *[ex-G8, partie 1]* 🟡 *codée le 19/09 — reste la première publication*
+## Itération 2 — Rendre impossible une publication hors de `main` *[ex-G8, partie 1]* ✅ *en production le 19/09 — sort du plan à la prochaine édition*
 
 | | |
 |---|---|
@@ -177,7 +183,7 @@ par une publication locale sur une cible plus récente et périmée. ⚠️ L'an
 > **aucun code ne la lit** — les adresses arrivent résolues par Orders. Signalé dans le guide et dans
 > `delivered.md` §6 ; son retrait rejoint les dettes de forme *(itération 12)*.
 
-## Itération 4 — Dire à l'ambulancier pourquoi le conducteur est refusé *[ex-G9 du 13/09]* 🟡 *codée le 19/09 — reste à publier*
+## Itération 4 — Dire à l'ambulancier pourquoi le conducteur est refusé *[ex-G9 du 13/09]* 🟡 *en production le 19/09 — reste à voir passer un refus*
 
 | | |
 |---|---|
@@ -238,7 +244,7 @@ Les deux clients vers Orders n'ont **ni délai court, ni nouvelle tentative, ni 
 lecture — 100 secondes par défaut *(13/09)*. L'écriture est couverte par la file de projection.
 ⇒ Délai explicite, puis `AddStandardResilienceHandler`, **en gardant** la tolérance au 404.
 
-## Itération 8 — Prendre le gestionnaire de jeton du paquet partagé *[ex-C2, reliquat]* 🟡 *codée le 19/09 — reste à publier*
+## Itération 8 — Prendre le gestionnaire de jeton du paquet partagé *[ex-C2, reliquat]* ✅ *en production le 19/09 — sort du plan à la prochaine édition*
 
 | | |
 |---|---|
@@ -322,7 +328,7 @@ Aucune table de suivi : prod et dev ont divergé en sens inverse. ⇒ Table de s
 - **Alias de compatibilité** (`IsAck`, champs historiques du détail, `SelectedDriver` jamais nul,
   champs typés des lieux) — retrait **sur confirmation du front uniquement**.
 
-## Itération 13 — Le dossier terrain en lot *[ex-B5, E3]* 🟡 *codée le 19/09 — reste à publier*
+## Itération 13 — Le dossier terrain en lot *[ex-B5, E3]* ✅ *en production le 19/09, adoptée par la facturation — sort du plan à la prochaine édition*
 
 | | |
 |---|---|
@@ -356,9 +362,13 @@ pour rien — l'image de signature pour sa date, le contenu des documents pour l
 d'identifiants (relevé le 19/09). Le prochain levier est chez lui — une lecture groupée « mission →
 commande → bénéficiaire » ramènerait le lot à un appel.
 
-**Fin** : la facturation bascule sur le lot, et remesure sa part Vector.
+**Constaté le 19/09** (journal de Vector, relevé de la facturation) : deux lots de paquets (200 + 142)
+en **3,9 s + 2,8 s**, en séquence ; sa part Vector passe de **12,8 s à 6,8 s**, son acquisition d'une
+journée de 18,3 s à 12,1 s ; même résultat mission par mission, aucune entrée en `Error`.
+⚖️ **Refusé le 19/09** : envoyer les deux lots en même temps (~3 s de gain) doublerait les appels
+simultanés vers Orders (16), qui sert aussi la régulation. Le levier est chez Orders *(itération 20)*.
 
-## Itération 14 — Les images de signature en lot *[ex-B5, suite]* 🟡 *codée le 19/09 — reste à publier*
+## Itération 14 — Les images de signature en lot *[ex-B5, suite]* ✅ *en production le 19/09, adoptée par la facturation — sort du plan à la prochaine édition*
 
 | | |
 |---|---|
@@ -445,6 +455,7 @@ et **c'est dit**.*
 | **Règle d'applicabilité des types** *[B9]* | Orders *(itération « Restreindre un type »)* + décision métier | 19/09 | Les 7 types proposés partout. Orders l'a placée en tête par priorité **parce que Vector s'y déclare bloqué** |
 | **`REFERENCE` et `URGENT`** *[B10]* | décision métier | 19/09 | Absents du catalogue ; tout le reste est servi. Reconstater sur le terrain avant de clore |
 | **`Billed` : l'écrire, ou retirer le palier** *[B4, E4]* | 🔴 décision | 13/09 | La facturation est en lecture seule par décision de son module |
+| **Lecture groupée « mission → commande → bénéficiaire »** *(B5, suite)* | Orders | 19/09 | Chaque mission d'un lot de paquets terrain coûte encore un appel unitaire à Orders (~20 ms, 8 simultanés) : c'est tout ce qui reste de la part Vector de la facturation (6,8 s par journée). Une lecture par liste d'identifiants ramènerait chaque lot à **un** appel. Orders n'en a aucune (relevé le 19/09) |
 | **Tests du transfert côté Orders** *[B6]* | Orders | 13/09 | Aucun filet sur la dérivation du statut et les gardes du transfert |
 | **Relance des missions terminées non clôturées** *[B7]* | Orders | 13/09 | Des dossiers n'arrivent jamais en facturation |
 | **Présence : qui est connecté** *[F4]* | 🔴 décision + cadrage **RH/RGPD** | 13/09 | Spec sans code : [`feadesc_utilisateurs_connectes_vector.md`](feadesc_utilisateurs_connectes_vector.md). Définir « connecté », choisir la topologie |
