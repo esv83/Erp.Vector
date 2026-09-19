@@ -33,7 +33,7 @@ public class ClGetMyActiveCrewsUseCaseTests
         public List<ClJobListItemModel> FetchJobList(Guid gCrewId) => throw new NotSupportedException();
         public List<ClJobListItemModel> FetchJobList(IReadOnlyCollection<Guid> gCrewIds) => throw new NotSupportedException();
         public List<ClInstructionListItemModel> FetchInstructionList(Guid gCrewId) => throw new NotSupportedException();
-        public void Update(ClCrew crew) => throw new NotSupportedException();
+        public ClCrewDriverWriteResult Update(ClCrew crew) => throw new NotSupportedException();
         public void AckInstruction(int instructionId) => throw new NotSupportedException();
         public List<Guid> GetCrewIdList(DateOnly id) => throw new NotSupportedException();
     }

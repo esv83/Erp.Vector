@@ -104,6 +104,12 @@ Un bouton « changer d'équipage » → **re-`GET /api/crew/mine`** → ré-affi
 
 `POST /api/driver/{crewId}` avec le `Guid` du conducteur choisi (un membre de l'équipage). Le serveur refuse (400) un conducteur hors équipage.
 
+**Le corps du 400 est une phrase à afficher telle quelle** *(depuis le 2026-09-19)*. Quand la
+régulation refuse, c'est son motif qui arrive — par exemple « La vacation s'est terminée le
+13/09/2026 à 18:00 : on ne peut pas y désigner un conducteur après. » Avant, le texte était technique
+(« Orders.Api PUT crews/…/driver → 400. ») et l'ambulancier réessayait en boucle. Même code, même
+format (texte simple) : rien à reparser, seulement à afficher au lieu d'un message générique.
+
 ---
 
 ## Codes d'erreur communs à tous les endpoints crew-scoped

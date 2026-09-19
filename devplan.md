@@ -148,20 +148,29 @@ n'est pas celui du dépôt**, et l'aligner.
 > **aucun code ne la lit** — les adresses arrivent résolues par Orders. Signalé dans le guide et dans
 > `delivered.md` §6 ; son retrait rejoint les dettes de forme *(itération 12)*.
 
-## Itération 4 — Dire à l'ambulancier pourquoi le conducteur est refusé *[ex-G9 du 13/09]*
+## Itération 4 — Dire à l'ambulancier pourquoi le conducteur est refusé *[ex-G9 du 13/09]* 🟡 *codée le 19/09 — reste à publier*
 
 | | |
 |---|---|
-| **Nature** | Un refus clair d'Orders arrive au terrain sous forme de panne |
-| **Effort** | Une session courte — le modèle existe |
-| **Bloqué par** | Rien |
+| **Nature** | Un refus clair d'Orders arrivait au terrain sous forme de panne |
+| **Effort** | Fait — reste la publication, puis le constat |
+| **Bloqué par** | **La publication** |
 
 Désigner un conducteur après la fin de la vacation est refusé par Orders avec un motif lisible
-*(« La vacation s'est terminée à 18:00 … »)*. Vector le journalise en erreur, le perd, et répond un
-message technique. L'ambulancier réessaie — **5 fois en 35 secondes** le 13/09.
+*(« La vacation s'est terminée à 18:00 … »)*. Vector le journalisait en erreur, le perdait, et
+répondait un message technique. L'ambulancier réessayait — **5 fois en 35 secondes** le 13/09.
 
-⇒ Le même traitement que les refus du formulaire de facturation *(livré le 15/09)* : refus métier
-typé, motif d'Orders rendu tel quel, journalisé en avertissement. Même code HTTP pour l'app.
+**Codé** (181 tests verts, +9) : `SetCrewDriverAsync` rend un `CrewDriverWriteResult`
+typé — 400/409 refus, 404 équipage inconnu, motif d'Orders conservé, journalisé en **WARN** ; seule
+une panne (5xx, réseau) lève encore. Le port `ICrewRepository.Update` rend un
+`ClCrewDriverWriteResult`, et `ClSetDriverUseCase` renvoie le motif **tel quel**, repli « Changement
+de conducteur refusé par la régulation. ». **Même code 400** pour l'app, seul le texte change (D14) ;
+le contrat du front est complété
+([`docs/ui-web/UI_selection-equipage-multi-crew.md`](docs/ui-web/UI_selection-equipage-multi-crew.md)).
+
+**Fin** : après publication, un refus de conducteur apparaît en `WARN` au journal (plus d'`ERROR`), et
+le corps du 400 est la phrase d'Orders. ⚠️ Que l'**écran** l'affiche au lieu d'un message générique
+dépend du dev web.
 
 ## Itération 5 — Trois mesures en production *[ex-F1, B2, B8]*
 

@@ -57,13 +57,32 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
         throw new HttpRequestException($"Orders.Api PUT missions/{missionId}/operational → {(int)response.StatusCode}.");
     }
 
-    public async Task SetCrewDriverAsync(Guid crewId, Guid driverPersonnelId, DateTime from, CancellationToken ct = default)
+    public async Task<CrewDriverWriteResult> SetCrewDriverAsync(Guid crewId, Guid driverPersonnelId, DateTime from, CancellationToken ct = default)
     {
         var body = new { driverPersonnelId, from };
         var response = await _http.PutAsJsonAsync($"crews/{crewId}/driver", body, JsonOptions, ct);
-        if (response.IsSuccessStatusCode) return;
+        if (response.IsSuccessStatusCode)
+            return new CrewDriverWriteResult(EnCrewDriverWriteOutcome.Applied);
+
+        // 400/409/404 = réponses métier (ProblemDetails), pas des pannes. Constaté le 2026-09-13 :
+        // « La vacation s'est terminée le 13/09/2026 à 18:00 : on ne peut pas y désigner un conducteur
+        // après. » partait en ERROR, puis au mobile sous la forme « Orders.Api PUT … → 400. » —
+        // l'ambulancier réessayait cinq fois en 35 s sans savoir pourquoi.
+        var outcome = response.StatusCode switch
+        {
+            HttpStatusCode.BadRequest or HttpStatusCode.Conflict => EnCrewDriverWriteOutcome.Refused,
+            HttpStatusCode.NotFound => EnCrewDriverWriteOutcome.CrewNotFound,
+            _ => (EnCrewDriverWriteOutcome?)null
+        };
 
         var content = await response.Content.ReadAsStringAsync(ct);
+        if (outcome.HasValue)
+        {
+            _logger.LogWarning("Orders.Api PUT crews/{CrewId}/driver refusé ({Outcome}) : {Status} {Body}",
+                crewId, outcome.Value, (int)response.StatusCode, content);
+            return new CrewDriverWriteResult(outcome.Value, ReadProblemDetail(content));
+        }
+
         _logger.LogError("Orders.Api PUT crews/{CrewId}/driver a échoué : {Status} {Body}",
             crewId, (int)response.StatusCode, content);
         throw new HttpRequestException($"Orders.Api PUT crews/{crewId}/driver → {(int)response.StatusCode}.");

@@ -28,7 +28,7 @@ public class OperationalOutboxDispatcherTests
             Calls++;
             return Task.FromResult(Projection());
         }
-        public Task SetCrewDriverAsync(Guid crewId, Guid driverPersonnelId, DateTime from, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<CrewDriverWriteResult> SetCrewDriverAsync(Guid crewId, Guid driverPersonnelId, DateTime from, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<EnContextOrderWriteOutcome> SetMissionContextOrderAsync(Guid missionId, int contextOrderId, string? setBy = null, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ContextOrderValuesWriteResult> SetContextOrderValuesAsync(Guid missionId, IReadOnlyCollection<(string Name, string? Value)> values, string? setBy = null, CancellationToken ct = default) => throw new NotSupportedException();
     }

@@ -122,14 +122,20 @@ public class CrewRepository : IMobileCrewRepository
     }
 
     // ── MOB-11 : désignation du conducteur (écriture ERP) ────────────────────────────────────
-    public void Update(ClCrew crew)
+    public ClCrewDriverWriteResult Update(ClCrew crew)
     {
         var driver = crew.LastDriver;
         if (driver is null)
             throw new InvalidOperationException($"Aucun conducteur à enregistrer pour l'équipage {crew.CrewId}.");
 
-        _erpWrite.SetCrewDriverAsync(crew.CrewId, driver.Employee.Id, driver.From, CancellationToken.None)
+        var write = _erpWrite.SetCrewDriverAsync(crew.CrewId, driver.Employee.Id, driver.From, CancellationToken.None)
             .GetAwaiter().GetResult();
+
+        // Le motif d'Orders traverse tel quel : il nomme la règle (vacation terminée…), et c'est lui
+        // que l'ambulancier doit lire. Refus et équipage inconnu se lisent pareil sur le terrain.
+        return write.Outcome == EnCrewDriverWriteOutcome.Applied
+            ? ClCrewDriverWriteResult.Applied()
+            : ClCrewDriverWriteResult.Refused(write.Reason);
     }
 
     // ── À implémenter ultérieurement ────────────────────────────────────────

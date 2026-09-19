@@ -25,8 +25,13 @@ public interface IErpWriteApiClient
     /// <summary>
     /// Désigne le conducteur d'un équipage (PUT /crews/{id}/driver, MOB-11). Endpoint additif
     /// côté Orders.Api : le personnel indiqué devient le conducteur actif à la date fournie.
+    /// <para>
+    /// Le refus d'Orders — vacation terminée, personnel hors de l'équipage, équipage inconnu — est
+    /// une issue métier, remontée par <see cref="CrewDriverWriteResult"/> <b>avec son motif</b>, et
+    /// jamais par une exception. Seule une panne réelle (5xx, réseau) lève.
+    /// </para>
     /// </summary>
-    Task SetCrewDriverAsync(Guid crewId, Guid driverPersonnelId, DateTime from, CancellationToken ct = default);
+    Task<CrewDriverWriteResult> SetCrewDriverAsync(Guid crewId, Guid driverPersonnelId, DateTime from, CancellationToken ct = default);
 
     /// <summary>
     /// Pose le <b>context de la mission</b> choisi par l'ambulancier — OC-2
@@ -84,6 +89,34 @@ public interface IErpWriteApiClient
 public sealed record ContextOrderValuesWriteResult(
     EnContextOrderValuesWriteOutcome Outcome,
     string? Reason = null);
+
+/// <summary>
+/// Issue d'une désignation de conducteur (MOB-11), <b>et le motif qu'Orders en a donné</b>.
+/// </summary>
+/// <param name="Outcome">Famille de l'issue.</param>
+/// <param name="Reason">
+/// Motif exact rendu par Orders (<c>detail</c>, à défaut <c>title</c>), destiné à être affiché.
+/// <c>null</c> quand Orders n'a pas répondu de ProblemDetails lisible.
+/// </param>
+public sealed record CrewDriverWriteResult(
+    EnCrewDriverWriteOutcome Outcome,
+    string? Reason = null);
+
+/// <summary>Issue d'une désignation de conducteur (MOB-11). Les deux refus sont des cas métier attendus.</summary>
+public enum EnCrewDriverWriteOutcome
+{
+    /// <summary>2xx — conducteur désigné.</summary>
+    Applied,
+
+    /// <summary>
+    /// 400/409 — Orders refuse la désignation : vacation terminée, personnel qui n'est pas membre
+    /// actif de l'équipage.
+    /// </summary>
+    Refused,
+
+    /// <summary>404 — équipage (ou personnel) introuvable côté ERP.</summary>
+    CrewNotFound
+}
 
 /// <summary>
 /// Issue d'une projection opérationnelle (TRF-3). Seul le 404 est un refus attendu : tout autre échec

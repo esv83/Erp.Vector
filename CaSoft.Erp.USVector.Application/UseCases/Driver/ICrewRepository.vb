@@ -14,7 +14,11 @@ Namespace Port
         ''' </summary>
         Function FetchJobList(gCrewIds As IReadOnlyCollection(Of Guid)) As List(Of ClJobListItemModel)
         Function FetchInstructionList(gCrewId As Guid) As List(Of ClInstructionListItemModel)
-        Sub Update(crew As ClCrew)
+        ''' <summary>
+        ''' Enregistre le dernier conducteur désigné de l'équipage. Un refus de l'ERP est rendu, avec
+        ''' son motif, et ne lève pas ; seule une panne réelle lève.
+        ''' </summary>
+        Function Update(crew As ClCrew) As ClCrewDriverWriteResult
         Sub AckInstruction(instructionId As Integer)
         Function GetCrewIdList(id As DateOnly) As List(Of Guid)
 

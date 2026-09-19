@@ -2,6 +2,9 @@
 Public Class ClSetDriverUseCase
     Implements IResultUseCase(Of Boolean)
 
+    ''' <summary>Libellé d'un refus d'Orders sans motif lisible.</summary>
+    Public Const RefusalFallback As String = "Changement de conducteur refusé par la régulation."
+
     Private ReadOnly _repository As ICrewRepository
     Private ReadOnly _command As ClSetDriverCommand
 
@@ -22,7 +25,14 @@ Public Class ClSetDriverUseCase
 
             Dim lastDriver = New ClLastDriver(employee, DateTime.Now)
             Crew.SetLastDriver(lastDriver)
-            _repository.Update(Crew)
+            ' Un refus d'Orders part tel quel : son motif est la seule phrase qui dise à l'ambulancier
+            ' pourquoi. Même code HTTP qu'avant (400, erreur applicative), seul le texte change (D14).
+            Dim written = _repository.Update(Crew)
+            If Not written.IsApplied Then
+                Return ClResult(Of Boolean).Fail(
+                    ClError.Application(If(written.HasReason, written.Reason, RefusalFallback)))
+            End If
+
             Return ClResult(Of Boolean).Ok(True)
 
         Catch ex As Exception
