@@ -37,7 +37,8 @@ dans `git log`.*
 ### 2.1 🟡 DEC-6 — Authentification de service à service — *reste la fermeture*
 
 **Fait dans les deux sens** ([`delivered.md`](delivered.md)) :
-- **Vector → Orders** : `ServiceAccountTokenHandler` pose le jeton `client_credentials` du client
+- **Vector → Orders** : le gestionnaire du paquet `CaSoft.Identity.Client` (`AddCaSoftServiceAccountToken`,
+  depuis le 19/09 — auparavant une copie locale) pose le jeton `client_credentials` du client
   `erp-vector-api` sur les appels à Orders.Api, en service depuis le 2026-09-13 à 18:59.
 - **Facturation → Vector** : BillingGateway présente le jeton de `erp-billinggateway-api`, que Vector
   admet (`Keycloak:ServiceAzp`) — constaté le **2026-09-19 à 11:48** ; depuis, la sonde de surface ne

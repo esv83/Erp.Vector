@@ -26,6 +26,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Jeton du compte de service sur les appels à Orders (C2). Ne dépend que de
+         CaSoft.Framework.Security 2.8.0, pas du socle : coexiste avec CaSoft.Framework 2.3.5. -->
+    <PackageReference Include="CaSoft.Identity.Client" Version="1.4.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
     <PackageReference Include="NLog.Web.AspNetCore" Version="5.4.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />

@@ -224,16 +224,36 @@ Les deux clients vers Orders n'ont **ni délai court, ni nouvelle tentative, ni 
 lecture — 100 secondes par défaut *(13/09)*. L'écriture est couverte par la file de projection.
 ⇒ Délai explicite, puis `AddStandardResilienceHandler`, **en gardant** la tolérance au 404.
 
-## Itération 8 — Prendre le gestionnaire de jeton du paquet partagé *[ex-C2, reliquat]*
+## Itération 8 — Prendre le gestionnaire de jeton du paquet partagé *[ex-C2, reliquat]* 🟡 *codée le 19/09 — reste à publier*
 
 | | |
 |---|---|
 | **Nature** | Doublon — une source de vérité au lieu de cinq |
-| **Effort** | Une session courte |
-| **Bloqué par** | Rien — `CaSoft.Identity.Client` ≥ 1.2.0 ne dépend que de `CaSoft.Framework.Security` 2.8.0, pas du socle |
+| **Effort** | Fait — reste la publication, puis le constat |
+| **Bloqué par** | **La publication** |
 
-Le gestionnaire écrit ici le 13/09 a été promu dans le paquet le jour même, mêmes règles. Retirer la
-copie locale.
+Le gestionnaire écrit ici le 13/09 avait été promu dans le paquet le jour même, mêmes règles.
+
+**Codé** : `CaSoft.Identity.Client` **1.4.0** référencé par l'API ; `ServiceAccountTokenHandler` et
+`ServiceAccountTokenProvider` **supprimés** ; les **trois** clients Orders passent par
+`AddVectorServiceAccountToken`, qui appelle `AddCaSoftServiceAccountToken` du paquet. Le troisième,
+la confirmation de prise de service, partait **sans** jeton de service : il serait tombé le jour où
+Orders exigera un jeton du terrain.
+
+> ⚖️ **La configuration ne bouge pas.** Le paquet lit la section `Identity` ; Vector garde
+> `OrdersApi:ServiceAccount` et la **traduit**. Lire la section du paquet aurait imposé de retoucher à
+> la main le `web.config` de production le jour de la publication — sans quoi le jeton disparaissait
+> sans erreur. Et la traduction ne passe **que** un compte complet : le paquet s'active sur le seul
+> `TokenEndpoint`, que Vector déduit toujours de `Keycloak:Authority` — un poste de dev au secret de
+> remplacement aurait demandé un jeton, en erreur, à chaque appel.
+
+**Éprouvé** : 6 tests sur le câblage réel (fabrique de clients + gestionnaire du paquet, realm et
+Orders simulés) — inerte sans compte et avec le secret de remplacement, Bearer posé puis réutilisé,
+oubli sur 401, realm indisponible non bloquant, traduction des réglages ; publication locale (DLL du
+paquet présentes) ; démarrage de l'API en Development. 180 tests verts.
+
+**Fin** : après publication, « JWT validé … azp=erp-vector-api » côté Orders, ou à défaut l'absence de
+« Jeton de service indisponible » dans le journal de Vector.
 
 ## Itération 9 — Dire l'heure qu'il est *[ex-E2]*
 

@@ -202,31 +202,28 @@ if (string.IsNullOrWhiteSpace(serviceAccount.TokenEndpoint)
 {
     serviceAccount.TokenEndpoint = builder.Configuration["Keycloak:Authority"]!.TrimEnd('/') + "/protocol/openid-connect/token";
 }
-builder.Services.AddSingleton(serviceAccount);
-builder.Services.AddSingleton(sp => new ServiceAccountTokenProvider(
-    // Client propre au realm, SANS le gestionnaire qui pose le jeton : sinon demander un jeton en exigerait un.
-    new HttpClient(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(15) })
-    {
-        Timeout = TimeSpan.FromSeconds(10)
-    },
-    sp.GetRequiredService<ServiceAccountOptions>(),
-    sp.GetRequiredService<ILogger<ServiceAccountTokenProvider>>()));
-builder.Services.AddTransient<ServiceAccountTokenHandler>();
+// Le gestionnaire est celui du paquet CaSoft.Identity.Client (promu depuis Vector le 13/09) : une
+// source de vérité pour tous les modules. La configuration reste OrdersApi:ServiceAccount, traduite
+// (cf. ServiceAccountTokenRegistration) — le web.config de production n'a rien à changer.
 
 // Découplage Vector↔Orders (4a) : données de référence ERP lues via Orders.Api en HTTP
-// (missions, commandes, bénéficiaires, équipages), comme Address.Api. Plus aucune réf projet Orders.
+// (missions, commandes, bénéficiaires, équipages). Plus aucune réf projet Orders.
 builder.Services.AddHttpClient<IErpReadApiClient, HttpErpReadApiClient>(c =>
     c.BaseAddress = OrdersBaseUri(builder.Configuration))
-    .AddHttpMessageHandler<ServiceAccountTokenHandler>();
+    .AddVectorServiceAccountToken(serviceAccount);
 
 // TRF-5 : chemin d'écriture Vector→Orders (projection de l'avancement opérationnel terrain).
 builder.Services.AddHttpClient<IErpWriteApiClient, HttpErpWriteApiClient>(c =>
     c.BaseAddress = OrdersBaseUri(builder.Configuration))
-    .AddHttpMessageHandler<ServiceAccountTokenHandler>();
+    .AddVectorServiceAccountToken(serviceAccount);
 
-// Confirmation de prise de service depuis l'application (lecture + confirmation, sans jeton).
+// Confirmation de prise de service depuis l'application (lecture + confirmation). « Sans jeton »
+// vaut pour le JETON DE LIEN du courriel, jamais demandé ici ; le jeton de SERVICE de Vector, lui,
+// est posé comme sur les deux autres clients Orders — sans quoi ces routes tomberaient le jour où
+// Orders exigera un jeton du terrain.
 builder.Services.AddHttpClient<IShiftConfirmationService, HttpShiftConfirmationService>(c =>
-    c.BaseAddress = OrdersBaseUri(builder.Configuration));
+    c.BaseAddress = OrdersBaseUri(builder.Configuration))
+    .AddVectorServiceAccountToken(serviceAccount);
 
 // Contrat mobile inchangé : PascalCase comme l'ancienne WebApi (pas de camelCase).
 builder.Services.AddControllers()
