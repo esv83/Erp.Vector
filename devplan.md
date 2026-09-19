@@ -33,6 +33,9 @@ au 18/09, elle a compté jusqu'à **7 662 appels anonymes par jour** — tous de
 > l'image de la carte **avec son propre jeton** ; la politique prévue admet les deux. Un seul appel
 > sans jeton venu de l'app en quatre jours *(18/09, et il a reçu un 404)*.
 
+**La facturation engage B5** *(19/09)* : Vector est devenu son goulot — ~40 appels par seconde au
+plus, 12,8 s sur 18,3 s d'acquisition. Deux itérations neuves *(13 et 14)*.
+
 **La confirmation de prise de service depuis l'app est adoptée** : 40 à 90 consultations par jour,
 9 confirmations du 15 au 18/09. **La carte mutuelle arrive** : 26 captures du 13 au 15/09, 13 le 16/09.
 
@@ -63,7 +66,7 @@ sans que rien le signale.
   longtemps *(itération 1)*. Deux autres, pour les écrans de la régulation et de la facturation,
   resteront ouvertes plus longtemps *(rubrique 3)*.
 - ⚠️ **Un ambulancier rattaché depuis l'écran d'Employee seul n'entre pas** : 8 membres d'équipage sur
-  244 sans compte reconnu *(13/09 — non remesuré)*. Une consigne transitoire existe *(itération 18)*.
+  244 sans compte reconnu *(13/09 — non remesuré)*. Une consigne transitoire existe *(itération 20)*.
 - ⚠️ **Ouvrir l'app avant que la régulation ait composé l'équipage échoue** — 23 min d'attente
   médiane, 9 cas au-delà d'une heure *(mesuré sur juillet-août)*. Le message dit désormais quoi faire.
 - ⚠️ **Les 7 types de mission sont proposés partout**, faute de règle d'applicabilité *(25/08)*.
@@ -207,7 +210,7 @@ dépend du dev web.
 | **Bloqué par** | ⚠️ Un **compte de lecture** : `ErpAccount` est refusé depuis le poste de dev *(13/09 — non revérifié)*. À défaut, les journaux et le paquet terrain |
 
 - **Taux de remplissage de la carte mutuelle** (cartes / missions) — c'est lui qui dira si l'extraction
-  automatique *(itération 14)* vaut la peine.
+  automatique *(itération 16)* vaut la peine.
 - **Les étapes de mission vides** : ~3 883 annoncées tant qu'Orders n'avait pas son repli — il l'a
   depuis le 23/07. Constater qu'elles ont disparu.
 - **Les adresses « non structurées »** : chaque cas est journalisé, personne n'a compté.
@@ -319,7 +322,54 @@ Aucune table de suivi : prod et dev ont divergé en sens inverse. ⇒ Table de s
 - **Alias de compatibilité** (`IsAck`, champs historiques du détail, `SelectedDriver` jamais nul,
   champs typés des lieux) — retrait **sur confirmation du front uniquement**.
 
-## Itération 13 — Le kilométrage dans le dossier transmis *[ex-E1, MOB-10]*
+## Itération 13 — Le dossier terrain en lot *[ex-B5, E3]* 🆕 *engagée le 19/09 à la demande de la facturation*
+
+| | |
+|---|---|
+| **Nature** | Performance — **Vector freine l'acquisition de la facturation** |
+| **Effort** | Une à deux sessions |
+| **Bloqué par** | **Rien** — une décision de forme, à prendre en codant |
+
+**Mesuré par BillingGateway le 19/09**, recoupé dans le journal de Vector : Vector plafonne vers **40
+appels par seconde**. Passer de 1 à 8 appels simultanés n'a multiplié son débit que par 2,4 — chaque
+appel monte à ~180 ms. Vector pèse **12,8 s sur les 18,3 s** d'acquisition d'une journée. La facturation
+reste à 8 appels simultanés pour ne pas charger une base qui sert aussi le terrain. *(La mesure de
+14,7 s pour 284 missions, citée jusqu'ici, date d'avant l'ajout des signatures à sa boucle.)*
+
+**Ce que coûte un paquet aujourd'hui** (`FieldDataReader.GetAsync`, relevé le 19/09) : **2 appels HTTP à
+Orders** (mission, puis commande pour le bénéficiaire) et **6 lectures en base**, mission par mission.
+
+1. **Gain immédiat, indépendant du lot** : `_signature.Fetch(missionId)?.DateTime` charge **l'image
+   entière** (~42 Ko) pour n'en lire que la date. Même défaut que celui corrigé sur la carte mutuelle le
+   26/08 : une projection des seules métadonnées.
+2. **La lecture groupée** — une requête `IN` par silo au lieu de six par mission. **La forme reste à
+   trancher** : la facturation demande « par période, à l'image de `for-export` » ; mais Vector ne
+   connaît pas les missions d'une journée sans le demander à Orders. **Une liste d'identifiants**
+   (`POST`, plafonnée, comme `mutuelle-card/presence`) épargne cet appel — la facturation les tient déjà
+   de `for-export`. Reste l'aller-retour vers Orders pour la commande et le bénéficiaire : à grouper s'il
+   existe une lecture groupée côté Orders, à vérifier avant de coder.
+3. **Même politique que les routes fermées** à l'itération 1 : la facturation ou l'app, avec jeton.
+
+⚠️ **À dire à la facturation** : elle dit lire `Attributes` — Vector le sert **toujours `null`** depuis le
+13/09 (OC-8) ; les valeurs sont chez Orders, où elle les lit déjà.
+
+**Fin** : la journée de la facturation s'acquiert en quelques appels, et sa part Vector est remesurée.
+
+## Itération 14 — Les images de signature en lot *[ex-B5, suite]* 🆕
+
+| | |
+|---|---|
+| **Nature** | Performance — l'autre moitié de la demande, que B5 ne couvrait pas |
+| **Effort** | Une session |
+| **Bloqué par** | **L'itération 13** — même forme d'appel, à réutiliser |
+
+**144 à 217 signatures par journée, ~42 Ko chacune, 6 à 9 Mo** — une requête par mission aujourd'hui.
+La règle D8 ne bouge pas : les octets restent chez Vector, la facturation les tire. Seule change la
+granularité : **une liste d'identifiants, paginée** (de l'ordre de 50 images par réponse), pour ne pas
+fabriquer une réponse de 9 Mo. Format à trancher en codant : binaire encodé dans du JSON (+33 %), ou
+réponse en plusieurs parties.
+
+## Itération 15 — Le kilométrage dans le dossier transmis *[ex-E1, MOB-10]*
 
 | | |
 |---|---|
@@ -330,7 +380,7 @@ Aucune table de suivi : prod et dev ont divergé en sens inverse. ⇒ Table de s
 Le kilométrage appartient à l'équipage et au véhicule, pas à la mission. Km du véhicule, ou relevé
 début/fin par mission (table, saisie mobile, paquet) ?
 
-## Itération 14 — Lire la carte mutuelle automatiquement *[ex-F2, P3]*
+## Itération 16 — Lire la carte mutuelle automatiquement *[ex-F2, P3]*
 
 | | |
 |---|---|
@@ -342,7 +392,7 @@ Extraction **asynchrone** par un modèle de vision, quatre champs proposés avec
 **validation humaine** — jamais d'écriture aveugle. À cadrer : où tourne l'appel (DMZ ou LAN), le coût
 par carte. Rappel : même validés, ces champs **n'alimentent pas** la colonne mutuelle de facturation.
 
-## Itération 15 — La fin de service *[ex-F3, MOB-12]*
+## Itération 17 — La fin de service *[ex-F3, MOB-12]*
 
 | | |
 |---|---|
@@ -353,7 +403,7 @@ par carte. Rappel : même validés, ces champs **n'alimentent pas** la colonne m
 Le contrôleur vise une session mobile qui n'est plus la source d'authentification : la clôture doit
 viser **la vacation côté Orders** — dont la règle est que **le régulateur** connaît l'heure de fin.
 
-## Itération 16 — Positions et statuts des véhicules *[ex-F3, MOB-16]*
+## Itération 18 — Positions et statuts des véhicules *[ex-F3, MOB-16]*
 
 | | |
 |---|---|
@@ -363,7 +413,7 @@ viser **la vacation côté Orders** — dont la règle est que **le régulateur*
 
 GpsGate (positions, REST) et Sirus (statuts, UDP) sont injectés mais ne servent à rien.
 
-## Itération 17 — Protéger les données du patient *[ex-G7, P4]*
+## Itération 19 — Protéger les données du patient *[ex-G7, P4]*
 
 | | |
 |---|---|
@@ -374,7 +424,7 @@ GpsGate (positions, REST) et Sirus (statuts, UDP) sont injectés mais ne servent
 Documents, carte mutuelle et anomalies servis par une API exposée : **rétention et purge** (3 ans),
 chiffrement au repos, accès fin à l'image de la carte, **audit des accès**.
 
-## Itération 18 — Ce qui attend ailleurs *[ex-A3, B, C1, C3, E3, E4, F4]*
+## Itération 20 — Ce qui attend ailleurs *[ex-A3, B, C1, C3, E4, F4]*
 
 *Rien à coder ici tant que l'autre partie n'a pas bougé. Non revérifié à cette édition sauf mention,
 et **c'est dit**.*
@@ -388,7 +438,6 @@ et **c'est dit**.*
 | **Règle d'applicabilité des types** *[B9]* | Orders *(itération « Restreindre un type »)* + décision métier | 19/09 | Les 7 types proposés partout. Orders l'a placée en tête par priorité **parce que Vector s'y déclare bloqué** |
 | **`REFERENCE` et `URGENT`** *[B10]* | décision métier | 19/09 | Absents du catalogue ; tout le reste est servi. Reconstater sur le terrain avant de clore |
 | **`Billed` : l'écrire, ou retirer le palier** *[B4, E4]* | 🔴 décision | 13/09 | La facturation est en lecture seule par décision de son module |
-| **Dossier terrain par période** *[B5, E3]* | la facturation, si elle le demande | 13/09 | 14,7 s pour 284 missions sur un clic. Non engagé côté demandeur |
 | **Tests du transfert côté Orders** *[B6]* | Orders | 13/09 | Aucun filet sur la dérivation du statut et les gardes du transfert |
 | **Relance des missions terminées non clôturées** *[B7]* | Orders | 13/09 | Des dossiers n'arrivent jamais en facturation |
 | **Présence : qui est connecté** *[F4]* | 🔴 décision + cadrage **RH/RGPD** | 13/09 | Spec sans code : [`feadesc_utilisateurs_connectes_vector.md`](feadesc_utilisateurs_connectes_vector.md). Définir « connecté », choisir la topologie |
@@ -405,7 +454,7 @@ et **c'est dit**.*
 | **Base Vector dédiée** *[Vd-1]* | Seul jalon DMZ non conditionné à la V2 | Pertinent dès maintenant ; personne ne l'a porté |
 | **Accès anticipé à cheval sur minuit** *[CREW-2]* | Correctif connu | Les vacations de nuit ne sont pas concernées *(décision du 02/08)* |
 | **Durcissement DMZ événementiel, push temps réel** *[Vd-2 à Vd-4, Vd-7, Vd-8]* | [`spec_architecture_vector_mission_dmz.md`](spec_architecture_vector_mission_dmz.md) | Une exigence d'exposition, ou le polling qui ne suffit plus |
-| **Photos hors SQL, masquage** *[Vd-6, Vd-5]* | NIR partiel, équipage retour | Le volume, ou l'itération 17 |
+| **Photos hors SQL, masquage** *[Vd-6, Vd-5]* | NIR partiel, équipage retour | Le volume, ou l'itération 19 |
 | **Contrats partagés avec Orders** *[4b]* | Écart JSON assumé | Une rupture de contrat constatée |
 | **Repère de fraîcheur du dossier** *[E5]* | `updatedAt` est servi, personne ne s'en sert | Un besoin de resynchronisation |
 | **Éviction ciblée du cache d'identité, mode hors ligne, géolocalisation avancée, renommage `USVector` → `Vector`** | — | Une demande |
@@ -436,7 +485,7 @@ plan se tient.*
 |---|---|
 | **Keycloak et BillingGateway pour l'authentification de service** *[C2, étapes 1 à 3]* | ✅ Client créé, jeton posé, constaté le 19/09 à 11:48. Reste la fermeture *(itération 1)* |
 | **Repli sur le snapshot `ORD_ORDER`** *[B2]* | ✅ Livré chez Orders le 23/07. Reste une mesure *(itération 5)* |
-| **Attributs « rattachés à rien »** *[B10]* | 🟡 Tous servis sauf `REFERENCE` et `URGENT` *(itération 18)* |
+| **Attributs « rattachés à rien »** *[B10]* | 🟡 Tous servis sauf `REFERENCE` et `URGENT` *(itération 20)* |
 | **Fraîcheur des coordonnées** *[G6]* | ✅ Orders remplace le numéro d'adresse à l'édition depuis le 06/09 |
 | **Transmettre la note carte mutuelle au dev web** *[F1]* | ✅ Sans objet : l'app capture depuis le 13/09 |
 
@@ -451,7 +500,7 @@ sur le format d'Orders. Les anciennes références restent entre crochets.
 |---|---|
 | [`delivered.md`](delivered.md) | Ce que le module fait, journal daté, décisions, configuration, pistes retirées, incidents |
 | [`AppMobile_specifications.md`](AppMobile_specifications.md) | Le besoin et le vocabulaire |
-| [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) | Carte mutuelle (itérations 5, 14) |
+| [`MUTUELLE_CARD_devplan.md`](MUTUELLE_CARD_devplan.md) | Carte mutuelle (itérations 5, 16) |
 | [`PROJECTION_TERRAIN_devplan.md`](PROJECTION_TERRAIN_devplan.md) | Projection du terrain vers Orders |
 | [`TRACABILITE_SAISIES_VECTOR_EXPORT.md`](TRACABILITE_SAISIES_VECTOR_EXPORT.md) | Des saisies Vector aux 91 colonnes de facturation |
 | [`VECTOR_ORDERS_DECOUPLING_devplan.md`](VECTOR_ORDERS_DECOUPLING_devplan.md) | Authentification de service, résilience (itérations 1, 7) |
