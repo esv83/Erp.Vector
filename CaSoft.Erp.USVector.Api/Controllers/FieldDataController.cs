@@ -29,5 +29,35 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             var data = await _reader.GetAsync(gJobId, ct);
             return data is null ? NotFound() : Ok(data);
         }
+
+        /// <summary>Plafond d'un lot : ~350 missions par journée chez la facturation, soit deux appels.</summary>
+        public const int MaxMissionsParLot = 200;
+
+        /// <summary>Corps de <c>POST api/missions/field-data</c>.</summary>
+        public sealed class FieldDataBatchQuery
+        {
+            public List<Guid>? MissionIds { get; set; }
+        }
+
+        /// <summary>
+        /// B5 — Paquets de plusieurs missions en un appel (19/09, demande de la facturation). Une entrée
+        /// par mission demandée : <c>Found</c> (paquet dans <c>Data</c>), <c>NotFound</c> (l'ancien 404),
+        /// <c>Error</c> (à retenter). Un échec sur une mission n'emporte pas le lot.
+        /// </summary>
+        /// <remarks>
+        /// <b>POST</b> : 200 Guid dépassent la longueur d'URL admise par IIS. L'appel reste une lecture.
+        /// Même politique que la route unitaire : la facturation ou l'app, avec jeton.
+        /// </remarks>
+        [Authorize(Policy = ClKeycloakCallers.ServiceOrMobilePolicy)]
+        [HttpPost("missions/field-data")]
+        public async Task<IActionResult> GetMany([FromBody] FieldDataBatchQuery query, CancellationToken ct)
+        {
+            var ids = query?.MissionIds?.Where(id => id != Guid.Empty).Distinct().ToList() ?? new List<Guid>();
+
+            if (ids.Count > MaxMissionsParLot)
+                return BadRequest($"Trop de missions demandées ({ids.Count}) : maximum {MaxMissionsParLot} par appel.");
+
+            return Ok(await _reader.GetManyAsync(ids, ct));
+        }
     }
 }

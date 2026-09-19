@@ -278,8 +278,12 @@ builder.Services.AddScoped<IMutuelleCardRepository, MutuelleCardRepository>();
 builder.Services.AddScoped<IAnomalyRepository, AnomalyRepository>();
 // Documents/photos terrain (TRF-10) : stockage BD Mobile.
 builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
-// Paquet d'enrichissement consolidé (TRF-6) : tiré par Certification au transfert.
+// Paquet d'enrichissement consolidé (TRF-6) : tiré par la facturation, à l'unité ou en lot (B5).
+// Les silos sont lus en une requête chacun, sans binaire (FieldDataQueryService).
+builder.Services.AddScoped<IFieldDataQueryService, CaSoft.Erp.USVector.Infrastructure.Repositories.FieldDataQueryService>();
 builder.Services.AddScoped<IFieldDataReader, CaSoft.Erp.USVector.Infrastructure.Repositories.FieldDataReader>();
+// Signatures en lot (B5) : une requête pour tout le lot.
+builder.Services.AddScoped<ISignatureQueryService, SignatureQueryService>();
 
 // ── Ports ERP-backed (in-process) ───────────────────────────────────────────
 builder.Services.AddScoped<ICrewRepository, CaSoft.Erp.USVector.Infrastructure.Repositories.Erp.CrewRepository>();

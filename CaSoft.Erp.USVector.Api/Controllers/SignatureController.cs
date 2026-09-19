@@ -30,6 +30,34 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             return GetSignatureUseCase.Handle().ToActionResult();
         }
 
+        /// <summary>Plafond d'un lot : ~42 Ko par image, soit ~2 Mo par réponse.</summary>
+        public const int MaxSignaturesParLot = 50;
+
+        /// <summary>Corps de <c>POST api/missions/signatures</c>.</summary>
+        public sealed class SignatureBatchQuery
+        {
+            public List<Guid>? MissionIds { get; set; }
+        }
+
+        /// <summary>
+        /// B5 — Signatures de plusieurs missions en un appel (19/09, demande de la facturation). Une
+        /// entrée par mission demandée : <c>Found</c> avec l'image (même valeur que
+        /// <c>GET api/Signature/{id}</c>), ou <c>NotFound</c>. Au-delà de
+        /// <see cref="MaxSignaturesParLot"/>, l'appelant découpe.
+        /// </summary>
+        // Route absolue : sous api/Signature, « batch » concurrencerait POST {gJobId}.
+        [Authorize(Policy = ClKeycloakCallers.ServiceOrMobilePolicy)]
+        [HttpPost("~/api/missions/signatures")]
+        public IActionResult GetMany([FromBody] SignatureBatchQuery query, [FromServices] ISignatureQueryService signatures)
+        {
+            var ids = query?.MissionIds?.Where(id => id != Guid.Empty).Distinct().ToList() ?? new List<Guid>();
+
+            if (ids.Count > MaxSignaturesParLot)
+                return BadRequest($"Trop de signatures demandées ({ids.Count}) : maximum {MaxSignaturesParLot} par appel.");
+
+            return Ok(signatures.ReadMany(ids));
+        }
+
         // Enregistrement de la signature (verbe unique côté contrat : POST).
         // Idempotent (relation 1:1 mission) : si une signature existe déjà — re-signature
         // ou double envoi du front — on met à jour au lieu de renvoyer une 400 (violation

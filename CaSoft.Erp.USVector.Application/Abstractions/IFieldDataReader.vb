@@ -2,14 +2,16 @@ Imports System.Threading
 
 Namespace Port
 
-    ''' <summary>
-    ''' TRF-6 — Assemble le paquet d'enrichissement terrain consolidé d'une mission (tous silos BD
-    ''' Mobile + rattachement commande), tiré par le module Certification au transfert en facturation.
-    ''' </summary>
     Public Interface IFieldDataReader
 
-        ''' <summary>Paquet consolidé de la mission, ou Nothing si la mission est introuvable côté ERP.</summary>
+        ''' <summary>Paquet d'une mission. Nothing si la mission est inconnue d'Orders.</summary>
         Function GetAsync(missionId As Guid, ct As CancellationToken) As Task(Of ClFieldEnrichmentDtoOut)
+
+        ''' <summary>
+        ''' Paquets de plusieurs missions (B5) : une entrée par mission demandée, dédoublonnée, avec son
+        ''' statut. Un échec sur une mission n'emporte pas le lot.
+        ''' </summary>
+        Function GetManyAsync(missionIds As IReadOnlyCollection(Of Guid), ct As CancellationToken) As Task(Of IReadOnlyList(Of ClFieldEnrichmentBatchItemDtoOut))
 
     End Interface
 

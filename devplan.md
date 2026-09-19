@@ -322,56 +322,59 @@ Aucune table de suivi : prod et dev ont divergé en sens inverse. ⇒ Table de s
 - **Alias de compatibilité** (`IsAck`, champs historiques du détail, `SelectedDriver` jamais nul,
   champs typés des lieux) — retrait **sur confirmation du front uniquement**.
 
-## Itération 13 — Le dossier terrain en lot *[ex-B5, E3]* 🆕 *engagée le 19/09 à la demande de la facturation*
+## Itération 13 — Le dossier terrain en lot *[ex-B5, E3]* 🟡 *codée le 19/09 — reste à publier*
 
 | | |
 |---|---|
 | **Nature** | Performance — **Vector freine l'acquisition de la facturation** |
-| **Effort** | Une à deux sessions |
-| **Bloqué par** | **Rien** — une décision de forme, à prendre en codant |
+| **Effort** | Fait — reste la publication, puis la mesure chez la facturation |
+| **Bloqué par** | **La publication** |
 
 **Mesuré par BillingGateway le 19/09**, recoupé dans le journal de Vector : Vector plafonne vers **40
-appels par seconde**. Passer de 1 à 8 appels simultanés n'a multiplié son débit que par 2,4 — chaque
-appel monte à ~180 ms. Vector pèse **12,8 s sur les 18,3 s** d'acquisition d'une journée. La facturation
-reste à 8 appels simultanés pour ne pas charger une base qui sert aussi le terrain. *(La mesure de
-14,7 s pour 284 missions, citée jusqu'ici, date d'avant l'ajout des signatures à sa boucle.)*
+appels par seconde** ; un paquet prend **225 ms en médiane** côté serveur (p90 428 ms), une signature
+45 ms. Vector pèse **12,8 s sur les 18,3 s** d'acquisition d'une journée.
 
-**Ce que coûte un paquet aujourd'hui** (`FieldDataReader.GetAsync`, relevé le 19/09) : **2 appels HTTP à
-Orders** (mission, puis commande pour le bénéficiaire) et **6 lectures en base**, mission par mission.
+**Où partait le temps** : **2 appels à Orders par mission** (la mission, la commande — ~150 à 170 ms
+chacun, mesurés depuis le poste de dev), et **6 lectures en base**, dont deux qui sortaient des binaires
+pour rien — l'image de signature pour sa date, le contenu des documents pour leurs métadonnées.
 
-1. **Gain immédiat, indépendant du lot** : `_signature.Fetch(missionId)?.DateTime` charge **l'image
-   entière** (~42 Ko) pour n'en lire que la date. Même défaut que celui corrigé sur la carte mutuelle le
-   26/08 : une projection des seules métadonnées.
-2. **La lecture groupée** — une requête `IN` par silo au lieu de six par mission. **Forme convenue
-   avec la facturation le 19/09** : une **liste d'identifiants** de missions (`POST`, plafonnée, sur le
-   modèle de `mutuelle-card/presence`) — elle les tient déjà de `for-export`, et une période aurait
-   obligé Vector à demander la journée à Orders. **Ses deux exigences fermes** : retrouver chaque
-   paquet **par son `MissionId`**, et distinguer **« inconnu de Vector »** (son 404 actuel, qui produit
-   une note à l'écran) de **« en erreur »**. Le plafond est à fixer ici et à lui communiquer ; elle
-   découpe de son côté. Reste l'aller-retour vers Orders pour la commande et le bénéficiaire : à
-   grouper s'il existe une lecture groupée côté Orders, à vérifier avant de coder.
-3. **Même politique que les routes fermées** à l'itération 1 : la facturation ou l'app, avec jeton.
+**Codé** — `POST api/missions/field-data`, corps `{ "MissionIds": [...] }`, **200 missions au plus** :
+- Réponse : une entrée par mission demandée, dans l'ordre, dédoublonnée —
+  `{ MissionId, Status, Data, Error }` ; `Status` vaut **`Found`** (paquet dans `Data`, identique à la
+  route unitaire), **`NotFound`** (l'ancien 404) ou **`Error`** (lecture Orders impossible pour cette
+  mission, à retenter). Un échec n'emporte pas le lot. Au-delà de 200 : 400 avec le maximum.
+- **Base Vector** : `IFieldDataQueryService` lit **chaque silo en une requête** pour tout le lot, **sans
+  aucun binaire**. La route unitaire passe par le même chemin : elle cesse aussi de charger l'image de
+  signature et le contenu des documents.
+- **Orders** : chaque **commande n'est lue qu'une fois** (l'aller et le retour la partagent) ; les appels
+  partent en parallèle, **8 au plus** — la charge que la facturation s'imposait déjà.
+- Même politique que les routes fermées à l'itération 1 : la facturation ou l'app, avec jeton.
+- 9 tests (lot : statuts, ordre, commande lue une fois, silos répartis, dédoublonnage, lot vide ;
+  unité : panne d'Orders toujours en 500) ; routes vérifiées au démarrage de l'API.
 
-**Ce que la facturation lit dans le paquet** *(confirmé le 19/09)* : `Timeline` et `Signature`
-(`Exists`, `ImageUrl`, date). `Attributes`, `null` depuis le 13/09, est sans effet chez elle — son code
-le tolère ; le lot n'a pas à le porter.
+⚠️ **Ce qui reste par mission : un appel à Orders pour la mission.** Orders n'a pas de lecture par liste
+d'identifiants (relevé le 19/09). Le prochain levier est chez lui — une lecture groupée « mission →
+commande → bénéficiaire » ramènerait le lot à un appel.
 
-**Fin** : la journée de la facturation s'acquiert en quelques appels, et sa part Vector est remesurée.
+**Fin** : la facturation bascule sur le lot, et remesure sa part Vector.
 
-## Itération 14 — Les images de signature en lot *[ex-B5, suite]* 🆕
+## Itération 14 — Les images de signature en lot *[ex-B5, suite]* 🟡 *codée le 19/09 — reste à publier*
 
 | | |
 |---|---|
 | **Nature** | Performance — l'autre moitié de la demande, que B5 ne couvrait pas |
-| **Effort** | Une session |
-| **Bloqué par** | **L'itération 13** — même forme d'appel, à réutiliser |
+| **Effort** | Fait — reste la publication |
+| **Bloqué par** | **La publication** |
 
-**144 à 217 signatures par journée, ~42 Ko chacune, 6 à 9 Mo** — une requête par mission aujourd'hui.
-La règle D8 ne bouge pas : les octets restent chez Vector, la facturation les tire. Seule change la
-granularité : **une liste d'identifiants, paginée** (de l'ordre de 50 images par réponse), pour ne pas
-fabriquer une réponse de 9 Mo. **Format convenu le 19/09 : JSON, image en base64** — la facturation la
-stocke déjà ainsi (colonne `C61`) ; +33 % sur le fil, accepté. Mêmes exigences qu'à l'itération 13 :
-chaque image retrouvée par son `MissionId`, « sans signature » distinct de « en erreur ».
+**144 à 217 signatures par journée, ~42 Ko chacune, 6 à 9 Mo.** La règle D8 ne bouge pas : les octets
+restent chez Vector.
+
+**Codé** — `POST api/missions/signatures`, corps `{ "MissionIds": [...] }`, **50 au plus** (~2 Mo par
+réponse ; la facturation découpe) : une entrée par mission, `{ MissionId, Status, SignedAt, Data }`,
+`Status` **`Found`** ou **`NotFound`** (mission non signée). `Data` est **la valeur exacte** de
+`GET api/Signature/{id}` — la facturation la stocke telle quelle (base64, colonne `C61`). Une seule
+requête en base : une panne fait échouer l'appel entier, il n'y a pas d'échec partiel. Route absolue :
+sous `api/Signature`, `batch` aurait concurrencé `POST {gJobId}`. 5 tests, plafonds compris.
 
 ## Itération 15 — Le kilométrage dans le dossier transmis *[ex-E1, MOB-10]*
 

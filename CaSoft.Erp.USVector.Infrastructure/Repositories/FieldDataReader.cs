@@ -1,51 +1,110 @@
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Infrastructure.ErpApi;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CaSoft.Erp.USVector.Infrastructure.Repositories;
 
 /// <summary>
 /// TRF-6 — Assemble le paquet d'enrichissement terrain consolidé (<see cref="ClFieldEnrichmentDtoOut"/>)
-/// à partir des silos BD Mobile + des données de référence ERP (mission → commande → bénéficiaire,
-/// lues via <see cref="IErpReadApiClient"/>). Tiré par Certification au transfert en facturation.
+/// à partir des silos de la base Vector et des données de référence d'Orders (mission → commande →
+/// bénéficiaire, lues via <see cref="IErpReadApiClient"/>). Tiré par la facturation.
 /// </summary>
+/// <remarks>
+/// <para>
+/// <b>Un seul chemin pour l'unité et le lot (B5, 19/09).</b> La facturation tirait un paquet par
+/// mission ; Vector plafonnait vers 40 appels/s et pesait 12,8 s sur les 18,3 s de son acquisition
+/// d'une journée. Le lot lit chaque silo en une requête (<see cref="IFieldDataQueryService"/>) et ne
+/// demande chaque commande qu'une fois — l'aller et le retour la partagent.
+/// </para>
+/// <para>
+/// <b>Ce qui reste par mission : l'appel à Orders</b> pour la mission (existence, commande). Orders
+/// n'a pas de lecture par liste d'identifiants ; ces appels partent en parallèle, bornés à
+/// <see cref="OrdersConcurrency"/> — la même charge que la facturation s'imposait déjà.
+/// </para>
+/// <para>
+/// <b>Un échec n'emporte pas le lot.</b> Une mission dont la lecture échoue chez Orders sort en
+/// <c>Error</c>, les autres en <c>Found</c> ou <c>NotFound</c>.
+/// </para>
+/// </remarks>
 public sealed class FieldDataReader : IFieldDataReader
 {
-    private readonly IErpReadApiClient _erp;
-    private readonly IJobTimeRepository _jobTime;
-    private readonly ISignatureRepository _signature;
-    private readonly IMutuelleCardRepository _mutuelle;
-    private readonly IDocumentRepository _documents;
-    private readonly IAnomalyRepository _anomalies;
+    /// <summary>Appels simultanés vers Orders pour un lot.</summary>
+    public const int OrdersConcurrency = 8;
 
-    public FieldDataReader(
-        IErpReadApiClient erp,
-        IJobTimeRepository jobTime,
-        ISignatureRepository signature,
-        IMutuelleCardRepository mutuelle,
-        IDocumentRepository documents,
-        IAnomalyRepository anomalies)
+    private readonly IErpReadApiClient _erp;
+    private readonly IFieldDataQueryService _silos;
+    private readonly ILogger _logger;
+
+    public FieldDataReader(IErpReadApiClient erp, IFieldDataQueryService silos,
+        ILogger<FieldDataReader>? logger = null)
     {
         _erp = erp;
-        _jobTime = jobTime;
-        _signature = signature;
-        _mutuelle = mutuelle;
-        _documents = documents;
-        _anomalies = anomalies;
+        _silos = silos;
+        _logger = (ILogger?)logger ?? NullLogger.Instance;
     }
 
     public async Task<ClFieldEnrichmentDtoOut> GetAsync(Guid missionId, CancellationToken ct)
     {
-        var full = await _erp.GetMissionFullAsync(missionId, ct);
-        if (full is null) return null!;   // mission introuvable côté ERP
+        var item = (await GetManyAsync(new[] { missionId }, ct))[0];
 
-        // Bénéficiaire via la commande parente (pour rattacher la carte mutuelle).
-        Guid? beneficiaryId = null;
-        var order = await _erp.GetOrderAsync(full.OrderId, ct);
-        if (order?.Order is not null) beneficiaryId = order.Order.BeneficiaryId;
+        return item.Status switch
+        {
+            ClFieldEnrichmentBatchItemDtoOut.StatusFound => item.Data,
+            ClFieldEnrichmentBatchItemDtoOut.StatusNotFound => null!,   // mission inconnue d'Orders → 404
+            // À l'unité, une panne reste une panne (500), comme avant le lot.
+            _ => throw new InvalidOperationException(item.Error)
+        };
+    }
 
-        // Timeline opérationnelle (BD Mobile).
-        var time = _jobTime.GetJobTimeData(missionId);
+    public async Task<IReadOnlyList<ClFieldEnrichmentBatchItemDtoOut>> GetManyAsync(
+        IReadOnlyCollection<Guid> missionIds, CancellationToken ct)
+    {
+        var ids = (missionIds ?? Array.Empty<Guid>()).Where(id => id != Guid.Empty).Distinct().ToList();
+        if (ids.Count == 0) return Array.Empty<ClFieldEnrichmentBatchItemDtoOut>();
+
+        // 1. Orders : la mission (existence, commande), puis chaque commande une seule fois.
+        var missions = await ForEachBoundedAsync(ids, id => _erp.GetMissionFullAsync(id, ct), ct);
+
+        var orderIds = missions.Values
+            .Where(r => r.Error is null && r.Value is not null)
+            .Select(r => r.Value!.OrderId)
+            .Distinct()
+            .ToList();
+        var orders = await ForEachBoundedAsync(orderIds, id => _erp.GetOrderAsync(id, ct), ct);
+
+        // 2. Base Vector : une requête par silo pour tout le lot.
+        var found = ids.Where(id => missions[id].Error is null && missions[id].Value is not null).ToList();
+        var beneficiaries = found
+            .Select(id => orders.TryGetValue(missions[id].Value!.OrderId, out var o) ? o.Value?.Order?.BeneficiaryId : null)
+            .Where(b => b.HasValue)
+            .Select(b => b!.Value)
+            .Distinct()
+            .ToList();
+        var silos = _silos.ReadSilos(found, beneficiaries);
+
+        // 3. Une entrée par mission demandée, dans l'ordre de la demande.
+        return ids.Select(id =>
+        {
+            var mission = missions[id];
+            if (mission.Error is not null)
+                return ClFieldEnrichmentBatchItemDtoOut.Failed(id, $"Lecture de la mission chez Orders impossible : {mission.Error.Message}");
+            if (mission.Value is null)
+                return ClFieldEnrichmentBatchItemDtoOut.NotFound(id);
+
+            var order = orders[mission.Value.OrderId];
+            if (order.Error is not null)
+                return ClFieldEnrichmentBatchItemDtoOut.Failed(id, $"Lecture de la commande chez Orders impossible : {order.Error.Message}");
+
+            return ClFieldEnrichmentBatchItemDtoOut.Found(
+                Assemble(id, mission.Value.OrderId, order.Value?.Order?.BeneficiaryId, silos));
+        }).ToList();
+    }
+
+    private static ClFieldEnrichmentDtoOut Assemble(Guid missionId, Guid orderId, Guid? beneficiaryId, ClFieldSilos silos)
+    {
+        silos.Timelines.TryGetValue(missionId, out var time);
         var timeline = new ClFieldTimelineDto
         {
             AckAt = time?.AckTime,
@@ -55,27 +114,22 @@ public sealed class FieldDataReader : IFieldDataReader
             TerminateAt = time?.TerminateTime
         };
 
-        // Signature (présence + horodatage ; binaire servi par api/Signature/{id}).
-        var sigExists = _signature.Exists(missionId);
-        DateTime? signedAt = sigExists ? _signature.Fetch(missionId)?.DateTime : null;
+        // Signature : présence + horodatage ; les octets sont servis par api/Signature/{id}.
+        DateTime? signedAt = silos.SignedAt.TryGetValue(missionId, out var at) ? at : null;
         var signature = new ClFieldSignatureDto
         {
-            Exists = sigExists,
+            Exists = signedAt.HasValue,
             SignedAt = signedAt,
-            ImageUrl = sigExists ? $"api/Signature/{missionId}" : null
+            ImageUrl = signedAt.HasValue ? $"api/Signature/{missionId}" : null
         };
 
-        // Carte mutuelle courante du bénéficiaire.
+        // Carte mutuelle courante du bénéficiaire (métadonnées : l'image est annoncée par son URL).
         ClMutuelleCardDtoOut? mutuelle = null;
-        if (beneficiaryId.HasValue)
-            // Métadonnées seules : le paquet annonce l'image par son URL, il ne la transporte pas
-            // (D8, l'aval tire les octets). Lire le binaire ici l'aurait sorti de la base une fois
-            // par mission, pour rien.
-            mutuelle = _mutuelle.GetCurrentMetadata(beneficiaryId.Value)?.ToDtoOut();
+        if (beneficiaryId.HasValue && silos.CurrentMutuelles.TryGetValue(beneficiaryId.Value, out var card))
+            mutuelle = card.ToDtoOut();
 
-        // Documents + anomalies (mission-scoped).
-        var documents = _documents.ListByMission(missionId).Select(d => d.ToDtoOut()).ToList();
-        var anomalies = _anomalies.ListByMission(missionId).Select(a => a.ToDtoOut()).ToList();
+        var documents = silos.Documents[missionId].Select(d => d.ToDtoOut()).ToList();
+        var anomalies = silos.Anomalies[missionId].Select(a => a.ToDtoOut()).ToList();
 
         // Watermark global = max des horodatages présents.
         var stamps = new List<DateTime?>
@@ -86,24 +140,60 @@ public sealed class FieldDataReader : IFieldDataReader
         stamps.AddRange(documents.Select(d => (DateTime?)d.CapturedAt));
         stamps.AddRange(anomalies.Select(a => (DateTime?)a.ReportedAt));
         var present = stamps.Where(s => s.HasValue).Select(s => s!.Value).ToList();
-        DateTime? updatedAt = present.Count == 0 ? null : present.Max();
 
         return new ClFieldEnrichmentDtoOut
         {
             MissionId = missionId,
-            OrderId = full.OrderId,
+            OrderId = orderId,
             SchemaVersion = 1,
-            UpdatedAt = updatedAt,
+            UpdatedAt = present.Count == 0 ? null : present.Max(),
             Timeline = timeline,
             Signature = signature,
             // OC-8 — toujours null : le magasin d'attributs Vector est retiré (2026-09-13). Les valeurs
-            // en vigueur sont chez Order, où la facturation les lit ; l'historique antérieur au
-            // 2026-08-25 n'est plus demandé. Propriété conservée : la facturation tolère le null.
+            // en vigueur sont chez Order, où la facturation les lit ; elle tolère ce null.
             Attributes = null,
             Mutuelle = mutuelle,
             Kilometers = null,   // crew/véhicule-scoped (cf. TRF-9), surfacé séparément
             Documents = documents,
             Anomalies = anomalies
         };
+    }
+
+    /// <summary>Résultat d'une lecture chez Orders : la valeur, ou l'échec qui l'a empêchée.</summary>
+    private sealed record Lecture<T>(T? Value, Exception? Error);
+
+    /// <summary>
+    /// Lit chaque clé chez Orders, <see cref="OrdersConcurrency"/> à la fois. Un échec est capturé
+    /// pour sa clé, journalisé, et n'interrompt pas les autres ; une annulation, elle, remonte.
+    /// </summary>
+    private async Task<Dictionary<Guid, Lecture<T>>> ForEachBoundedAsync<T>(
+        IReadOnlyCollection<Guid> keys, Func<Guid, Task<T?>> read, CancellationToken ct) where T : class
+    {
+        var results = new Dictionary<Guid, Lecture<T>>();
+        if (keys.Count == 0) return results;
+
+        using var gate = new SemaphoreSlim(OrdersConcurrency);
+        var tasks = keys.Select(async key =>
+        {
+            await gate.WaitAsync(ct);
+            try
+            {
+                return (key, new Lecture<T>(await read(key), null));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                _logger.LogWarning(ex, "field-data en lot : lecture Orders impossible pour {Key}.", key);
+                return (key, new Lecture<T>(null, ex));
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }).ToList();
+
+        foreach (var (key, lecture) in await Task.WhenAll(tasks))
+            results[key] = lecture;
+
+        return results;
     }
 }
