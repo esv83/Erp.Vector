@@ -182,6 +182,8 @@ Aucune table de suivi : prod et dev ont divergé en sens inverse. ⇒ Table de s
 - `AddressApi:BaseUrl` : configurée, lue par aucun code — la retirer des `appsettings` *(19/09)*.
 - `ClAutorizationCommand.AutorizeJob` rend **toujours `true`** : reste de l'ancienne session mobile,
   appelé par `GetSignature` *(19/09)* — le retirer.
+- `ClReliableValue` et `ClValueInfo` (socle, `0 - Outils`) n'ont plus d'usage depuis le retrait de la fin
+  de service *(19/09)*.
 - Nommage des DTO en `…DtoIn` / `…DtoOut` — aucun impact JSON.
 - Pont synchrone/asynchrone (`.GetAwaiter().GetResult()`) sur liste, détail, identité, conducteur.
 - `IResultUseCase` est synchrone : les cas d'usage asynchrones n'implémentent aucune interface.
@@ -211,16 +213,30 @@ Extraction **asynchrone** par un modèle de vision, quatre champs proposés avec
 **validation humaine** — jamais d'écriture aveugle. À cadrer : où tourne l'appel (DMZ ou LAN), le coût
 par carte. Rappel : même validés, ces champs **n'alimentent pas** la colonne mutuelle de facturation.
 
-## Itération 11 — La fin de service *[ex-F3, MOB-12]*
+## Itération 11 — La fin de service *[ex-F3, MOB-12]* ✅ *routes retirées le 19/09 — reste à publier*
 
 | | |
 |---|---|
-| **Nature** | Code hérité qui vise la mauvaise cible |
-| **Effort** | Un recadrage, puis une ou deux sessions |
-| **Bloqué par** | **Le recadrage** |
+| **Nature** | Code hérité, cassé, et contraire à une règle d'Orders |
+| **Effort** | Fait — option « retirer » retenue le 19/09 |
+| **Bloqué par** | **La publication** |
 
-Le contrôleur vise une session mobile qui n'est plus la source d'authentification : la clôture doit
-viser **la vacation côté Orders** — dont la règle est que **le régulateur** connaît l'heure de fin.
+**Recadrage fait avant de coder** :
+- **Contraire à la règle d'Orders** du 13/09 : « Qui connaît l'heure de fin ? Le régulateur, jamais
+  l'ambulancier » — le laisser déclarer sa propre fin ouvre une fraude que rien ne peut contredire.
+- **Cassé** : le contrôleur n'avait pas de préfixe de route (il répondait à `/{CrewId}`), le paramètre
+  n'était pas lu (`intCrewId` toujours vide) ; le `POST` marquait la date « FromRegulation » et
+  appelait `ICrewRepository.Update` — qui désigne le **conducteur** chez Orders.
+- **Inutilisé** : aucun appel en production du 15 au 19/09.
+
+**Retiré** : `EndOfServiceController`, les quatre fichiers `UseCases/EndOfService`, et la « fin de
+service fiabilisée » du domaine (`ClCrew.ServiceEndDateR`, `ClReliableEndOfService`,
+`ClReliableEndOfServiceValue`), qui ne servait qu'à eux. `ICrewCache` reste (kilométrage). Note au dev
+web complétée ([`note_web_alexandre_routes_retirees.md`](note_web_alexandre_routes_retirees.md)).
+191 tests verts.
+
+**Écarté, à rouvrir côté Orders s'il le faut** : laisser l'ambulancier **signaler** une heure fausse,
+sans la déclarer — piste qu'Orders range dans ses fonctionnalités envisagées.
 
 ## Itération 12 — Positions et statuts des véhicules *[ex-F3, MOB-16]*
 

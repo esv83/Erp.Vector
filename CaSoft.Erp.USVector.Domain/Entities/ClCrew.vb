@@ -5,8 +5,6 @@ Public Class ClCrew
 
     Public Sub New(gCrewId As Guid, lstEmployee As List(Of ClEmployee), dteServiceStartDate As DateTime, objVehicle As ClVehicle, Optional dteServiceEndDate As DateTime? = Nothing)
 
-        _serviceEndDateR = New ClReliableEndOfService
-
         _crewId = gCrewId
         _employeeList = lstEmployee
         _serviceStart = dteServiceStartDate
@@ -35,13 +33,6 @@ Public Class ClCrew
     Public ReadOnly Property ServiceEnd As DateTime?
         Get
             Return _serviceEnd
-        End Get
-    End Property
-
-    Private _serviceEndDateR As ClReliableEndOfService
-    Public ReadOnly Property ServiceEndDateR As ClReliableEndOfService
-        Get
-            Return _serviceEndDateR
         End Get
     End Property
 

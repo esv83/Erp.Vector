@@ -33,3 +33,21 @@ anomalies, carte mutuelle.
 
 - [ ] Retirer tout appel à `api/Contact`, `api/MecanicLog`, `analyze`, `api/ReferenceData`
 - [ ] Retirer l'écran de main courante mécanicien s'il existe
+
+---
+
+## Ajout du 2026-09-19 — la fin de service
+
+| Route | Usage prévu |
+|---|---|
+| `GET /{crewId}` · `POST /{crewId}` (contrôleur `EndOfService`, sans préfixe `api/`) | lire ou déclarer la fin de service d'un équipage |
+
+**Jamais fonctionnelles** : sans préfixe de route, elles répondaient à la racine, et l'identifiant
+d'équipage n'était pas lu. **Aucun appel** dans les journaux de production du 15 au 19/09.
+
+**Pourquoi elles ne reviendront pas sous cette forme** : la fin de service se lit sur la **vacation**,
+chez la régulation, et **seul le régulateur la décide** (règle d'Orders du 13/09 : l'ambulancier qui
+déclarerait sa propre fin ouvrirait une fraude que rien ne peut contredire). L'app affiche déjà
+« en cours » ou « clôturé », avec l'heure de fin, dans le sélecteur d'équipage.
+
+- [ ] Retirer tout appel à la fin de service, et le bouton ou l'écran qui la déclarait s'il existe
