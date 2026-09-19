@@ -342,16 +342,19 @@ Orders** (mission, puis commande pour le bénéficiaire) et **6 lectures en base
 1. **Gain immédiat, indépendant du lot** : `_signature.Fetch(missionId)?.DateTime` charge **l'image
    entière** (~42 Ko) pour n'en lire que la date. Même défaut que celui corrigé sur la carte mutuelle le
    26/08 : une projection des seules métadonnées.
-2. **La lecture groupée** — une requête `IN` par silo au lieu de six par mission. **La forme reste à
-   trancher** : la facturation demande « par période, à l'image de `for-export` » ; mais Vector ne
-   connaît pas les missions d'une journée sans le demander à Orders. **Une liste d'identifiants**
-   (`POST`, plafonnée, comme `mutuelle-card/presence`) épargne cet appel — la facturation les tient déjà
-   de `for-export`. Reste l'aller-retour vers Orders pour la commande et le bénéficiaire : à grouper s'il
-   existe une lecture groupée côté Orders, à vérifier avant de coder.
+2. **La lecture groupée** — une requête `IN` par silo au lieu de six par mission. **Forme convenue
+   avec la facturation le 19/09** : une **liste d'identifiants** de missions (`POST`, plafonnée, sur le
+   modèle de `mutuelle-card/presence`) — elle les tient déjà de `for-export`, et une période aurait
+   obligé Vector à demander la journée à Orders. **Ses deux exigences fermes** : retrouver chaque
+   paquet **par son `MissionId`**, et distinguer **« inconnu de Vector »** (son 404 actuel, qui produit
+   une note à l'écran) de **« en erreur »**. Le plafond est à fixer ici et à lui communiquer ; elle
+   découpe de son côté. Reste l'aller-retour vers Orders pour la commande et le bénéficiaire : à
+   grouper s'il existe une lecture groupée côté Orders, à vérifier avant de coder.
 3. **Même politique que les routes fermées** à l'itération 1 : la facturation ou l'app, avec jeton.
 
-⚠️ **À dire à la facturation** : elle dit lire `Attributes` — Vector le sert **toujours `null`** depuis le
-13/09 (OC-8) ; les valeurs sont chez Orders, où elle les lit déjà.
+**Ce que la facturation lit dans le paquet** *(confirmé le 19/09)* : `Timeline` et `Signature`
+(`Exists`, `ImageUrl`, date). `Attributes`, `null` depuis le 13/09, est sans effet chez elle — son code
+le tolère ; le lot n'a pas à le porter.
 
 **Fin** : la journée de la facturation s'acquiert en quelques appels, et sa part Vector est remesurée.
 
@@ -366,8 +369,9 @@ Orders** (mission, puis commande pour le bénéficiaire) et **6 lectures en base
 **144 à 217 signatures par journée, ~42 Ko chacune, 6 à 9 Mo** — une requête par mission aujourd'hui.
 La règle D8 ne bouge pas : les octets restent chez Vector, la facturation les tire. Seule change la
 granularité : **une liste d'identifiants, paginée** (de l'ordre de 50 images par réponse), pour ne pas
-fabriquer une réponse de 9 Mo. Format à trancher en codant : binaire encodé dans du JSON (+33 %), ou
-réponse en plusieurs parties.
+fabriquer une réponse de 9 Mo. **Format convenu le 19/09 : JSON, image en base64** — la facturation la
+stocke déjà ainsi (colonne `C61`) ; +33 % sur le fil, accepté. Mêmes exigences qu'à l'itération 13 :
+chaque image retrouvée par son `MissionId`, « sans signature » distinct de « en erreur ».
 
 ## Itération 15 — Le kilométrage dans le dossier transmis *[ex-E1, MOB-10]*
 
