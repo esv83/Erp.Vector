@@ -76,14 +76,14 @@ Demandé au dev web le 26/08. **Fin** : les deux constatés sur l'app.
 
 | Réf | Ce qui manque | Effet visible côté terrain | État |
 |---|---|---|---|
-| **B2** | **Repli sur le snapshot `ORD_ORDER`** dans le chemin de lecture d'Orders — plan code-only : [`plan_correctif_vector_fallback_snapshot.md`](plan_correctif_vector_fallback_snapshot.md) | **~3 883 étapes de mission s'affichent vides** ; résiduel attendu ~93 | ⏳ à coder dans `Erp.Order` |
+| **B2** | ~~**Repli sur le snapshot `ORD_ORDER`**~~ | — | ✅ **Livré chez Orders le 23/07/2026** *(`f0cedc1`, « repli snapshot ORD_ORDER dans /missions/{id}/full »)* — **vérifié le 19/09**. Ce plan l'attendait depuis **huit semaines** : à reconstater côté terrain, les ~3 883 étapes vides devraient avoir disparu |
 | **B4** | `Billed` n'a **aucun écrivain** | palier théorique | ⛔ décision (E4) |
 | **B5** | **`field-data` par période** (à l'image de `for-export`) | 14,7 s pour 284 missions, sur un clic | ⏳ non engagé côté demandeur |
 | **B6** | **Tests xUnit du transfert côté Orders** : dérivation `MIS_STATUS`, pose de `Transferable`, garde-fous de `MarkTransferred` / `MarkBilled` | aucun filet aujourd'hui | ⏳ |
 | **B7** | **Relance de clôture** des missions terminées non clôturées | dossiers qui n'arrivent jamais en facturation | ⏳ piste : tableau de bord `?status=Done` |
 | **B8** | **Adresses « non structurées »** (`DET-3`) côté Orders / Address.Api | repli mono-ligne, WARNING journalisé | ⏳ mesurer l'ampleur d'abord |
 | **B9** | **Applicabilité agence/mode non configurée** : `ORD_ORDER_CONTEXT_AGENCE` et `_MODE` vides → les 7 types proposés partout (mesuré le 2026-08-25) | « Secours sur piste » proposé sur des missions sans rapport | ⛔ décision métier : la **matrice**. ⚠️ la première liaison posée sur un type le restreint aux seules valeurs liées. Aucun écran ne gère ces liaisons |
-| **B10** | **Attributs au catalogue Order rattachés à rien** : `COMMENTS`, `PHONES`, `MAILS`, `PMT`, `SMUR_DE`, `COMMUNE`, `NOM_CENTRALE` n'atteignent aucune mission (30 formulaires, 2026-08-25). `NOM_ASSISTANCE` déclaré `list`, servi `text` | commentaire libre et ajout téléphone/e-mail perdus sur **toutes** les missions ; `PMT` disparu | ⛔ paramétrage, famille de B9. `REFERENCE` et `URGENT` sans équivalent, à arbitrer |
+| **B10** | ~~Attributs rattachés à rien~~ — **relevé dans la base de production le 19/09** : `COMMENTS`, `PHONES` et `MAILS` sont **globaux et actifs**, donc servis sur **toutes** les missions sans liaison à poser ; `PMT`, `SMUR_DE`, `COMMUNE`, `NOM_CENTRALE` et `NOM_ASSISTANCE` portent **un type lié chacun** | Le commentaire libre et l'ajout téléphone/e-mail **sont revenus** | 🟡 **Presque clos.** Restent **`REFERENCE` et `URGENT`**, absents du catalogue — à arbitrer. ⚠️ *La mesure du 25/08 portait sur 30 formulaires servis ; celle-ci lit le catalogue lui-même. Reconstater côté terrain avant de clore* |
 
 > Contrat détaillé de ce que Vector attend d'Orders : [`endPoint.md`](endPoint.md).
 
@@ -124,8 +124,20 @@ n'accède pas à ses missions.
   pour les quatre routes ci-dessous, qui restent anonymes.
 - **Sortant** — `ServiceAccountTokenHandler` pose un jeton `client_credentials` sur les appels à
   Orders.Api **dès que `OrdersApi:ServiceAccount` est renseigné** ; inerte sinon. Un realm
-  indisponible ne bloque pas l'appel (Orders reste anonyme pour le terrain). Pas de référence à
-  `CaSoft.Identity.Client` : il exige le socle 2.8.0.
+  indisponible ne bloque pas l'appel (Orders reste anonyme pour le terrain).
+
+> 🔴 **CORRECTION DU 13/09/2026 — la raison de ne pas prendre le paquet était fausse.** Ce plan
+> affirmait : *« Pas de référence à `CaSoft.Identity.Client` : il exige le socle 2.8.0 »*. Son nuspec
+> ne dépend que de **`CaSoft.Framework.Security` 2.8.0**, pas du socle — et Orders en fait la preuve
+> **en production** : socle `2.5.0`, client d'identité référencé, build propre. La demi-journée
+> passée à réécrire ce gestionnaire l'a été pour contourner un obstacle qui n'existait pas.
+>
+> ⚖️ **Ce code a été promu dans le paquet** *(`CaSoft.Identity.Client` **1.2.0**, 13/09)* :
+> `ClServiceAccountTokenHandler` + `AddCaSoftServiceAccountToken`, avec les quatre règles figées par
+> des tests — inerte sans compte, un realm muet ne bloque pas l'appel, un en-tête déjà posé n'est pas
+> écrasé, et un 401 **sur notre propre jeton** l'oublie. ⇒ *Vector peut retirer son implémentation
+> locale et prendre celle du paquet : même comportement, une source de vérité au lieu de cinq. Ce
+> n'est pas urgent — ce qui l'était, c'était d'empêcher les quatre autres modules de la réécrire.*
 
 **Reste, dans l'ordre — hors code Vector jusqu'à l'étape 4 :**
 1. **Keycloak** — guide : [`docs/deploiement/keycloak-compte-service-vector.md`](docs/deploiement/keycloak-compte-service-vector.md).
@@ -292,9 +304,14 @@ transfert est `027` dans l'historique et `034` dans le dépôt.
 
 - **`README.md`** : accès ERP **in-process**, sous-app `/mobile`, « MOB-4 reporté » — faux (vérifié le 2026-09-13).
 - **`docs/deploiement/configuration-keycloak-iis.md`** : « `Authority`/`Audience` codés en dur » — résolu par KC-1.
-- **`BUG_DISPLAY.MD` §6** : DET-1 présenté comme bloquant — livré. Restent trois vérifications
-  d'exploitation : mission **retour**, lieu **non référencé**, **fraîcheur des coordonnées** (pas de
-  re-géocodage sur édition d'adresse : **à traiter avant tout usage navigation**).
+- **`BUG_DISPLAY.MD` §6** : DET-1 présenté comme bloquant — livré. Restent **deux** vérifications
+  d'exploitation : mission **retour** et lieu **non référencé**.
+  ✅ **La fraîcheur des coordonnées n'en est plus une** *(vérifié chez Orders le 19/09)* : depuis le
+  06/09, **modifier une adresse de bénéficiaire REMPLACE son numéro canonique** — jamais ne le
+  complète, y compris par rien : un texte modifié dont le module Adresse ne rend aucun numéro voit le
+  sien **effacé**, plutôt que de garder celui d'une autre adresse. Et si le texte est **inchangé**,
+  rien n'est redemandé : corriger un libellé n'exige pas que le module Adresse soit joignable. ⇒ *La
+  position se lit par le numéro ; elle suit donc l'édition sans re-géocodage à déclencher.*
 - **`endPoint.md` §5** : `engagedOnly` encore décrit comme une demande — honoré par Orders.
 - **`refactor_result_pattern.md`** : plan terminé, à marquer comme tel.
 - **Deux liens vers `Erp.Order` sont cassés** (constaté le 2026-09-13) : `feature_order_context_devplan.md`
