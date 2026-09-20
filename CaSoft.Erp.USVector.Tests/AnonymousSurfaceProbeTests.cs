@@ -52,6 +52,14 @@ public class AnonymousSurfaceProbeTests
     /// `WhoAmI` doit pouvoir répondre « pas de jeton » : c'est son rôle, et le diagnostic est
     /// appelé par les développeurs. Les mesurer noierait le signal sous notre propre trafic.
     /// </summary>
+    /// <summary>
+    /// La version est demandée après chaque publication — par nous. La mesurer noierait le signal.
+    /// </summary>
+    [Fact]
+    public void La_version_n_est_pas_mesuree()
+        => AnonymousSurfaceProbe.ActionMesuree(Point<VersionController>(nameof(VersionController.Get)))
+            .Should().BeNull();
+
     [Fact]
     public void Les_ouvertures_de_diagnostic_ne_sont_pas_mesurees()
     {

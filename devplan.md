@@ -149,17 +149,38 @@ Les étapes sont en UTC **sans le déclarer** ; l'heure de signature est écrite
 (`SignatureRepository.cs:34`, `:43`). Même motif à examiner dans `ClMarkMissionSeenUseCase`,
 `ClSetDriverUseCase`. **Fin** : tout en UTC, fuseau **déclaré** dans le contrat du paquet.
 
-## Itération 6 — Savoir ce qui tourne *[ex-G8, partie 2]*
+## Itération 6 — Savoir ce qui tourne *[ex-G8, partie 2]* ✅ *codée le 20/09 — reste à publier*
 
 | | |
 |---|---|
 | **Nature** | Traçabilité d'exploitation |
-| **Effort** | Une session |
-| **Bloqué par** | Rien — la garde de publication est en service depuis le 19/09 |
+| **Effort** | Fait |
+| **Bloqué par** | **La publication** |
 
-Le `.pdb` donne le commit ; rien ne dit **la base** à laquelle l'API parle, ni les drapeaux en vigueur.
-Un correctif a déjà été joué sur la mauvaise base Orders sans erreur *(25/08)*. ⇒ Une route réservée
-qui expose commit, environnement, **base résolue** (sans identifiants) et drapeaux.
+Le `.pdb` donne le commit du build, **jamais l'état de l'arbre** ; rien ne disait **la base** à
+laquelle l'API parle. Un correctif a déjà été joué sur la mauvaise base Orders sans une erreur
+*(25/08)*, et la production a annoncé un commit qui ne contenait pas le code servi *(13/09)*.
+
+**Codé** :
+- **Au build** : le csproj relève `git rev-parse HEAD` et `git status --porcelain`, et injecte le
+  **commit** (`SourceRevisionId`) et l'**état de l'arbre** (`clean` / `modified`) dans l'assemblage.
+  Sans git — archive, serveur — la version reste celle du `.csproj` et l'API annonce `unknown` : elle
+  ne refuse pas de démarrer pour autant.
+- `GET api/version`, **anonyme** : service, version, commit, commit court, **état de l'arbre**, date de
+  build, environnement. Déclarée comme troisième groupe dans `AnonymousSurfaceTests` — une publication
+  doit pouvoir se constater **sans jeton**, et c'est quand quelque chose cloche qu'on n'en a pas sous
+  la main. La sonde ne la mesure pas : ce serait notre propre trafic.
+- `GET api/version/runtime`, **avec jeton** (`ServiceOrMobile`) : la même chose, plus la **base
+  résolue** (serveur et nom, jamais d'identifiants) et les **drapeaux** — Keycloak, azp mobile et de
+  service, validation désactivée, diagnostic, URL d'Orders, et *compte de service posé ou non*, l'état
+  qui manquait le 13/09 quand deux variables du `web.config` mal écrites le laissaient inerte.
+- 12 tests, dont « aucun identifiant ne sort de la chaîne de connexion ». 203 verts.
+
+**Éprouvé sur l'API lancée** : `api/version` rend le `HEAD` du dépôt et `Tree: modified` sur un arbre
+en cours ; `api/version/runtime` rend 401 sans jeton.
+
+**Fin** : après publication, `GET /vector/api/version` dit le commit servi — et `deploy.ps1` pourrait
+s'en servir pour son contrôle d'après copie, à la place du `.pdb`.
 
 ## Itération 7 — Suivre les migrations SQL *[ex-G4]*
 

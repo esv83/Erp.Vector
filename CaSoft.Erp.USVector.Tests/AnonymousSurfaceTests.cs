@@ -67,8 +67,22 @@ public class AnonymousSurfaceTests
         "DiagController.*"                    // 404 hors dev/staging (Diagnostics:Enabled)
     };
 
+    /// <summary>
+    /// G8 — <c>GET api/version</c> : version, commit, état de l'arbre au build, environnement.
+    /// <para>
+    /// <b>Anonyme par nécessité</b> : une publication doit pouvoir se constater sans jeton, et c'est
+    /// quand quelque chose cloche qu'on n'en a pas sous la main. Ce qu'elle divulgue est borné à ce
+    /// qu'un binaire assume de lui-même — pas une donnée métier, pas un réglage. La base et les
+    /// drapeaux vivent sur <c>api/version/runtime</c>, qui exige un jeton.
+    /// </para>
+    /// </summary>
+    private static readonly string[] OuvertureDExploitation =
+    {
+        "VersionController.Get"
+    };
+
     private static IEnumerable<string> SurfaceAttendue
-        => OuverturesPourLesEcransAmont.Concat(OuverturesDeDiagnostic);
+        => OuverturesPourLesEcransAmont.Concat(OuverturesDeDiagnostic).Concat(OuvertureDExploitation);
 
     [Fact]
     public void La_surface_anonyme_est_exactement_celle_qui_est_justifiee()
@@ -83,6 +97,20 @@ public class AnonymousSurfaceTests
     /// qui n'admet que l'app — et la facturation recevrait des 403. Chacune doit porter
     /// <see cref="ClKeycloakCallers.ServiceOrMobilePolicy"/>, et rien d'anonyme.
     /// </summary>
+    /// <summary>
+    /// La version détaillée (base résolue, drapeaux) n'est <b>pas</b> anonyme : elle nomme le serveur
+    /// et la base, qui n'ont rien à faire sur l'internet public.
+    /// </summary>
+    [Fact]
+    public void La_version_detaillee_exige_un_jeton()
+    {
+        var methode = typeof(VersionController).GetMethod(nameof(VersionController.GetRuntime))!;
+
+        methode.GetCustomAttribute<AllowAnonymousAttribute>().Should().BeNull();
+        methode.GetCustomAttributes<AuthorizeAttribute>().Select(a => a.Policy)
+            .Should().Contain(ClKeycloakCallers.ServiceOrMobilePolicy);
+    }
+
     [Fact]
     public void Les_routes_de_la_facturation_exigent_un_jeton_de_service_ou_mobile()
     {

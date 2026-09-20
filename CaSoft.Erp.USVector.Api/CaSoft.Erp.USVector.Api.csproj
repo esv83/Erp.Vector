@@ -10,6 +10,31 @@
     <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
   </PropertyGroup>
 
+  <!-- G8 — « quel commit tourne, et depuis quel arbre ? ». Le .pdb donne le HEAD du build, jamais
+       l'état de l'arbre : une publication depuis un arbre modifié annonce un commit qui ne contient
+       pas le code servi (incident du 13/09). On relève donc les deux AU BUILD, et l'API les sert.
+       Tolérant : sans git (serveur, archive), la version reste celle du .csproj et l'API le dit. -->
+  <Target Name="ReleveGit" BeforeTargets="GetAssemblyVersion;CoreGenerateAssemblyInfo">
+    <Exec Command="git -C &quot;$(MSBuildProjectDirectory)&quot; rev-parse HEAD"
+          ConsoleToMSBuild="true" ContinueOnError="true" StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="VectorCommit" />
+      <Output TaskParameter="ExitCode" PropertyName="VectorGitExitCode" />
+    </Exec>
+    <Exec Command="git -C &quot;$(MSBuildProjectDirectory)&quot; status --porcelain"
+          ConsoleToMSBuild="true" ContinueOnError="true" StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="VectorGitStatus" />
+    </Exec>
+    <PropertyGroup Condition="'$(VectorGitExitCode)' == '0' And '$(VectorCommit)' != ''">
+      <SourceRevisionId>$(VectorCommit.Trim())</SourceRevisionId>
+      <VectorTree Condition="'$(VectorGitStatus)' == ''">clean</VectorTree>
+      <VectorTree Condition="'$(VectorGitStatus)' != ''">modified</VectorTree>
+    </PropertyGroup>
+    <ItemGroup>
+      <AssemblyMetadata Include="VectorTree" Value="$(VectorTree)" Condition="'$(VectorTree)' != ''" />
+      <AssemblyMetadata Include="VectorBuildUtc" Value="$([System.DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))" />
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <!-- Config NLog et appsettings : TOUJOURS copiés à la publication. En PreserveNewest (défaut du
          SDK Web, qui range *.config et *.json en Content), la copie vers le partage se fie aux

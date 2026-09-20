@@ -50,7 +50,10 @@ public sealed class AnonymousSurfaceProbe
     private static readonly HashSet<string> HorsMesure = new(StringComparer.Ordinal)
     {
         "AuthController.WhoAmI",
-        "DiagController.*"
+        "DiagController.*",
+        // Même raison : la version est faite pour être demandée librement, y compris par nous après
+        // chaque publication. La mesurer noierait le signal sous nos propres constats.
+        "VersionController.Get"
     };
 
     private readonly RequestDelegate _suivant;
