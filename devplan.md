@@ -420,20 +420,10 @@ et **c'est dit**.*
 ---
 # 4. Décisions tranchées — ne pas les rejouer
 
-*Les décisions appliquées vivent dans [`delivered.md`](delivered.md) §4 — **celles du 19/09 au §4.3** :
-fermer sur une mesure, lots par liste d'identifiants, pas plus de 8 appels vers Orders, le paquet
-partagé sans toucher la configuration, publier depuis `main` seulement. Ce qui suit est la façon dont
-ce plan se tient.*
+**Cette rubrique a déménagé dans [`decided.md`](decided.md)** *(21/09/2026)*. Elle
+**s'ajoute** ; ce plan, lui, **se régénère** à chaque compaction — les deux n'avaient rien à
+faire dans le même fichier. 🔴 *À lire avant d'écrire du code.*
 
-| Date | Décision, et pourquoi |
-|---|---|
-| 2026-08-24 | **D14 — on code neutre ou additif.** L'app web n'est pas déployée avec l'API |
-| 2026-09-13 | **Le livré sort du plan et entre, daté, dans `delivered.md`** au prompt « compact devplan » |
-| 2026-09-19 | **Une attente envers l'amont se vérifie chez l'amont avant d'être reconduite.** Ce plan a attendu d'Orders pendant **huit semaines** un repli livré le 23/07 |
-| 2026-09-19 | **Une entrée se cite par son titre**, l'ancienne référence entre crochets |
-| 2026-09-19 | **Une édition qui n'a pas tout revérifié le dit**, avec la date du dernier relevé |
-
----
 # 5. Journal des livraisons
 
 *Le journal daté vit dans [`delivered.md`](delivered.md) §2, les incidents au §8.*
