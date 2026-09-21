@@ -217,12 +217,16 @@ if (string.IsNullOrWhiteSpace(serviceAccount.TokenEndpoint)
 // (missions, commandes, bénéficiaires, équipages). Plus aucune réf projet Orders.
 builder.Services.AddHttpClient<IErpReadApiClient, HttpErpReadApiClient>(c =>
     c.BaseAddress = OrdersBaseUri(builder.Configuration))
-    .AddVectorServiceAccountToken(serviceAccount);
+    .AddVectorServiceAccountToken(serviceAccount)
+    .AddOrdersResilience(builder.Configuration);
 
 // TRF-5 : chemin d'écriture Vector→Orders (projection de l'avancement opérationnel terrain).
 builder.Services.AddHttpClient<IErpWriteApiClient, HttpErpWriteApiClient>(c =>
     c.BaseAddress = OrdersBaseUri(builder.Configuration))
-    .AddVectorServiceAccountToken(serviceAccount);
+    .AddVectorServiceAccountToken(serviceAccount)
+    // Sûr parce que les écritures sont rejouables : instantané complet pour la projection,
+    // remplacement pour le conducteur et le questionnaire (cf. OrdersResilience).
+    .AddOrdersResilience(builder.Configuration);
 
 // Confirmation de prise de service depuis l'application (lecture + confirmation). « Sans jeton »
 // vaut pour le JETON DE LIEN du courriel, jamais demandé ici ; le jeton de SERVICE de Vector, lui,
@@ -230,7 +234,9 @@ builder.Services.AddHttpClient<IErpWriteApiClient, HttpErpWriteApiClient>(c =>
 // Orders exigera un jeton du terrain.
 builder.Services.AddHttpClient<IShiftConfirmationService, HttpShiftConfirmationService>(c =>
     c.BaseAddress = OrdersBaseUri(builder.Configuration))
-    .AddVectorServiceAccountToken(serviceAccount);
+    .AddVectorServiceAccountToken(serviceAccount)
+    // Idempotent côté Orders : un second appel rend « déjà confirmé », pas une erreur.
+    .AddOrdersResilience(builder.Configuration);
 
 // Contrat mobile inchangé : PascalCase comme l'ancienne WebApi (pas de camelCase).
 builder.Services.AddControllers()

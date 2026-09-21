@@ -140,18 +140,39 @@ diagnostic fermé en production, et les routes retirées du contrat qui doivent 
 Les requêtes s'enchaînent : le jeton nourrit les suivantes, l'équipage donne son `CrewId`, la liste
 donne un `JobId`. **Aucun secret dans le fichier** : identifiants à renseigner au moment de jouer.
 
-## Itération 4 — Des appels sortants qui ne pendent pas *[ex-D, DEC-7]*
+## Itération 4 — Des appels sortants qui ne pendent pas *[ex-D, DEC-7]* ✅ *codée le 21/09 — reste à publier*
 
 | | |
 |---|---|
 | **Nature** | Robustesse — **plus pressant depuis les lots** |
-| **Effort** | Une session |
-| **Bloqué par** | Rien |
+| **Effort** | Fait |
+| **Bloqué par** | **La publication** |
 
-Les trois clients vers Orders n'ont **ni délai court, ni nouvelle tentative, ni disjoncteur** en
-lecture — 100 secondes par défaut *(13/09)*. Depuis le 19/09, **un seul appel à Orders qui pend retient
-tout un lot de 200 paquets**. ⇒ Délai explicite, puis `AddStandardResilienceHandler`, **en gardant** la
-tolérance au 404 — et sans relancer en rafale un Orders qui sert aussi la régulation.
+Les trois clients vers Orders n'avaient que leur adresse : **100 secondes** de délai par défaut, aucune
+nouvelle tentative, aucun disjoncteur. Une requête mobile pendait jusqu'à ce que l'ambulancier
+abandonne — et depuis le 19/09, **un seul appel qui pend retient un lot de 200 paquets**.
+
+**Codé** (`Microsoft.Extensions.Http.Resilience`, extension `AddOrdersResilience`) :
+- **Délais** : 8 s par essai, **25 s au total**, tentatives comprises ; le client garde une borne
+  ultime à 30 s, au cas où la configuration deviendrait incohérente.
+- **Nouvelles tentatives** : 2, avec attente croissante et *jitter* — deux instances ne repartent pas
+  à la même seconde.
+- 🔴 **Ce qui n'est jamais retenté** : le **404**, qui est une réponse et pas une panne — plusieurs
+  lectures s'appuient dessus (équipage inconnu → liste vide, mission inconnue → `NotFound` dans le
+  lot) ; et les **refus métier** (400, 409), qui portent leur motif.
+- **Disjoncteur** : il protège Orders autant que nous — Orders sert aussi la régulation, et relancer
+  200 appels de lot ne le relèvera pas. Ouvert, les appels échouent **vite et clairement**, et le lot
+  rend `Error` pour ces missions au lieu d'une attente muette.
+- **Réglable** sous `OrdersApi:Resilience`, valeurs de production dans `appsettings.json`.
+
+> ⚖️ **Pourquoi retenter une écriture est sûr ici** : elles sont toutes rejouables — la projection
+> pousse un instantané complet, le conducteur et le questionnaire s'écrivent en remplacement, et la
+> confirmation de prise de service est idempotente côté Orders (un second appel rend « déjà
+> confirmé »).
+
+**Éprouvé** : 7 tests sur le vrai câblage (fabrique de clients + pipeline, Orders simulé) — panne
+retentée, coupure réseau retentée, **404 et refus métier jamais retentés**, appel qui pend coupé bien
+avant les 100 s, réponse normale intacte. 235 verts. API démarrée avec le pipeline.
 
 ## Itération 5 — Dire l'heure qu'il est *[ex-E2]*
 

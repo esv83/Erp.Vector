@@ -15,13 +15,11 @@
        pas le code servi (incident du 13/09). On relève donc les deux AU BUILD, et l'API les sert.
        Tolérant : sans git (serveur, archive), la version reste celle du .csproj et l'API le dit. -->
   <Target Name="ReleveGit" BeforeTargets="GetAssemblyVersion;CoreGenerateAssemblyInfo">
-    <Exec Command="git -C &quot;$(MSBuildProjectDirectory)&quot; rev-parse HEAD"
-          ConsoleToMSBuild="true" ContinueOnError="true" StandardOutputImportance="low">
+    <Exec Command="git -C &quot;$(MSBuildProjectDirectory)&quot; rev-parse HEAD" ConsoleToMSBuild="true" ContinueOnError="true" StandardOutputImportance="low">
       <Output TaskParameter="ConsoleOutput" PropertyName="VectorCommit" />
       <Output TaskParameter="ExitCode" PropertyName="VectorGitExitCode" />
     </Exec>
-    <Exec Command="git -C &quot;$(MSBuildProjectDirectory)&quot; status --porcelain"
-          ConsoleToMSBuild="true" ContinueOnError="true" StandardOutputImportance="low">
+    <Exec Command="git -C &quot;$(MSBuildProjectDirectory)&quot; status --porcelain" ConsoleToMSBuild="true" ContinueOnError="true" StandardOutputImportance="low">
       <Output TaskParameter="ConsoleOutput" PropertyName="VectorGitStatus" />
     </Exec>
     <PropertyGroup Condition="'$(VectorGitExitCode)' == '0' And '$(VectorCommit)' != ''">
@@ -55,6 +53,7 @@
          CaSoft.Framework.Security 2.8.0, pas du socle : coexiste avec CaSoft.Framework 2.3.5. -->
     <PackageReference Include="CaSoft.Identity.Client" Version="1.4.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.10.0" />
     <PackageReference Include="NLog.Web.AspNetCore" Version="5.4.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
