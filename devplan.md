@@ -79,7 +79,7 @@ numéros changent d'une édition à l'autre — une entrée se cite par son titr
 |---|---|
 | **Nature** | Constats et mesures — aucun code |
 | **Effort** | Une petite session, plus des constats au fil de l'eau |
-| **Bloqué par** | ⚠️ Un **compte de lecture** pour les mesures : `ErpAccount` est refusé depuis le poste de dev *(13/09 — non revérifié)*. À défaut, les journaux et le paquet terrain |
+| **Bloqué par** | 🟢 **Plus rien** — relevé le 20/09 : la base **est joignable depuis le poste de dev**, l'API en Development lit la chaîne complète dans les *user secrets* (`c17727bc-…`). Le « compte `ErpAccount` refusé » du 13/09 visait un autre chemin |
 
 **À constater quand l'événement arrivera** — le code est en production depuis le 19/09 :
 - **Un refus de conducteur** apparaît en `WARN` avec la phrase d'Orders, et plus en `ERROR`. Aucun
@@ -182,17 +182,39 @@ en cours ; `api/version/runtime` rend 401 sans jeton.
 **Fin** : après publication, `GET /vector/api/version` dit le commit servi — et `deploy.ps1` pourrait
 s'en servir pour son contrôle d'après copie, à la place du `.pdb`.
 
-## Itération 7 — Suivre les migrations SQL *[ex-G4]*
+## Itération 7 — Suivre les migrations SQL *[ex-G4]* ✅ *codée le 20/09 — reste à jouer `MOB_009` et à publier*
 
 | | |
 |---|---|
 | **Nature** | Divergence de schéma — **a déjà coûté une journée sans données terrain** *(06/08)* |
-| **Effort** | Une session, plus une réconciliation |
-| **Bloqué par** | Rien |
+| **Effort** | Fait |
+| **Bloqué par** | **Le script à jouer** en dev puis en prod, et la publication |
 
-Aucune table de suivi : prod et dev ont divergé en sens inverse. ⇒ Table de suivi (modèle
-`__BillingGatewaySchema`) et **contrôle au démarrage**. À réconcilier : la migration du transfert est
-`027` dans l'historique, `034` dans le dépôt.
+Prod et dev avaient divergé **en sens inverse** : 500 opaque, et rien ne disait quel script manquait.
+
+**Codé**, sur le modèle de BillingGateway (`__BillingGatewaySchema`) :
+- **`MOB_009_SchemaJournal.sql`** pose `__VectorSchema` (script, date, origine) et l'amorce avec ce
+  qu'elle **constate** dans la base — jamais avec ce qu'on suppose : chaque script d'avant n'est
+  inscrit que si ses objets sont là, et la ligne porte alors `Origine = 'constat'`. Une base vide ne se
+  déclare pas à jour.
+- **Le catalogue se lit dans l'assemblage** (`Sql\*.sql` embarqués) : un script ajouté demain est
+  attendu sans que personne y pense. ⚖️ **`MOB_002` et `MOB_007` n'y figurent plus** : `MOB_008` a
+  supprimé ce qu'ils posaient, et réclamer un script dont l'effet a été défait ne ferait qu'un signal
+  faux de plus. Inscrits sur une base ancienne, ils ne sont **ni manquants, ni inconnus**.
+- **Contrôle au démarrage** : à jour → INFO ; script manquant ou base **en avance sur le dépôt** →
+  ERROR nommant les scripts ; base injoignable → WARN (au démarrage, SQL peut monter plus lentement).
+  **L'API ne refuse jamais de démarrer** : un schéma en retard casse les requêtes qui touchent ses
+  tables, pas le terrain qui marche sur tout le reste. Et **elle ne migre jamais** toute seule.
+- **`api/version/runtime`** sert l'état : à jour ou non, dernier appliqué, manquants, inconnus — jamais
+  le détail SQL, qui nomme le compte de connexion.
+- 10 tests ; 212 verts.
+
+**Éprouvé sur l'API lancée** : `Schéma : la table __VectorSchema est ABSENTE … Attendus : 7 scripts
+(jouer MOB_009)` — le constat exact avant de jouer le script.
+
+**À faire** : jouer `MOB_009` sur la base de dev, puis sur la production ; publier. **Reste ensuite** la
+réconciliation d'histoire : la migration du transfert est `027` dans l'historique et `034` dans le
+dépôt *(côté Orders)*.
 
 ## Itération 8 — Les dettes de forme *[ex-G2, G5]*
 
@@ -225,17 +247,44 @@ Aucune table de suivi : prod et dev ont divergé en sens inverse. ⇒ Table de s
 Le kilométrage appartient à l'équipage et au véhicule, pas à la mission. Km du véhicule, ou relevé
 début/fin par mission (table, saisie mobile, paquet) ?
 
-## Itération 10 — Lire la carte mutuelle automatiquement *[ex-F2, P3]*
+## Itération 10 — Lire la carte mutuelle automatiquement *[ex-F2, P3]* 🟡 *codée le 20/09 — inerte, une décision avant d'activer*
 
 | | |
 |---|---|
 | **Nature** | Fonctionnalité neuve |
-| **Effort** | Plusieurs sessions |
-| **Bloqué par** | **La mesure du remplissage** *(itération « Constater et mesurer en production »)* |
+| **Effort** | Fait — reste `MOB_010`, la publication, et **la décision d'activer** |
+| **Bloqué par** | 🔴 **Une décision d'exploitation** : activer, c'est envoyer une **donnée de santé** au fournisseur du modèle (P4/RGPD) |
 
-Extraction **asynchrone** par un modèle de vision, quatre champs proposés avec leur confiance, puis
-**validation humaine** — jamais d'écriture aveugle. À cadrer : où tourne l'appel (DMZ ou LAN), le coût
-par carte. Rappel : même validés, ces champs **n'alimentent pas** la colonne mutuelle de facturation.
+**Mesuré le 20/09** (base de production, la mesure qui conditionnait cette itération) : **85 cartes
+depuis le 13/09** pour 78 bénéficiaires, contre **1 864 missions** suivies — soit **~4,6 %** de
+remplissage, une douzaine de cartes par jour. **Le code AMC n'est saisi que 41 fois sur 85** (le nom de
+mutuelle 45) : c'est là que la lecture automatique a de la valeur, pas dans le volume.
+
+**Codé** — pipeline **asynchrone**, la capture n'attend jamais le modèle :
+- La capture met la carte en **`pending`** ; `MutuelleCardOcrDispatcher` dépile (5 par cycle, une
+  minute), tire l'image **une par une**, appelle le modèle, et enregistre.
+- `ClaudeMutuelleCardOcrService` : Claude (`claude-opus-5` par défaut), **sortie structurée imposée**
+  par schéma JSON — un champ non lu revient `null`, jamais deviné ; la **confiance** est rendue,
+  bornée à [0,1], stockée et servie.
+- 🔴 **`M5` tenu par le code** : les quatre champs proposés vivent dans des colonnes **à part**
+  (`MOB_010`). Les champs officiels ne sont **jamais** touchés par la machine ; c'est le `PATCH`
+  existant, déclenché par un humain, qui recopie. Un test le fige.
+- **Une carte illisible n'est pas une panne** : le modèle répond, ne lit rien, la carte sort de la
+  file. Une panne technique se retente **3 fois**, puis la carte passe en `error` avec son motif — la
+  file de projection a relancé 55 450 fois une mission qui ne reviendrait jamais.
+- **Inerte sans clé** : sans `MutuelleCardOcr:ApiKey`, le worker ne démarre pas et rien n'appelle de
+  modèle. Vector peut donc être publié **avant** la décision d'activer.
+- Contrat additif : `OcrProposal` s'ajoute au DTO de la carte (D14). Note au dev web écrite
+  ([`note_web_alexandre_carte_mutuelle_ocr.md`](note_web_alexandre_carte_mutuelle_ocr.md)).
+- 14 tests ; 228 verts.
+
+**Coût, ordre de grandeur** : une carte pèse ~476 Ko, soit ~1,5 à 2 k jetons d'entrée — de l'ordre du
+**centime par carte**, donc **~0,15 € par jour** au volume actuel. À remesurer sur les premières
+cartes réelles.
+
+**Reste** : jouer `MOB_010`, publier, **décider** si l'image peut sortir (le modèle peut aussi tourner
+sur un service LAN : c'est l'implémentation du port qui change, pas le reste), puis l'écran de
+validation côté web.
 
 ## Itération 11 — La fin de service *[ex-F3, MOB-12]* ✅ *routes retirées le 19/09 — reste à publier*
 
