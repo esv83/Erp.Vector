@@ -25,8 +25,11 @@
   la capture mutuelle ni le correctif de cloture. -Force ne saute PAS cette garde.
   -CheckOnly : execute la garde et s'arrete, sans rien publier.
 
-  APRES PUBLICATION : le .pdb de la cible doit annoncer le commit publie (sourcelink), et
-  appsettings*.json + nlog.config doivent etre identiques au depot.
+  APRES PUBLICATION, trois verifications : le .pdb de la cible annonce le commit publie
+  (ce qui a ete COPIE), appsettings*.json + nlog.config sont identiques au depot, et
+  api/version annonce ce meme commit sur un arbre propre (ce qui TOURNE -- seule reponse a
+  "le serveur a-t-il redemarre dessus ?"). L'adresse publique vient du .pubxml
+  (VectorVersionUrl) ; absente, ce dernier controle est saute et le script le dit.
 
   Prerequis (1re fois) : une session ouverte sur le partage cible
     net use \\192.168.1.112\dev_api  /user:192.168.1.112\DeployApi *
@@ -120,6 +123,53 @@ function Assert-PublishableTree($key) {
     return $head
 }
 
+# Lit api/version sur l'instance publiee et verifie que le commit SERVI est celui qu'on vient de
+# publier. Rend l'objet lu, ou $null quand le profil ne porte pas d'adresse (controle saute, et dit).
+#
+# POURQUOI EN PLUS DU .pdb. Le .pdb dit ce qui a ete COPIE sur le partage ; il ne dit pas si IIS a
+# redemarre dessus. "La production sert-elle ce commit ?" n'a qu'une reponse : le demander au
+# processus qui sert. api/version est anonyme, donc lisible sans jeton, y compris depuis un poste.
+function Assert-VersionServie($profileName, $head) {
+    $pubxml = Join-Path $PSScriptRoot "CaSoft.Erp.USVector.Api\Properties\PublishProfiles\$profileName.pubxml"
+    [xml]$x = Get-Content -LiteralPath $pubxml
+    $noeud = $x.SelectSingleNode('//*[local-name()="VectorVersionUrl"]')
+    $baseUrl = if ($noeud) { ([string]$noeud.InnerText).Trim() } else { '' }
+    if (-not $baseUrl) {
+        Write-Host "     (api/version non interroge : renseigner VectorVersionUrl dans $profileName.pubxml)" -ForegroundColor DarkYellow
+        return $null
+    }
+
+    # IIS demarre l'application a la PREMIERE requete : le premier essai reveille le processus, les
+    # suivants attendent qu'il reponde. D'ou plusieurs tentatives avant de conclure.
+    $version = $null
+    foreach ($essai in 1..10) {
+        try {
+            $version = Invoke-RestMethod -Uri "$baseUrl/api/version" -TimeoutSec 10 -ErrorAction Stop
+            if ($version.Commit) { break }
+        }
+        catch {
+            if ($essai -eq 10) {
+                throw "Verif KO : $baseUrl/api/version ne repond pas apres $essai essais ($($_.Exception.Message)). " +
+                      "Les fichiers sont copies, mais rien ne prouve que l'API tourne dessus."
+            }
+            Start-Sleep -Seconds 3
+        }
+    }
+
+    if ($version.Commit -ne $head) {
+        throw "Verif KO : l'API sert le commit $($version.ShortCommit), pas $($head.Substring(0, 7)). " +
+              "Les fichiers sont a jour sur le partage, mais le processus n'a pas redemarre dessus " +
+              "(app_offline.htm reste ? pool fige ?) -- recycler le pool, puis relire $baseUrl/api/version."
+    }
+
+    if ($version.Tree -ne 'clean') {
+        throw "Verif KO : l'API sert un binaire construit depuis un arbre $($version.Tree) : le commit " +
+              "annonce ne contient donc pas tout le code servi."
+    }
+
+    return $version
+}
+
 function Publish-Target($key) {
     $profileName = $profileOf[$key]
     Write-Host ""
@@ -194,8 +244,14 @@ function Publish-Target($key) {
         }
     }
 
+    # Ce qui a ete copie est verifie ; reste ce qui TOURNE.
+    $servi = Assert-VersionServie $profileName $head
+    $ligneServi = if ($servi) { "$($servi.ShortCommit) (arbre $($servi.Tree)) confirme par api/version" }
+                  else { "NON VERIFIE -- aucune VectorVersionUrl dans $profileName.pubxml" }
+
     Write-Host "[OK] $($key.ToUpper()) publie et verifie -> $url" -ForegroundColor Green
-    Write-Host "     Commit verifie   : $($head.Substring(0, 7)) annonce par le .pdb publie" -ForegroundColor DarkGray
+    Write-Host "     Commit copie     : $($head.Substring(0, 7)) annonce par le .pdb publie" -ForegroundColor DarkGray
+    Write-Host "     Commit servi     : $ligneServi" -ForegroundColor DarkGray
     Write-Host "     Assembly verifie : $($localNewest.Name) @ $($localNewest.LastWriteTime)" -ForegroundColor DarkGray
     Write-Host "     Config verifiee  : $($configs -join ', ') identiques au depot" -ForegroundColor DarkGray
 }

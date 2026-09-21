@@ -33,5 +33,6 @@ ce plan se tient.*
 | 2026-09-19 | **Une attente envers l'amont se vérifie chez l'amont avant d'être reconduite.** Ce plan a attendu d'Orders pendant **huit semaines** un repli livré le 23/07 |
 | 2026-09-19 | **Une entrée se cite par son titre**, l'ancienne référence entre crochets |
 | 2026-09-19 | **Une édition qui n'a pas tout revérifié le dit**, avec la date du dernier relevé |
+| 2026-09-21 | **Le `.pdb` dit ce qui a été COPIÉ, `api/version` dit ce qui TOURNE.** Les deux se vérifient après une publication, et le second seul répond à « le serveur a-t-il redémarré dessus ? ». Le 13/09 puis le 15/09, la production a servi autre chose que ce que le partage portait — un contrôle sur les fichiers ne pouvait pas le voir |
 
 ---

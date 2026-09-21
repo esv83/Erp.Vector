@@ -96,7 +96,7 @@ numéros changent d'une édition à l'autre — une entrée se cite par son titr
   Constater qu'elles ont disparu.
 - **Les adresses « non structurées »** : chaque cas est journalisé, personne n'a compté.
 
-## Itération 2 — La liste des documents charge leurs contenus *[relevé le 19/09]* ✅ *codée le 19/09 — reste à publier*
+## Itération 2 — La liste des documents charge leurs contenus *[relevé le 19/09]* ✅ *en production le 21/09*
 
 | | |
 |---|---|
@@ -140,7 +140,7 @@ diagnostic fermé en production, et les routes retirées du contrat qui doivent 
 Les requêtes s'enchaînent : le jeton nourrit les suivantes, l'équipage donne son `CrewId`, la liste
 donne un `JobId`. **Aucun secret dans le fichier** : identifiants à renseigner au moment de jouer.
 
-## Itération 4 — Des appels sortants qui ne pendent pas *[ex-D, DEC-7]* ✅ *codée le 21/09 — reste à publier*
+## Itération 4 — Des appels sortants qui ne pendent pas *[ex-D, DEC-7]* ✅ *en production le 21/09 — à constater sur une vraie panne d'Orders*
 
 | | |
 |---|---|
@@ -186,7 +186,7 @@ Les étapes sont en UTC **sans le déclarer** ; l'heure de signature est écrite
 (`SignatureRepository.cs:34`, `:43`). Même motif à examiner dans `ClMarkMissionSeenUseCase`,
 `ClSetDriverUseCase`. **Fin** : tout en UTC, fuseau **déclaré** dans le contrat du paquet.
 
-## Itération 6 — Savoir ce qui tourne *[ex-G8, partie 2]* ✅ *codée le 20/09 — reste à publier*
+## Itération 6 — Savoir ce qui tourne *[ex-G8, partie 2]* ✅ *en production le 21/09 — `api/version` répond, et `deploy.ps1` la lit*
 
 | | |
 |---|---|
@@ -216,10 +216,15 @@ laquelle l'API parle. Un correctif a déjà été joué sur la mauvaise base Ord
 **Éprouvé sur l'API lancée** : `api/version` rend le `HEAD` du dépôt et `Tree: modified` sur un arbre
 en cours ; `api/version/runtime` rend 401 sans jeton.
 
-**Fin** : après publication, `GET /vector/api/version` dit le commit servi — et `deploy.ps1` pourrait
-s'en servir pour son contrôle d'après copie, à la place du `.pdb`.
+**Constaté le 21/09** : en production, `api/version` rend `f000ad0` et `Tree: clean`.
 
-## Itération 7 — Suivre les migrations SQL *[ex-G4]* ✅ *codée le 20/09 — reste à jouer `MOB_009` et à publier*
+**Et `deploy.ps1` la lit** *(21/09)* : après la copie, il interroge `api/version` sur l'adresse du
+profil (`VectorVersionUrl`) et **refuse** si le commit servi n'est pas celui qu'on vient de publier, ou
+si l'arbre n'était pas propre. Le `.pdb` dit ce qui a été **copié** ; seule la route dit ce qui
+**tourne** — c'est-à-dire si le serveur a redémarré dessus. ⏳ L'adresse de la **recette** reste à
+renseigner dans `IIS-DevServer.pubxml` ; vide, le contrôle est sauté et le script le dit.
+
+## Itération 7 — Suivre les migrations SQL *[ex-G4]* ✅ *en production le 21/09 — 8 scripts sur 8, constaté au démarrage*
 
 | | |
 |---|---|
@@ -294,7 +299,7 @@ les retirer pendant que le front s'en sert casserait un écran en production. Le
 Le kilométrage appartient à l'équipage et au véhicule, pas à la mission. Km du véhicule, ou relevé
 début/fin par mission (table, saisie mobile, paquet) ?
 
-## Itération 10 — Lire la carte mutuelle automatiquement *[ex-F2, P3]* 🟡 *codée le 20/09 — inerte, une décision avant d'activer*
+## Itération 10 — Lire la carte mutuelle automatiquement *[ex-F2, P3]* 🟡 *en production le 21/09, **inerte** — une décision avant d'activer*
 
 | | |
 |---|---|
@@ -333,7 +338,7 @@ cartes réelles.
 sur un service LAN : c'est l'implémentation du port qui change, pas le reste), puis l'écran de
 validation côté web.
 
-## Itération 11 — La fin de service *[ex-F3, MOB-12]* ✅ *routes retirées le 19/09 — reste à publier*
+## Itération 11 — La fin de service *[ex-F3, MOB-12]* ✅ *routes retirées, en production le 21/09*
 
 | | |
 |---|---|
