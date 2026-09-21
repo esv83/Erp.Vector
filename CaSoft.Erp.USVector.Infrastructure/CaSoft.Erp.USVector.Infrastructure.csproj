@@ -29,4 +29,11 @@
     <InternalsVisibleTo Include="CaSoft.Erp.USVector.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- G4 — Les scripts de schéma sont EMBARQUÉS : le catalogue des scripts attendus se déduit de
+         l'assemblage (SchemaCatalogue), jamais d'une liste écrite à la main qu'on oublierait de
+         tenir. Un script ajouté demain est attendu sans que personne y pense. -->
+    <EmbeddedResource Include="Sql\*.sql" />
+  </ItemGroup>
+
 </Project>

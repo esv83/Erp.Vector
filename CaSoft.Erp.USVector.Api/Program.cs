@@ -178,6 +178,12 @@ else
         options.AddPolicy(ClKeycloakCallers.ServiceOrMobilePolicy, policy => policy.RequireAssertion(_ => true)));
 }
 
+// G4 — Journal du schéma (`__VectorSchema`) : lu au démarrage, et servi par api/version/runtime.
+// Sa propre connexion, hors du DbContext : il doit pouvoir dire « base injoignable ».
+builder.Services.AddSingleton(new CaSoft.Erp.USVector.Infrastructure.Persistence.Schema.SchemaJournal(
+    builder.Configuration.GetConnectionString("MobileDb")));
+builder.Services.AddHostedService<SchemaCheckAtStartup>();
+
 // BD Mobile dédiée (MOB_* : sessions, timeline statuts, signatures)
 builder.Services.AddDbContext<MobileDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MobileDb")));

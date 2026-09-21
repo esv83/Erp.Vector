@@ -1,5 +1,6 @@
 using System.Data.Common;
 using CaSoft.Erp.USVector.Api.Infrastructure;
+using CaSoft.Erp.USVector.Infrastructure.Persistence.Schema;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -62,9 +63,12 @@ public class VersionController : ControllerBase
     /// </remarks>
     [Authorize(Policy = ClKeycloakCallers.ServiceOrMobilePolicy)]
     [HttpGet("runtime")]
-    public IActionResult GetRuntime()
+    public async Task<IActionResult> GetRuntime([FromServices] SchemaJournal schema, CancellationToken ct)
     {
         var (server, database) = ResolveDatabase(_cfg.GetConnectionString("MobileDb"));
+        // G4 — l'état du schéma se relit à chaque appel : entre le démarrage et maintenant, un script
+        // a pu être joué. Le message ne porte jamais le détail SQL (il nomme le compte de connexion).
+        var etat = await schema.ReadAsync(ct);
 
         return Ok(new
         {
@@ -76,7 +80,20 @@ public class VersionController : ControllerBase
             BuildInfo.BuildUtc,
             Environment = _env.EnvironmentName,
             TimestampUtc = DateTimeOffset.UtcNow,
-            Database = new { Server = server, Name = database },
+            Database = new
+            {
+                Server = server,
+                Name = database,
+                Schema = new
+                {
+                    etat.UpToDate,
+                    Statement = etat.Statement(),
+                    LastApplied = etat.LastApplied,
+                    Applied = etat.Applied.Select(a => new { a.ScriptId, a.AppliedAt, a.Origin }),
+                    Missing = etat.Missing,
+                    Unknown = etat.Unknown
+                }
+            },
             Flags = new
             {
                 KeycloakEnabled = _cfg.GetValue("Keycloak:Enabled", false),
