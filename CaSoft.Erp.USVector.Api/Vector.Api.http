@@ -1,0 +1,237 @@
+###############################################################################
+# Vector.Api — suite de vérification rejouable (G3)
+#
+# À QUOI ÇA SERT. Après chaque publication, rejouer ce fichier de haut en bas
+# répond en une minute à « l'API sert-elle encore ce que l'app attend ? ».
+# Jusqu'ici il ne restait que le gabarit « weatherforecast » du modèle de projet :
+# aucune des routes du terrain n'était couverte.
+#
+# COMMENT L'UTILISER. Visual Studio, VS Code (extension REST Client) ou Rider :
+# chaque bloc se lance d'un clic, et les requêtes nommées (# @name …) passent
+# leur réponse aux suivantes — jeton, équipage, mission s'enchaînent seuls.
+#
+# ORDRE. Les requêtes se suivent : le jeton, l'équipage, ses missions, puis une
+# mission. Lancer une requête du milieu sans les précédentes laisse ses
+# variables vides — c'est attendu, pas un défaut.
+#
+# ⚠️ ÇA ÉCRIT. Le bloc 5 pose des jalons et une signature sur une MISSION
+# RÉELLE, et ces gestes remontent à la régulation. En production, le jouer sur
+# une mission déjà terminée — ou s'arrêter au bloc 4, qui ne fait que lire.
+###############################################################################
+
+### ── Cible ────────────────────────────────────────────────────────────────
+# Décommenter la cible voulue.
+@host = https://api.urgencesante.net/vector
+# @host = http://192.168.1.112/vector          # dev
+# @host = http://localhost:5277                # poste de dev (dotnet run)
+
+@keycloak = https://auth.ade-dev.fr/realms/delesse
+@clientId = us-ambulance
+
+# Compte d'un ambulancier rattaché (cf. docs/auth/consigne-rattachement-ambulancier.md).
+# Ne JAMAIS commiter de mot de passe ici : le renseigner au moment de jouer la suite.
+@username =
+@password =
+
+###############################################################################
+# 0. LE JETON — tout le reste en dépend
+###############################################################################
+
+# @name jeton
+POST {{keycloak}}/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id={{clientId}}&username={{username}}&password={{password}}
+
+### Attendu : 200, un access_token. 401 « invalid_grant » = compte ou mot de passe ;
+### 400 « unauthorized_client » = le client Keycloak n'autorise pas ce type de connexion.
+
+@token = {{jeton.response.body.access_token}}
+
+### Qui suis-je, pour l'API ? Répond même SANS jeton : c'est son rôle.
+GET {{host}}/api/auth/whoami
+Authorization: Bearer {{token}}
+
+###############################################################################
+# 1. CE QUI TOURNE — à faire juste après une publication
+###############################################################################
+
+### Version, commit, état de l'arbre au build. Anonyme : aucun jeton requis.
+GET {{host}}/api/version
+
+### Attendu : le commit publié, et "Tree": "clean". "modified" = le binaire a été
+### construit depuis un arbre non commité — ce qu'il annonce ne suffit pas à le retrouver.
+
+### La même chose, plus la base résolue, les drapeaux et l'état du schéma.
+GET {{host}}/api/version/runtime
+Authorization: Bearer {{token}}
+
+### Attendu : la bonne base (serveur + nom), et "Schema.UpToDate": true.
+### Faux → jouer les scripts nommés dans "Schema.Missing" (Infrastructure\Sql).
+
+###############################################################################
+# 2. L'ÉQUIPAGE — le point d'entrée de l'app
+###############################################################################
+
+# @name equipage
+GET {{host}}/api/Crew/mine
+Authorization: Bearer {{token}}
+
+### Attendu : l'équipage du jour, ou la liste de ceux à choisir.
+### 404 avec un texte = normal hors service : « équipage pas encore composé »,
+### « votre service commence à … », « votre service est clôturé ». Le message dit quoi faire.
+### 403 = compte non rattaché côté Orders (consigne de rattachement).
+
+### La réponse porte TOUS les équipages du jour (RequiresSelection dit s'il faut choisir).
+### On prend le premier ; pour en viser un autre, coller son CrewId ici.
+@crewId = {{equipage.response.body.$.Crews[0].CrewId}}
+
+### Conducteur de l'équipage (lecture).
+GET {{host}}/api/Driver/{{crewId}}
+Authorization: Bearer {{token}}
+
+### Ce qui attend une confirmation de prise de service, tous équipages confondus.
+GET {{host}}/api/personnel/me/shift-confirmations/pending
+Authorization: Bearer {{token}}
+
+###############################################################################
+# 3. LES MISSIONS DU JOUR
+###############################################################################
+
+# @name joblist
+GET {{host}}/api/JobList/{{crewId}}
+Authorization: Bearer {{token}}
+
+### Attendu : les missions ENGAGÉES de l'équipage, les clôturées exclues.
+### Liste vide = rien d'engagé ce jour-là, ce n'est pas une erreur.
+
+@jobId = {{joblist.response.body.$[0].JobId}}
+
+### Détail d'une mission : patient, lieux composés par le serveur, horaires.
+GET {{host}}/api/JobDetail/{{jobId}}
+Authorization: Bearer {{token}}
+
+### Jalons posés (contrat plat, historique).
+GET {{host}}/api/Time/{{jobId}}
+Authorization: Bearer {{token}}
+
+### Les mêmes, prêts à afficher (ordre, code, libellé, heure).
+GET {{host}}/api/Time/{{jobId}}/timeline
+Authorization: Bearer {{token}}
+
+### Signature du patient : 200 avec l'image, ou 404 si la mission n'est pas signée.
+GET {{host}}/api/Signature/{{jobId}}
+Authorization: Bearer {{token}}
+
+### Documents de la mission (métadonnées seules — les octets se tirent un par un).
+GET {{host}}/api/missions/{{jobId}}/documents
+Authorization: Bearer {{token}}
+
+### Anomalies de la mission.
+GET {{host}}/api/missions/{{jobId}}/anomalies
+Authorization: Bearer {{token}}
+
+### Carte mutuelle du patient de la mission : 200, ou 404 si aucune carte.
+GET {{host}}/api/missions/{{jobId}}/mutuelle-card
+Authorization: Bearer {{token}}
+
+### Type de mission et questionnaire de facturation, servis par la régulation.
+GET {{host}}/api/Contract/{{jobId}}
+Authorization: Bearer {{token}}
+
+###############################################################################
+# 4. CE QUE TIRE LA FACTURATION — à l'unité, puis en lot (B5)
+###############################################################################
+
+### Le dossier terrain d'une mission.
+GET {{host}}/api/missions/{{jobId}}/field-data
+Authorization: Bearer {{token}}
+
+### Le même, en lot — 200 missions au plus. Une entrée par mission demandée :
+### Found (paquet dans Data), NotFound (mission inconnue d'Orders), Error (à retenter).
+POST {{host}}/api/missions/field-data
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "MissionIds": [ "{{jobId}}" ] }
+
+### Les signatures en lot — 50 au plus. Found ou NotFound, jamais d'absence silencieuse.
+POST {{host}}/api/missions/signatures
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "MissionIds": [ "{{jobId}}" ] }
+
+### Les cartes mutuelle présentes pour une liste de bénéficiaires (route anonyme,
+### pour les écrans amont — aucun jeton, ni nom de mutuelle, ni code AMC en réponse).
+POST {{host}}/api/mutuelle-card/presence
+Content-Type: application/json
+
+{ "beneficiaryIds": [ "00000000-0000-0000-0000-000000000000" ] }
+
+###############################################################################
+# 5. ⚠️ ÉCRITURES — elles remontent à la régulation. Mission de test de préférence.
+###############################################################################
+
+### « Mission vue » : la régulation voit l'heure de prise de connaissance.
+PATCH {{host}}/api/JobList
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "JobId": "{{jobId}}", "IsJob": true }
+
+### Poser les jalons. Heures au format "HH:mm" ; un jalon omis n'est pas touché.
+PATCH {{host}}/api/Time/{{jobId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "GoTime": "08:00", "OnSiteTime": "08:20", "TerminatedTime": "" }
+
+### Retour arrière sur un jalon (jalon : go | onsite | terminated) — l'effacement
+### remonte aussi à la régulation.
+DELETE {{host}}/api/Time/{{jobId}}/terminated
+Authorization: Bearer {{token}}
+
+### Signature du patient (image en base64, comme l'app l'envoie). Idempotent :
+### une signature existante est mise à jour, pas refusée.
+POST {{host}}/api/Signature/{{jobId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "Data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==" }
+
+### Désigner le conducteur (corps = le Guid d'un membre de l'équipage).
+### Un refus de la régulation revient en 400 AVEC son motif, à afficher tel quel.
+POST {{host}}/api/Driver/{{crewId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+"00000000-0000-0000-0000-000000000000"
+
+###############################################################################
+# 6. CE QUI DOIT ÊTRE REFUSÉ — la suite ne vaut que si elle vérifie aussi ça
+###############################################################################
+
+### Sans jeton : 401 attendu sur une route du terrain.
+GET {{host}}/api/JobList/{{crewId}}
+
+### Sans jeton, sur ce que tire la facturation : 401 attendu depuis le 19/09.
+GET {{host}}/api/missions/{{jobId}}/field-data
+
+### Jeton valide, mission d'un autre équipage : 403 ou 404 attendu, jamais 200.
+GET {{host}}/api/JobDetail/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}
+
+### Le diagnostic est fermé en production : 404 attendu (Diagnostics:Enabled absent).
+GET {{host}}/api/diag
+
+###############################################################################
+# Routes retirées du contrat — 404 attendu. Elles figurent ici pour qu'une
+# résurrection se voie : api/Contact, api/MecanicLog, analyze,
+# api/ReferenceData (13/09), et la fin de service (20/09).
+###############################################################################
+
+GET {{host}}/api/Contact?FullSearchName=test
+Authorization: Bearer {{token}}
+
+###

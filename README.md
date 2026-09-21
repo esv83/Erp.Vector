@@ -45,6 +45,9 @@ Guides : [`docs/deploiement/configuration-keycloak-iis.md`](docs/deploiement/con
 
 ## Build, tests, déploiement
 
+**Après une publication**, rejouer [`CaSoft.Erp.USVector.Api/Vector.Api.http`](CaSoft.Erp.USVector.Api/Vector.Api.http) :
+jeton, équipage, missions, jalons, signature, lots de la facturation, et ce qui **doit** être refusé.
+
 ```powershell
 dotnet build USVector.sln
 dotnet test USVector.sln

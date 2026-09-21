@@ -112,17 +112,33 @@ contenu de chaque document** de la base pour n'en rendre que les métadonnées.
 appelant : la liste de l'app — réponse inchangée. Un test fige que la liste ne porte pas le contenu.
 192 tests verts.
 
-## Itération 3 — Un jeu de requêtes rejouables *[ex-G3, MOB-9]*
+## Itération 3 — Un jeu de requêtes rejouables *[ex-G3, MOB-9]* ✅ *écrit le 21/09 — à jouer après la prochaine publication*
 
 | | |
 |---|---|
 | **Nature** | Outil de vérification |
-| **Effort** | Une session |
-| **Bloqué par** | Rien |
+| **Effort** | Fait |
+| **Bloqué par** | Rien — reste à le jouer en vrai |
 
-Le fichier `.http` ne couvre ni la liste, ni les étapes, ni la signature *(13/09)*, ni les deux routes
-en lot. **Fin** : connexion → liste → détail → étapes → signature → lots, rejouables après chaque
-publication.
+Le fichier `.http` du dépôt n'était **que le gabarit « weatherforecast »** du modèle de projet :
+aucune route du terrain n'y figurait. Remplacé par
+[`CaSoft.Erp.USVector.Api/Vector.Api.http`](CaSoft.Erp.USVector.Api/Vector.Api.http), en six blocs :
+
+1. **le jeton** (Keycloak, client mobile) — tout le reste en dépend ;
+2. **ce qui tourne** : `api/version` (commit, état de l'arbre) et `api/version/runtime` (base,
+   drapeaux, état du schéma) — les deux questions d'après publication ;
+3. **l'équipage**, son conducteur, ses confirmations de prise de service ;
+4. **les missions** : liste, détail, jalons, signature, documents, anomalies, carte, questionnaire ;
+5. **ce que tire la facturation** : le dossier à l'unité, puis **en lot**, et les signatures en lot ;
+6. **⚠️ les écritures** (mission vue, jalons, retour arrière, signature, conducteur) — elles remontent
+   à la régulation : bloc à jouer sur une mission de test, ou à sauter.
+
+**Il vérifie aussi ce qui doit être REFUSÉ** — c'est ce qui manquait le plus : 401 sans jeton sur une
+route du terrain **et** sur le dossier de la facturation (fermé le 19/09), mission d'un autre équipage,
+diagnostic fermé en production, et les routes retirées du contrat qui doivent rendre 404.
+
+Les requêtes s'enchaînent : le jeton nourrit les suivantes, l'équipage donne son `CrewId`, la liste
+donne un `JobId`. **Aucun secret dans le fichier** : identifiants à renseigner au moment de jouer.
 
 ## Itération 4 — Des appels sortants qui ne pendent pas *[ex-D, DEC-7]*
 
