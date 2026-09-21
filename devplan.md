@@ -253,25 +253,35 @@ Prod et dev avaient divergé **en sens inverse** : 500 opaque, et rien ne disait
 réconciliation d'histoire : la migration du transfert est `027` dans l'historique et `034` dans le
 dépôt *(côté Orders)*.
 
-## Itération 8 — Les dettes de forme *[ex-G2, G5]*
+## Itération 8 — Les dettes de forme *[ex-G2, G5]* 🟡 *code mort retiré le 21/09 — le reste demande du temps*
 
 | | |
 |---|---|
 | **Nature** | Hygiène — aucun changement de contrat |
-| **Effort** | Plusieurs petites sessions, à piocher |
-| **Bloqué par** | Rien, sauf les alias *(le front)* |
+| **Effort** | Les retraits sont faits ; le reste se pioche |
+| **Bloqué par** | Rien |
 
-- `ListMissionsAsync` n'a plus aucun appelant : à supprimer.
-- `AddressApi:BaseUrl` : configurée, lue par aucun code — la retirer des `appsettings` *(19/09)*.
-- `ClAutorizationCommand.AutorizeJob` rend **toujours `true`** : reste de l'ancienne session mobile,
-  appelé par `GetSignature` *(19/09)* — le retirer.
-- `ClReliableValue` et `ClValueInfo` (socle, `0 - Outils`) n'ont plus d'usage depuis le retrait de la fin
-  de service *(19/09)*.
-- Nommage des DTO en `…DtoIn` / `…DtoOut` — aucun impact JSON.
-- Pont synchrone/asynchrone (`.GetAwaiter().GetResult()`) sur liste, détail, identité, conducteur.
-- `IResultUseCase` est synchrone : les cas d'usage asynchrones n'implémentent aucune interface.
-- **Alias de compatibilité** (`IsAck`, champs historiques du détail, `SelectedDriver` jamais nul,
-  champs typés des lieux) — retrait **sur confirmation du front uniquement**.
+**Retiré le 21/09** — du code que plus rien n'appelait, et qui donnait le change :
+- `ListMissionsAsync` (et ses six doublures de test) : la liste du terrain passe par la route de
+  l'équipage depuis juillet. C'est elle qui portait l'attente `assignedCrewId` chez Orders, devenue
+  sans objet.
+- `ClAutorizationCommand.AutorizeJob`, reste de l'ancienne session mobile : il **rendait toujours
+  `true`** après avoir lu un jeton qu'il jetait. Un garde-fou qui ne garde rien vaut moins que pas de
+  garde-fou — on le croit en place.
+- `ClReliableValue` et `ClValueInfo` (socle), orphelins depuis le retrait de la fin de service.
+- La clé **`AddressApi:BaseUrl`**, retirée des quatre `appsettings` : lue par aucun code — les
+  adresses arrivent résolues par Orders.
+
+**Reste, et ce n'est plus du retrait** :
+- **Nommage des DTO** en `…DtoIn` / `…DtoOut` — aucun impact JSON, mais des centaines de références.
+- **Pont synchrone/asynchrone** (`.GetAwaiter().GetResult()`) sur liste, détail, identité, conducteur :
+  à défaire en remontant l'asynchrone jusqu'aux cas d'usage, pas au chausse-pied.
+- **`IResultUseCase` est synchrone** : les cas d'usage asynchrones n'implémentent aucune interface.
+
+⚖️ **Les alias de compatibilité restent** (`IsAck`, champs historiques du détail, `SelectedDriver`
+jamais nul, champs typés des lieux) : l'app web n'est pas déployée en même temps que l'API (D14), et
+les retirer pendant que le front s'en sert casserait un écran en production. Leur retrait part en
+**rubrique 3**, conditionné à la confirmation du front.
 
 ## Itération 9 — Le kilométrage dans le dossier transmis *[ex-E1, MOB-10]*
 
@@ -398,6 +408,7 @@ et **c'est dit**.*
 |---|---|---|
 | **Fermer les routes d'affichage de la carte** *[M9]* | L'image courante et la présence restent anonymes : une balise `<img src>` ne porte pas de jeton. **Aucun appel constaté** du 15 au 19/09 | Les écrans d'Orders et de la facturation passent à un appel authentifié |
 | **Lots en parallèle pour la facturation** | ~3 s de gain par journée, 16 appels simultanés vers Orders — **refusé le 19/09** | La lecture groupée chez Orders, qui rend la question sans objet |
+| **Retirer les alias de compatibilité** *[G2]* | `IsAck` (alias de `IsSeen`), champs historiques du détail (`Schedule`, `TransportMode`, `Departure`/`Arrival`), `SelectedDriver` jamais nul, champs typés des lieux à côté de l'affichage composé par le serveur. **Conservés délibérément** (D14) | **La confirmation du front, champ par champ** : l'écran lit `IsSeen`, les libellés, `PickupLocation`/`DropoffLocation`, l'affichage piloté serveur. Contrat : [`note_ui_alex.md`](note_ui_alex.md) |
 | **Base Vector dédiée** *[Vd-1]* | Seul jalon DMZ non conditionné à la V2 | Pertinent dès maintenant ; personne ne l'a porté |
 | **Accès anticipé à cheval sur minuit** *[CREW-2]* | Correctif connu | Les vacations de nuit ne sont pas concernées *(décision du 02/08)* |
 | **Durcissement DMZ événementiel, push temps réel** *[Vd-2 à Vd-4, Vd-7, Vd-8]* | [`spec_architecture_vector_mission_dmz.md`](spec_architecture_vector_mission_dmz.md) | Une exigence d'exposition, ou le polling qui ne suffit plus |

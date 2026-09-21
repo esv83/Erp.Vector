@@ -10,17 +10,6 @@ public interface IErpReadApiClient
     Task<ErpMissionFullDto?> GetMissionFullAsync(Guid missionId, CancellationToken ct = default);
 
     /// <summary>
-    /// Missions sur une fenêtre. <paramref name="assignedCrewIds"/> (optionnel) demande à Orders.Api
-    /// de ne renvoyer que les missions affectées à ces équipages (param répétable
-    /// <c>assignedCrewId</c>) : évite de rapatrier toute la journée pour n'en garder qu'une poignée,
-    /// et surtout évite que le plafond <paramref name="take"/> (global) tronque les missions d'un
-    /// équipage un jour chargé. Ignoré par Orders.Api s'il ne le gère pas encore (rétro-compatible).
-    /// </summary>
-    Task<IReadOnlyList<ErpMissionListItemDto>> ListMissionsAsync(
-        DateTime from, DateTime to, int take,
-        IReadOnlyCollection<Guid>? assignedCrewIds = null, CancellationToken ct = default);
-
-    /// <summary>
     /// Toutes les missions affectées à un équipage, <b>sans borne de date</b>
     /// (<c>GET /crews/{crewId}/missions</c>). Le crew (cycle de vie ≤ 18h) EST le périmètre : la liste
     /// terrain se filtre par équipage uniquement, plus par jour. Liste vide si l'équipage n'a aucune mission.

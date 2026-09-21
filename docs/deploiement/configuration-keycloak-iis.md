@@ -23,7 +23,7 @@ La configuration se lit dans cet ordre (le dernier gagne) :
 |---|---|---|---|
 | `ConnectionStrings:MobileDb` | **env** (secret) | `Server=192.168.1.109,1440;Database=BD_ERP_MOBILE_APP;User Id=ErpAccount;Password=***;TrustServerCertificate=True` | BD Mobile (sessions, timeline, signatures) |
 | `OrdersApi:BaseUrl` | env / appsettings | `https://.../order/` | ERP lu en HTTP. **⚠ doit finir par `/`** |
-| `AddressApi:BaseUrl` | appsettings | `http://localhost:5100/api/v1/` | ⚠ **Lue par aucun code** (constaté le 2026-09-19) : les adresses arrivent résolues par Orders |
+| ~~`AddressApi:BaseUrl`~~ | — | — | **Retirée des `appsettings` le 2026-09-21** : lue par aucun code — les adresses arrivent résolues par Orders |
 | `Keycloak:Enabled` | env / appsettings | `true` | Active la validation JWT |
 | `Keycloak:RequireHttpsMetadata` | appsettings | `true` | Exige HTTPS pour les métadonnées OIDC |
 | `Keycloak:DisableValidation` | **dev only** | `false` | ⚠ décode sans vérifier signature — **jamais en prod** |

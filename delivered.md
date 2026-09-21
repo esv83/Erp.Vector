@@ -598,7 +598,8 @@ terrain dans la foulée.*
 
 *Procédure complète :* [`docs/deploiement/configuration-keycloak-iis.md`](docs/deploiement/configuration-keycloak-iis.md).
 
-> ⚠️ `AddressApi:BaseUrl` figure dans les `appsettings` mais **aucun code ne la lit** (constaté le 2026-09-19) ; retirée de cette liste.
+> ⚠️ `AddressApi:BaseUrl` n'était lue par **aucun code** (constaté le 2026-09-19) : retirée des quatre
+> `appsettings` le 2026-09-21. Les adresses arrivent résolues par Orders.
 
 **Clés lues** : `ConnectionStrings:MobileDb` (`OrdersDb` inutilisé) · `OrdersApi:BaseUrl` (et
 `OrdersApi:ServiceAccount`) · `Keycloak:{Enabled, Authority, Audience, ServiceAzp, DisableValidation,

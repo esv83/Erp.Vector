@@ -43,8 +43,6 @@ public class MissionMutuelleCardTests
             RequestedOrderId = id;
             return Task.FromResult(Order);
         }
-        public Task<IReadOnlyList<ErpMissionListItemDto>> ListMissionsAsync(DateTime f, DateTime t, int take, IReadOnlyCollection<Guid>? crews = null, CancellationToken ct = default)
-            => throw new NotSupportedException();
         public Task<IReadOnlyList<ErpMissionListItemDto>> ListMissionsByCrewAsync(Guid crewId, CancellationToken ct = default)
             => throw new NotSupportedException();
         public Task<ErpBeneficiaryDetailDto?> GetBeneficiaryAsync(Guid id, CancellationToken ct = default)

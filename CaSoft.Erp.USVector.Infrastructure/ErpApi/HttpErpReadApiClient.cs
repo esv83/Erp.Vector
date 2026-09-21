@@ -25,23 +25,6 @@ public sealed class HttpErpReadApiClient : IErpReadApiClient
     public async Task<ErpMissionFullDto?> GetMissionFullAsync(Guid missionId, CancellationToken ct = default)
         => await GetOrNullAsync<ErpMissionFullDto>($"missions/{missionId}/full", ct);
 
-    public async Task<IReadOnlyList<ErpMissionListItemDto>> ListMissionsAsync(
-        DateTime from, DateTime to, int take,
-        IReadOnlyCollection<Guid>? assignedCrewIds = null, CancellationToken ct = default)
-    {
-        var url = $"missions?from={Uri.EscapeDataString(from.ToString("o"))}"
-                + $"&to={Uri.EscapeDataString(to.ToString("o"))}"
-                + $"&unassignedOnly=false&includeCancelled=false&take={take}";
-
-        // Filtre équipage (param répétable) : ne rapatrie que les missions du/des crew(s). Ignoré
-        // par Orders.Api tant que non implémenté → repli sur le filtre client (correction préservée).
-        if (assignedCrewIds is { Count: > 0 })
-            url += string.Concat(assignedCrewIds.Select(id => $"&assignedCrewId={id}"));
-
-        var list = await _http.GetFromJsonAsync<List<ErpMissionListItemDto>>(url, JsonOptions, ct);
-        return list ?? new List<ErpMissionListItemDto>(0);
-    }
-
     public async Task<IReadOnlyList<ErpMissionListItemDto>> ListMissionsByCrewAsync(Guid crewId, CancellationToken ct = default)
     {
         // Endpoint crew-only : Orders.Api renvoie directement les missions de l'équipage, aucune date.

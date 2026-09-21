@@ -20,11 +20,6 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         [HttpGet("{gJobId}")]
         public ActionResult<ClSignatureGetModel> GetSignature(Guid gJobId, [FromServices] ISignatureRepository getSignatureRepository)
         {
-            if (!ClAutorizationCommand.AutorizeJob(Request, gJobId))
-            {
-                return BadRequest("Autorisation refusée");
-            }
-
             ClGetSignatureUseCase GetSignatureUseCase = new ClGetSignatureUseCase(gJobId, getSignatureRepository);
             // Use case migré au Result pattern : consommé via le pont Result→ActionResult.
             return GetSignatureUseCase.Handle().ToActionResult();
