@@ -102,6 +102,49 @@ Principe constant : **le terrain n'écrase jamais la donnée officielle de l'ERP
 
 *Du plus récent au plus ancien.*
 
+## 2026-09-21 — Publication : ce qui tourne se demande, le schéma se suit, les appels ne pendent plus
+
+*En production — `f000ad0` (`main`), rechargé à 09:11:39. **Constaté par `GET /vector/api/version`** :
+commit `f000ad0`, `Tree: clean`, environnement Production — et non plus seulement par le `.pdb`.*
+
+- **Deux routes disent ce qui tourne** (`e0e0bc5`) : `api/version`, **anonyme** (service, version,
+  commit, **état de l'arbre au build**, date de build, environnement) et `api/version/runtime`, avec
+  jeton (base résolue sans identifiants, drapeaux, état du schéma). Le commit et l'état de l'arbre
+  sont relevés **au build** par le csproj, depuis git.
+- **Le schéma de la base se suit** (`22b5b9f`) : `__VectorSchema` (script, date, origine), amorcée par
+  `MOB_009` avec ce qu'elle **constate** dans la base. **Constaté au démarrage** : « Schéma : 8
+  script(s) inscrit(s) sur 8 attendus · à jour (dernier : MOB_010_MutuelleCardOcr). » L'API ne migre
+  jamais et ne refuse jamais de démarrer.
+- **Les appels à Orders ne pendent plus** (`b8b9bf2`) : 8 s par essai, 25 s au total, 2 nouvelles
+  tentatives, disjoncteur — **jamais sur un 404 ni sur un refus métier**. Avant : 100 s par défaut,
+  et depuis les lots, un seul appel qui pend retenait 200 paquets.
+- **La lecture automatique des cartes mutuelle est en place et INERTE** (`defda33`) : file, worker,
+  appel à un modèle de vision en sortie structurée, colonnes de proposition (`MOB_010`). Sans clé, le
+  worker **ne démarre pas** — constaté : aucune ligne de dispatcher au journal. Ce qu'elle lit est
+  **proposé**, jamais écrit dans les champs de facturation (`M5`).
+- **Aussi en production** : la liste des documents ne charge plus leurs octets (`f584449`), les routes
+  de fin de service sont retirées (`66b6d28`), et le code mort part — `ListMissionsAsync`,
+  `AutorizeJob` qui rendait toujours `true`, deux classes du socle, la clé `AddressApi:BaseUrl`
+  (`f000ad0`).
+- **Mesuré le 20/09 en base** : **85 cartes mutuelle depuis le 13/09** pour 78 bénéficiaires, contre
+  1 864 missions suivies — ~4,6 % de remplissage. **Le code AMC n'est saisi que 41 fois sur 85.**
+- **Constaté après publication** : aucune erreur, le jeton de service obtenu à 09:11:40, le terrain
+  qui travaille normalement (équipages, liste, détail, jalons, conducteur, tous en 200).
+- 235 tests verts.
+
+## 2026-09-21 — Outillage : la suite de requêtes, et la publication qui lit `api/version`
+
+*Dans le dépôt ; **pas encore éprouvé sur une vraie publication** — ce sera la prochaine.*
+
+- **`Vector.Api.http`** (`2c4cf5a`) remplace le gabarit « weatherforecast » qui tenait lieu de suite
+  depuis le portage : jeton, version, équipage, missions, lots de la facturation, écritures — **et ce
+  qui doit être refusé** (401 sans jeton, mission d'un autre équipage, diagnostic fermé, routes
+  retirées en 404).
+- **`deploy.ps1` interroge `api/version` après la copie** (`896109b`) et refuse si le commit **servi**
+  n'est pas celui qu'on vient de publier, ou si l'arbre n'était pas propre. **Éprouvé contre la
+  production** sur les trois cas (commit servi confirmé, commit différent refusé, profil sans adresse
+  sauté) ; l'adresse de la **recette** reste à renseigner.
+
 ## 2026-09-19 — Publication : routes fermées, lots pour la facturation, garde de déploiement
 
 *En production — `03f9d01` (`main`), rechargé à 16:46:56, vérifié par sourcelink et journal. Publié
@@ -495,7 +538,9 @@ terrain dans la foulée.*
 | Prise de service depuis l'app | 9 confirmations servies du 15 au 18/09 |
 | Lots pour la facturation | 2026-09-19 : bascule de BillingGateway, part Vector 12,8 s → 6,8 s par journée, résultat identique à l'octet |
 | Fermeture des routes de la facturation | 2026-09-19 : 559 appels en 200 avec jeton après publication, aucun 401/403 |
-| Suite complète | 126 verts (2026-08-25) → 112 (2026-09-13) → 172 (2026-09-15) → **191 verts (2026-09-19)** |
+| Ce qui tourne | 2026-09-21 : `api/version` rend le commit publié et `Tree: clean`, en production |
+| Schéma de la base | 2026-09-21 : 8 scripts sur 8, constaté au démarrage |
+| Suite complète | 126 verts (2026-08-25) → 112 (2026-09-13) → 172 (2026-09-15) → 191 (2026-09-19) → **235 verts (2026-09-21)** |
 
 ---
 
@@ -602,7 +647,8 @@ terrain dans la foulée.*
 > `appsettings` le 2026-09-21. Les adresses arrivent résolues par Orders.
 
 **Clés lues** : `ConnectionStrings:MobileDb` (`OrdersDb` inutilisé) · `OrdersApi:BaseUrl` (et
-`OrdersApi:ServiceAccount`) · `Keycloak:{Enabled, Authority, Audience, ServiceAzp, DisableValidation,
+`OrdersApi:ServiceAccount`, `OrdersApi:Resilience`) · `MutuelleCardOcr:{ApiKey, Model, BatchSize,
+PollSeconds, MaxAttempts}` *(lecture automatique — inerte sans clé)* · `Keycloak:{Enabled, Authority, Audience, ServiceAzp, DisableValidation,
 RequireHttpsMetadata, AdminClientId, AdminClientSecret}` · `Diagnostics:Enabled` ·
 `MobileIdentityCache:{PersonnelMinutes=30, ActiveCrewsMinutes=15}` · secrets GpsGate/Sirus
 `__SET_VIA_ENV__`.
