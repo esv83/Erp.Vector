@@ -14,4 +14,24 @@ Public Class ClMutuelleCardDtoOut
     Public Property Concentrateur As String
     Public Property Teletransmission As String
     Public Property OcrStatus As String
+
+    ''' <summary>
+    ''' P3 — Ce que la lecture automatique PROPOSE, à côté des champs officiels ci-dessus. Nothing
+    ''' tant qu'aucune lecture n'a abouti. L'écran de validation affiche ces valeurs à côté de la
+    ''' saisie ; les valider les recopie dans les champs officiels (M5 : jamais d'écriture aveugle).
+    ''' </summary>
+    Public Property OcrProposal As ClMutuelleCardOcrProposalDtoOut
+End Class
+
+''' <summary>P3 — Proposition de la lecture automatique, telle que l'écran de validation la lit.</summary>
+Public Class ClMutuelleCardOcrProposalDtoOut
+    Public Property MutuelleName As String
+    Public Property AmcCode As String
+    Public Property Concentrateur As String
+    Public Property Teletransmission As String
+
+    ''' <summary>Confiance du modèle, de 0 à 1 — à afficher : on ne valide pas 0,4 comme 0,95.</summary>
+    Public Property Confidence As Decimal?
+
+    Public Property ExtractedAt As DateTime?
 End Class

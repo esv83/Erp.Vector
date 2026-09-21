@@ -5,6 +5,7 @@ using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Repositories;
 using CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 using CaSoft.Erp.USVector.Infrastructure.ErpApi;
+using CaSoft.Erp.USVector.Infrastructure.Ocr;
 using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Api.Workers;
 using EmergencyPlatformConnector;
@@ -288,6 +289,19 @@ builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
 // Les silos sont lus en une requête chacun, sans binaire (FieldDataQueryService).
 builder.Services.AddScoped<IFieldDataQueryService, CaSoft.Erp.USVector.Infrastructure.Repositories.FieldDataQueryService>();
 builder.Services.AddScoped<IFieldDataReader, CaSoft.Erp.USVector.Infrastructure.Repositories.FieldDataReader>();
+// P3 — Lecture automatique des cartes mutuelle. INERTE sans clé : le worker ne démarre pas, rien
+// n'appelle de modèle, et la capture continue exactement comme avant. La décision « où tourne
+// l'appel » et l'arbitrage RGPD (l'image part chez le fournisseur) précèdent l'activation.
+var ocrOptions = builder.Configuration.GetSection(MutuelleCardOcrOptions.SectionName).Get<MutuelleCardOcrOptions>()
+    ?? new MutuelleCardOcrOptions();
+builder.Services.AddSingleton(ocrOptions);
+if (ocrOptions.IsConfigured)
+{
+    builder.Services.AddSingleton(new Anthropic.AnthropicClient { ApiKey = ocrOptions.ApiKey });
+    builder.Services.AddScoped<IMutuelleCardOcrService, ClaudeMutuelleCardOcrService>();
+    builder.Services.AddHostedService<MutuelleCardOcrDispatcher>();
+}
+
 // Signatures en lot (B5) : une requête pour tout le lot.
 builder.Services.AddScoped<ISignatureQueryService, SignatureQueryService>();
 

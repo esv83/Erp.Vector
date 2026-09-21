@@ -52,7 +52,17 @@ public class MutuelleCardRepository : IMutuelleCardRepository
                 c.MMC_CONCENTRATEUR,
                 c.MMC_TELETRANSMISSION,
                 c.MMC_OCR_STATUS,
-                c.MMC_OCR_VALIDATED_AT
+                c.MMC_OCR_VALIDATED_AT,
+                // MOB_010 — la proposition de la lecture automatique : l'écran de validation la lit
+                // à côté des champs officiels. Toujours pas d'image dans cette projection.
+                c.MMC_OCR_MUTUELLE_NAME,
+                c.MMC_OCR_AMC_CODE,
+                c.MMC_OCR_CONCENTRATEUR,
+                c.MMC_OCR_TELETRANSMISSION,
+                c.MMC_OCR_CONFIDENCE,
+                c.MMC_OCR_EXTRACTED_AT,
+                c.MMC_OCR_ATTEMPTS,
+                c.MMC_OCR_LAST_ERROR
             })
             .FirstOrDefault();
 
@@ -73,6 +83,14 @@ public class MutuelleCardRepository : IMutuelleCardRepository
             Concentrateur = row.MMC_CONCENTRATEUR,
             Teletransmission = row.MMC_TELETRANSMISSION,
             OcrStatus = row.MMC_OCR_STATUS,
+            OcrMutuelleName = row.MMC_OCR_MUTUELLE_NAME,
+            OcrAmcCode = row.MMC_OCR_AMC_CODE,
+            OcrConcentrateur = row.MMC_OCR_CONCENTRATEUR,
+            OcrTeletransmission = row.MMC_OCR_TELETRANSMISSION,
+            OcrConfidence = row.MMC_OCR_CONFIDENCE,
+            OcrExtractedAt = row.MMC_OCR_EXTRACTED_AT,
+            OcrAttempts = row.MMC_OCR_ATTEMPTS,
+            OcrLastError = row.MMC_OCR_LAST_ERROR,
             OcrValidatedAt = row.MMC_OCR_VALIDATED_AT
         };
     }
@@ -135,4 +153,54 @@ public class MutuelleCardRepository : IMutuelleCardRepository
         _ctx.SaveChanges();
         return entity.ToDomain();
     }
+
+    // ── P3 : la file de lecture automatique ──────────────────────────────────
+
+    public IReadOnlyList<Guid> ListPendingOcr(int take)
+        => _ctx.MutuelleCards.AsNoTracking()
+            .Where(c => c.MMC_OCR_STATUS == PendingStatus)
+            .OrderBy(c => c.MMC_CAPTURED_AT)
+            .Take(take)
+            .Select(c => c.MMC_ID)   // l'image se tire une par une, au moment de la lire
+            .ToList();
+
+    public void SaveOcrProposal(Guid cardId, ClMutuelleCardOcrProposal proposal)
+    {
+        var entity = _ctx.MutuelleCards.SingleOrDefault(c => c.MMC_ID == cardId);
+        if (entity is null) return;
+
+        // ⚠️ Les quatre champs officiels (MMC_MUTUELLE_NAME, MMC_AMC_CODE, …) ne sont PAS touchés :
+        // la proposition vit à côté, et c'est la validation humaine qui recopie (M5).
+        entity.MMC_OCR_MUTUELLE_NAME = proposal.MutuelleName;
+        entity.MMC_OCR_AMC_CODE = proposal.AmcCode;
+        entity.MMC_OCR_CONCENTRATEUR = proposal.Concentrateur;
+        entity.MMC_OCR_TELETRANSMISSION = proposal.Teletransmission;
+        entity.MMC_OCR_CONFIDENCE = proposal.Confidence;
+        entity.MMC_OCR_EXTRACTED_AT = DateTime.UtcNow;
+        entity.MMC_OCR_ATTEMPTS += 1;
+        entity.MMC_OCR_LAST_ERROR = null;
+        entity.MMC_OCR_STATUS = ExtractedStatus;
+
+        _ctx.SaveChanges();
+    }
+
+    public ClOcrFailureOutcome MarkOcrFailure(Guid cardId, string reason, int maxAttempts)
+    {
+        var entity = _ctx.MutuelleCards.SingleOrDefault(c => c.MMC_ID == cardId);
+        if (entity is null) return new ClOcrFailureOutcome { Attempts = 0, GaveUp = true };
+
+        entity.MMC_OCR_ATTEMPTS += 1;
+        var giveUp = entity.MMC_OCR_ATTEMPTS >= maxAttempts;
+        // Le motif est borné à la colonne : un message d'exception entier la ferait échouer, et on
+        // perdrait l'échec en voulant l'enregistrer.
+        entity.MMC_OCR_LAST_ERROR = reason.Length > 400 ? reason[..400] : reason;
+        if (giveUp) entity.MMC_OCR_STATUS = ErrorStatus;
+
+        _ctx.SaveChanges();
+        return new ClOcrFailureOutcome { Attempts = entity.MMC_OCR_ATTEMPTS, GaveUp = giveUp };
+    }
+
+    private const string PendingStatus = "pending";
+    private const string ExtractedStatus = "extracted";
+    private const string ErrorStatus = "error";
 }

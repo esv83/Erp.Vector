@@ -25,6 +25,9 @@ Public Class ClUploadMutuelleCardUseCase
                 Return ClResult(Of ClMutuelleCardCreatedDtoOut).Fail(ClError.Application("Image trop volumineuse (max 8 Mo)."))
             End If
 
+            ' P3 — la carte part EN FILE de lecture automatique (« pending »). Sans worker
+            ' configuré, ce statut ne fait rien : personne ne dépile, et la saisie manuelle reste
+            ' le seul chemin, exactement comme avant.
             Dim card As New ClMutuelleCard With {
                 .Id = Guid.NewGuid(),
                 .BeneficiaryId = _command.BeneficiaryId,
@@ -34,7 +37,7 @@ Public Class ClUploadMutuelleCardUseCase
                 .CapturedAt = DateTime.UtcNow,
                 .CapturedCrewId = _command.CrewId,
                 .MissionId = _command.MissionId,
-                .OcrStatus = "none"
+                .OcrStatus = "pending"
             }
 
             _repository.Save(card)

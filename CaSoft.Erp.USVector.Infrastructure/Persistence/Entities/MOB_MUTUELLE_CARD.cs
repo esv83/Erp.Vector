@@ -21,5 +21,22 @@ public partial class MOB_MUTUELLE_CARD
     public string? MMC_CONCENTRATEUR { get; set; }
     public string? MMC_TELETRANSMISSION { get; set; }
     public string? MMC_OCR_STATUS { get; set; }
+
+    // MOB_010 — champs PROPOSÉS par la lecture automatique, à côté des officiels ci-dessus.
+    public string? MMC_OCR_MUTUELLE_NAME { get; set; }
+
+    public string? MMC_OCR_AMC_CODE { get; set; }
+
+    public string? MMC_OCR_CONCENTRATEUR { get; set; }
+
+    public string? MMC_OCR_TELETRANSMISSION { get; set; }
+
+    public decimal? MMC_OCR_CONFIDENCE { get; set; }
+
+    public DateTime? MMC_OCR_EXTRACTED_AT { get; set; }
+
+    public int MMC_OCR_ATTEMPTS { get; set; }
+
+    public string? MMC_OCR_LAST_ERROR { get; set; }
     public DateTime? MMC_OCR_VALIDATED_AT { get; set; }
 }

@@ -63,6 +63,28 @@ Namespace Port
         ''' </summary>
         Function Update(card As ClMutuelleCard) As ClMutuelleCard
 
+        ''' <summary>
+        ''' P3 — Les cartes en attente de lecture automatique (statut <c>pending</c>), les plus
+        ''' anciennes d'abord. <b>Les identifiants seuls</b> : l'image se tire une par une, au moment
+        ''' de la lire — en charger cinquante d'un coup sortirait 25 Mo de la base pour rien.
+        ''' </summary>
+        Function ListPendingOcr(take As Integer) As IReadOnlyList(Of Guid)
+
+        ''' <summary>
+        ''' Enregistre ce que la lecture automatique <b>propose</b> : statut <c>extracted</c>, champs
+        ''' proposés, confiance. <b>Les quatre champs officiels ne sont pas touchés</b> (M5).
+        ''' </summary>
+        Sub SaveOcrProposal(cardId As Guid, proposal As ClMutuelleCardOcrProposal)
+
+        ''' <summary>
+        ''' Enregistre un échec de lecture : motif, tentative de plus. La carte passe en <c>error</c>
+        ''' une fois <paramref name="maxAttempts"/> atteint — sans quoi une carte illisible se
+        ''' relancerait sans fin, comme la file de projection l'a fait 55 450 fois avant le 13/09.
+        ''' <b>Le décompte est tenu ici</b>, là où la ligne est : l'appelant n'a pas à le relire.
+        ''' </summary>
+        ''' <returns>Le nombre de tentatives après celle-ci, et si la carte est abandonnée.</returns>
+        Function MarkOcrFailure(cardId As Guid, reason As String, maxAttempts As Integer) As ClOcrFailureOutcome
+
     End Interface
 
 End Namespace

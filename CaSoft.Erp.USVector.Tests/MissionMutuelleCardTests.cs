@@ -91,7 +91,8 @@ public class MissionMutuelleCardTests
         stored!.Id.Should().Be(result.Value.Id);
         stored.MissionId.Should().Be(Mission);
         stored.CapturedCrewId.Should().Be(Crew);
-        stored.OcrStatus.Should().Be("none");
+        // P3 — la carte part en file de lecture automatique. Sans worker configuré, personne ne dépile.
+        stored.OcrStatus.Should().Be("pending");
     }
 
     [Fact]

@@ -16,7 +16,30 @@ Public Module ModMutuelleCardMapping
             .AmcCode = card.AmcCode,
             .Concentrateur = card.Concentrateur,
             .Teletransmission = card.Teletransmission,
-            .OcrStatus = card.OcrStatus
+            .OcrStatus = card.OcrStatus,
+            .OcrProposal = ToProposalDtoOut(card)
+        }
+    End Function
+
+    ''' <summary>
+    ''' La proposition, ou Nothing quand il n'y en a pas — un bloc vide se lirait comme « le modèle a
+    ''' lu, et n'a rien trouvé », ce qui n'est pas la même chose que « personne n'a encore lu ».
+    ''' </summary>
+    Private Function ToProposalDtoOut(card As ClMutuelleCard) As ClMutuelleCardOcrProposalDtoOut
+        If String.IsNullOrWhiteSpace(card.OcrMutuelleName) AndAlso
+           String.IsNullOrWhiteSpace(card.OcrAmcCode) AndAlso
+           String.IsNullOrWhiteSpace(card.OcrConcentrateur) AndAlso
+           String.IsNullOrWhiteSpace(card.OcrTeletransmission) Then
+            Return Nothing
+        End If
+
+        Return New ClMutuelleCardOcrProposalDtoOut With {
+            .MutuelleName = card.OcrMutuelleName,
+            .AmcCode = card.OcrAmcCode,
+            .Concentrateur = card.OcrConcentrateur,
+            .Teletransmission = card.OcrTeletransmission,
+            .Confidence = card.OcrConfidence,
+            .ExtractedAt = card.OcrExtractedAt
         }
     End Function
 

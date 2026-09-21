@@ -82,6 +82,9 @@ public class MobileDbContext : DbContext
             b.Property(c => c.MMC_IMAGE).IsRequired();
             b.Property(c => c.MMC_CAPTURED_AT).HasPrecision(0).HasDefaultValueSql("SYSUTCDATETIME()");
             b.Property(c => c.MMC_OCR_VALIDATED_AT).HasPrecision(0);
+            // MOB_010 — proposition de la lecture automatique : décimal borné (0 à 1), daté à la seconde.
+            b.Property(c => c.MMC_OCR_CONFIDENCE).HasPrecision(4, 3);
+            b.Property(c => c.MMC_OCR_EXTRACTED_AT).HasPrecision(0);
             b.HasIndex(c => new { c.MMC_BENEFICIARY_ID, c.MMC_CAPTURED_AT }, "IX_MOB_MUTUELLE_CARD_BENEFICIARY");
         });
 

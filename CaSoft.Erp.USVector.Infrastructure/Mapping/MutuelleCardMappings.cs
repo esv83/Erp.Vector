@@ -22,6 +22,14 @@ internal static class MutuelleCardMappings
         MMC_TELETRANSMISSION = c.Teletransmission,
         MMC_OCR_STATUS = c.OcrStatus,
         MMC_OCR_VALIDATED_AT = c.OcrValidatedAt,
+        MMC_OCR_MUTUELLE_NAME = c.OcrMutuelleName,
+        MMC_OCR_AMC_CODE = c.OcrAmcCode,
+        MMC_OCR_CONCENTRATEUR = c.OcrConcentrateur,
+        MMC_OCR_TELETRANSMISSION = c.OcrTeletransmission,
+        MMC_OCR_CONFIDENCE = c.OcrConfidence,
+        MMC_OCR_EXTRACTED_AT = c.OcrExtractedAt,
+        MMC_OCR_ATTEMPTS = c.OcrAttempts,
+        MMC_OCR_LAST_ERROR = c.OcrLastError,
     };
 
     public static ClMutuelleCard ToDomain(this MOB_MUTUELLE_CARD e) => new()
@@ -40,5 +48,13 @@ internal static class MutuelleCardMappings
         Teletransmission = e.MMC_TELETRANSMISSION,
         OcrStatus = e.MMC_OCR_STATUS,
         OcrValidatedAt = e.MMC_OCR_VALIDATED_AT,
+        OcrMutuelleName = e.MMC_OCR_MUTUELLE_NAME,
+        OcrAmcCode = e.MMC_OCR_AMC_CODE,
+        OcrConcentrateur = e.MMC_OCR_CONCENTRATEUR,
+        OcrTeletransmission = e.MMC_OCR_TELETRANSMISSION,
+        OcrConfidence = e.MMC_OCR_CONFIDENCE,
+        OcrExtractedAt = e.MMC_OCR_EXTRACTED_AT,
+        OcrAttempts = e.MMC_OCR_ATTEMPTS,
+        OcrLastError = e.MMC_OCR_LAST_ERROR,
     };
 }
