@@ -8,8 +8,8 @@
 > ✅ **La carte mutuelle sort du terrain** : l'équipage sait qu'elle est connue, les écrans de la
 > régulation et de la certification peuvent la lire — dès qu'on leur aura ouvert la porte.
 >
-> ⏳ **Ce qui reste est surtout chez les autres** : les clients Keycloak des écrans, le front de Jules,
-> l'écran d'Alexandre. Chez nous : voir passer la semaine, puis démonter deux échafaudages.
+> ⏳ **Ce qui reste est surtout chez les autres** : les clients Keycloak des écrans, le front de Jules, qui
+> reprend aussi l'app terrain d'Alexandre. Chez nous : voir passer la semaine, puis démonter deux échafaudages.
 >
 > Ce document **se régénère** au prompt *« compact devplan »* et ne porte **que l'ouvert**. Le
 > **pourquoi** vit dans [`decided.md`](decided.md), à lire avant de coder ; le **fait**, horodaté et
@@ -226,13 +226,11 @@ et **c'est dit**.*
 | Entrée | Qui doit bouger | Dernier relevé | En deux mots |
 |---|---|---|---|
 | **Les clients Keycloak des écrans** 🆕 | exploitation Keycloak | **04/10** | L'`azp` des jetons de l'écran de régulation et de celui de la certification → `Keycloak:ScreenAzp`. Sans eux, les écrans reçoivent 401 |
-| **La carte mutuelle dans les deux listes de missions** 🆕 | Jules | **04/10** | [`note_front_jules_carte_mutuelle.md`](note_front_jules_carte_mutuelle.md) : présence par page, données au clic, image par `fetch` + blob. Sa bascule débloque « Fermer les routes anonymes de la carte » |
-| **Afficher la carte connue, le message du 503, prendre acte des kilomètres** | dev web (Alexandre) | **04/10** | [`note_web_alexandre_carte_mutuelle_detail.md`](note_web_alexandre_carte_mutuelle_detail.md), [`note_web_alexandre_503_regulation_indisponible.md`](note_web_alexandre_503_regulation_indisponible.md), [routes retirées](note_web_alexandre_routes_retirees.md). Neutre s'il ne bouge pas |
+| **Tout le front, en une note** 🆕 | **Jules** — il reprend l'app terrain d'Alexandre, indisponible | **04/10** | [`note_front_jules_vector.md`](note_front_jules_vector.md) : le nouveau du 04/10 pour l'app (503, carte connue, saisie, kilomètres), **les demandes faites à Alexandre à vérifier** (statut inconnu), la carte dans les listes de régulation et de certification. Sa bascule débloque « Fermer les routes anonymes de la carte » |
 | **Règle d'applicabilité des types** *[B9]* | Orders + décision métier | 04/10 | **11 types proposés partout**, tables de restriction vides. Première de leur plan, **par priorité** |
 | **Exiger un jeton du terrain** | Orders | 04/10 | Rien ne l'en empêche de notre côté. ⚠️ **`POST /missions/batch-refs` répond 200 sans jeton** |
 | **La cause des coupures** | exploitation / réseau | 04/10 | 22/09 et 02/10 : SQL, Orders et DNS **ensemble** ; 04/10, 15:00 : redémarrage du serveur SQL de la base Vector. Hors de ce dépôt |
 | **Rattachement des comptes** *[C1]* | Orders, Identity, **RH** | 13/09 | Vector lit `PER_KEYCLOAK_MAP`, que l'écran d'Employee n'alimente pas ; **273 personnels sans fiche Employee**. [Consigne](docs/auth/consigne-rattachement-ambulancier.md) **à transmettre à la régulation et à la RH** |
-| **Écrans : motif d'un champ grisé, relecture du NIR, bouton *Réessayer*, motif du refus de conducteur, validation des cartes lues** | dev web | 21/09 | [`note_ui_alex.md`](note_ui_alex.md), [`docs/ui-web/UI_selection-equipage-multi-crew.md`](docs/ui-web/UI_selection-equipage-multi-crew.md), [`note_web_alexandre_carte_mutuelle_ocr.md`](note_web_alexandre_carte_mutuelle_ocr.md) |
 | **Composer les équipages avant la prise de service** *[C3]* | 🔴 régulation — décision | 13/09 | Sans quoi l'accès anticipé de 30 min ne sert à rien. Le filtre d'appartenance est **volontaire** |
 | **`REFERENCE` et `URGENT`** *[B10]* | décision métier | 19/09 | Absents du catalogue |
 | **`Billed` : l'écrire, ou retirer le palier** *[B4, E4]* | 🔴 décision | 13/09 | La facturation est en lecture seule par décision de son module |

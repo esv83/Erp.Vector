@@ -113,7 +113,7 @@ la publication** : « Schéma : 9 script(s) inscrit(s) sur 9 attendus · à jour
   par mission, patient résolu en un appel `batch-refs`) et `GET api/missions/{id}/mutuelle-card/image`.
   Ils entrent par un azp dédié (`Keycloak:ScreenAzp`) sur quatre routes de lecture figées par un test.
   **Inerte en production** : la liste est vide tant que les clients Keycloak des écrans ne sont pas
-  connus. Note à Jules : [`note_front_jules_carte_mutuelle.md`](note_front_jules_carte_mutuelle.md).
+  connus. Note à Jules : [`note_front_jules_vector.md`](note_front_jules_vector.md).
 - **L'équipage voit la carte dans le détail de la mission** : connue ou non, date de la dernière photo,
   champs repris, lien vers l'image — sans appel à Orders de plus. Note à Alexandre :
   [`note_web_alexandre_carte_mutuelle_detail.md`](note_web_alexandre_carte_mutuelle_detail.md).
