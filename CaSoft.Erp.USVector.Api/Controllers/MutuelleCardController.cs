@@ -114,7 +114,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         {
             Tracer("image", 1);
             var beneficiaryId = await _beneficiaries.GetBeneficiaryIdAsync(missionId, ct);
-            return beneficiaryId is null ? NotFound() : ServirImage(_repository.GetCurrentImage(beneficiaryId.Value));
+            return beneficiaryId is null ? NotFound() : ServirImage(await _repository.GetCurrentImageAsync(beneficiaryId.Value, ct));
         }
 
         /// <summary>
@@ -134,26 +134,27 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             Guid beneficiaryId,
             [FromForm] UploadMutuelleCardForm form,
             [FromQuery] Guid? crewId,
-            [FromQuery] Guid? missionId)
+            [FromQuery] Guid? missionId,
+            CancellationToken ct)
         {
             var file = form.File;
             if (file is null || file.Length == 0)
                 return BadRequest("Fichier image manquant.");
 
             using var ms = new MemoryStream();
-            await file.CopyToAsync(ms);
+            await file.CopyToAsync(ms, ct);
 
             var command = new ClUploadMutuelleCardCommand(
                 beneficiaryId, ms.ToArray(), file.ContentType, crewId, missionId);
 
-            return new ClUploadMutuelleCardUseCase(command, _repository).Handle().ToActionResult();
+            return (await new ClUploadMutuelleCardUseCase(command, _repository).HandleAsync(ct)).ToActionResult();
         }
 
         /// <summary>Métadonnées de la carte courante du bénéficiaire (sans le binaire).</summary>
         [HttpGet("beneficiaries/{beneficiaryId:guid}/mutuelle-card")]
-        public IActionResult GetCurrent(Guid beneficiaryId)
+        public async Task<IActionResult> GetCurrent(Guid beneficiaryId, CancellationToken ct)
         {
-            var card = _repository.GetCurrentMetadata(beneficiaryId);
+            var card = await _repository.GetCurrentMetadataAsync(beneficiaryId, ct);
             return card is null ? NotFound() : Ok(card.ToDtoOut());
         }
 
@@ -191,7 +192,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         /// </remarks>
         [AllowAnonymous]
         [HttpPost("mutuelle-card/presence")]
-        public IActionResult ListPresence([FromBody] MutuelleCardPresenceQuery query)
+        public async Task<IActionResult> ListPresence([FromBody] MutuelleCardPresenceQuery query, CancellationToken ct)
         {
             var ids = query?.BeneficiaryIds?.Where(id => id != Guid.Empty).ToList() ?? new List<Guid>();
 
@@ -202,7 +203,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             // erreur d'appelant, et le lui dire l'obligerait à traiter un cas de plus.
             if (ids.Count == 0) return Ok(new List<ClMutuelleCardPresenceDtoOut>());
 
-            var presences = _repository.ListPresence(ids)
+            var presences = (await _repository.ListPresenceAsync(ids, ct))
                 .Select(p => p.ToDtoOut())
                 .ToList();
 
@@ -226,18 +227,18 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         /// </remarks>
         [AllowAnonymous]
         [HttpGet("beneficiaries/{beneficiaryId:guid}/mutuelle-card/image")]
-        public IActionResult GetCurrentImage(Guid beneficiaryId)
-            => ServirImage(_repository.GetCurrentImage(beneficiaryId));
+        public async Task<IActionResult> GetCurrentImage(Guid beneficiaryId, CancellationToken ct)
+            => ServirImage(await _repository.GetCurrentImageAsync(beneficiaryId, ct));
 
         /// <summary>
         /// Renseigne/corrige manuellement les champs mutuelle d'une carte (avant OCR, P2).
         /// Saisie humaine → statut <c>validated</c>.
         /// </summary>
         [HttpPatch("mutuelle-card/{cardId:guid}")]
-        public IActionResult SetFields(Guid cardId, [FromBody] ClMutuelleFieldsDtoIn fields)
+        public async Task<IActionResult> SetFields(Guid cardId, [FromBody] ClMutuelleFieldsDtoIn fields, CancellationToken ct)
         {
             var command = new ClSetMutuelleFieldsCommand(cardId, fields);
-            return new ClSetMutuelleFieldsUseCase(command, _repository).Handle().ToActionResult();
+            return (await new ClSetMutuelleFieldsUseCase(command, _repository).HandleAsync(ct)).ToActionResult();
         }
 
         /// <summary>Octets de l'image d'une carte (Content-Type d'origine).</summary>
@@ -247,10 +248,10 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         // restent ouvertes (M9) jusqu'à ce que les écrans soient passés aux routes par mission.
         [Authorize(Policy = ClKeycloakCallers.MutuelleCardReadPolicy)]
         [HttpGet("mutuelle-card/{cardId:guid}/image")]
-        public IActionResult GetImage(Guid cardId)
+        public async Task<IActionResult> GetImage(Guid cardId, CancellationToken ct)
         {
             Tracer("image", 1);
-            return ServirImage(_repository.GetImage(cardId));
+            return ServirImage(await _repository.GetImageAsync(cardId, ct));
         }
 
         /// <summary>Une ligne par lecture : appelant et volume, sans identifiant de patient.</summary>

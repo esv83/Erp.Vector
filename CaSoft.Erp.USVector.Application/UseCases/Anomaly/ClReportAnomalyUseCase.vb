@@ -1,9 +1,11 @@
+Imports System.Threading
+
 ''' <summary>
 ''' TRF-8 — Signale une anomalie terrain sur une mission. Anomalie non bloquante : simple
 ''' enregistrement historisé, transféré ensuite dans le paquet field-data. Result pattern.
 ''' </summary>
 Public Class ClReportAnomalyUseCase
-    Implements IResultUseCase(Of ClAnomalyDtoOut)
+    Implements IResultUseCaseAsync(Of ClAnomalyDtoOut)
 
     Private ReadOnly _command As ClReportAnomalyCommand
     Private ReadOnly _repository As IAnomalyRepository
@@ -13,7 +15,7 @@ Public Class ClReportAnomalyUseCase
         _repository = repository
     End Sub
 
-    Public Function Handle() As ClResult(Of ClAnomalyDtoOut) Implements IResultUseCase(Of ClAnomalyDtoOut).Handle
+    Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of ClAnomalyDtoOut)) Implements IResultUseCaseAsync(Of ClAnomalyDtoOut).HandleAsync
         If _command.MissionId = Guid.Empty Then
             Return ClResult(Of ClAnomalyDtoOut).Fail(ClError.Application("Mission obligatoire."))
         End If
@@ -30,7 +32,7 @@ Public Class ClReportAnomalyUseCase
             .ReportedCrewId = _command.Input.CrewId
         }
 
-        _repository.Save(anomaly)
+        Await _repository.SaveAsync(anomaly, ct)
         Return ClResult(Of ClAnomalyDtoOut).Ok(anomaly.ToDtoOut())
     End Function
 

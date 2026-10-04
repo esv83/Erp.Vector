@@ -1,9 +1,11 @@
+Imports System.Threading
+
 ''' <summary>
 ''' TRF-10 — Dépose un document/photo terrain sur une mission. Historisé ; transféré ensuite
 ''' dans le paquet field-data (binaire servi par <c>imageUrl</c>). Result pattern.
 ''' </summary>
 Public Class ClUploadDocumentUseCase
-    Implements IResultUseCase(Of ClDocumentDtoOut)
+    Implements IResultUseCaseAsync(Of ClDocumentDtoOut)
 
     Private ReadOnly _command As ClUploadDocumentCommand
     Private ReadOnly _repository As IDocumentRepository
@@ -13,7 +15,7 @@ Public Class ClUploadDocumentUseCase
         _repository = repository
     End Sub
 
-    Public Function Handle() As ClResult(Of ClDocumentDtoOut) Implements IResultUseCase(Of ClDocumentDtoOut).Handle
+    Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of ClDocumentDtoOut)) Implements IResultUseCaseAsync(Of ClDocumentDtoOut).HandleAsync
         If _command.MissionId = Guid.Empty Then
             Return ClResult(Of ClDocumentDtoOut).Fail(ClError.Application("Mission obligatoire."))
         End If
@@ -36,7 +38,7 @@ Public Class ClUploadDocumentUseCase
             .CapturedCrewId = _command.CrewId
         }
 
-        _repository.Save(document)
+        Await _repository.SaveAsync(document, ct)
         Return ClResult(Of ClDocumentDtoOut).Ok(document.ToDtoOut())
     End Function
 

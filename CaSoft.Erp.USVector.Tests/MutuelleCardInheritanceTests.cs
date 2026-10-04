@@ -1,4 +1,5 @@
 using CaSoft.Erp.USVector.Application;
+using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 using FluentAssertions;
@@ -15,54 +16,58 @@ namespace CaSoft.Erp.USVector.Tests;
 public class MutuelleCardInheritanceTests
 {
     private static readonly Guid Patient = Guid.Parse("22222222-0000-0000-0000-000000000009");
+    private static readonly CancellationToken Ct = CancellationToken.None;
 
     private static MutuelleCardRepository Repository()
         => new(new MobileDbContext(new DbContextOptionsBuilder<MobileDbContext>()
             .UseInMemoryDatabase($"heritage-{Guid.NewGuid()}").Options));
 
-    private static Guid Photographier(MutuelleCardRepository repository)
+    private static async Task<Guid> Photographier(MutuelleCardRepository repository)
     {
-        var result = new ClUploadMutuelleCardUseCase(
+        var result = await new ClUploadMutuelleCardUseCase(
                 new ClUploadMutuelleCardCommand(Patient, new byte[] { 1, 2, 3 }, "image/jpeg", null, null), repository)
-            .Handle();
+            .HandleAsync(Ct);
         result.IsSucces.Should().BeTrue();
         // Deux photos dans la même milliseconde se départageraient mal : la plus récente fait foi.
-        Thread.Sleep(5);
+        await Task.Delay(5);
         return result.Value.Id;
     }
 
-    private static void Valider(MutuelleCardRepository repository, Guid cardId, string amc)
-        => new ClSetMutuelleFieldsUseCase(
+    private static async Task Valider(MutuelleCardRepository repository, Guid cardId, string amc)
+        => (await new ClSetMutuelleFieldsUseCase(
                 new ClSetMutuelleFieldsCommand(cardId, new ClMutuelleFieldsDtoIn
                 {
                     MutuelleName = "MGEN", AmcCode = amc, Concentrateur = "SP Santé", Teletransmission = "Oui"
                 }),
                 repository)
-            .Handle().IsSucces.Should().BeTrue();
+            .HandleAsync(Ct)).IsSucces.Should().BeTrue();
+
+    private static async Task<ClMutuelleCard> Courante(MutuelleCardRepository repository)
+        => (await repository.GetCurrentMetadataAsync(Patient, Ct))!;
 
     [Fact]
-    public void Une_premiere_photo_n_herite_de_rien()
+    public async Task Une_premiere_photo_n_herite_de_rien()
     {
         var repository = Repository();
 
-        Photographier(repository);
+        await Photographier(repository);
 
-        var courante = repository.GetCurrentMetadata(Patient)!;
+        var courante = await Courante(repository);
         courante.AmcCode.Should().BeNull();
         courante.FieldsInheritedFrom.Should().BeNull();
     }
 
     [Fact]
-    public void Une_nouvelle_photo_reprend_les_champs_valides_et_dit_de_quelle_photo()
+    public async Task Une_nouvelle_photo_reprend_les_champs_valides_et_dit_de_quelle_photo()
     {
         var repository = Repository();
-        var premiere = Photographier(repository);
-        Valider(repository, premiere, "12345678");
-        var datePremiere = repository.GetCurrentMetadata(Patient)!.CapturedAt;
+        var premiere = await Photographier(repository);
+        await Valider(repository, premiere, "12345678");
+        var datePremiere = (await Courante(repository)).CapturedAt;
 
-        Photographier(repository);
+        await Photographier(repository);
 
-        var courante = repository.GetCurrentMetadata(Patient)!;
+        var courante = await Courante(repository);
         courante.Id.Should().NotBe(premiere);
         courante.MutuelleName.Should().Be("MGEN");
         courante.AmcCode.Should().Be("12345678");
@@ -75,44 +80,44 @@ public class MutuelleCardInheritanceTests
     }
 
     [Fact]
-    public void Reprise_deux_fois_elle_garde_la_date_de_la_photo_d_origine()
+    public async Task Reprise_deux_fois_elle_garde_la_date_de_la_photo_d_origine()
     {
         var repository = Repository();
-        var premiere = Photographier(repository);
-        Valider(repository, premiere, "12345678");
-        var datePremiere = repository.GetCurrentMetadata(Patient)!.CapturedAt;
+        var premiere = await Photographier(repository);
+        await Valider(repository, premiere, "12345678");
+        var datePremiere = (await Courante(repository)).CapturedAt;
 
-        Photographier(repository);
-        Photographier(repository);
+        await Photographier(repository);
+        await Photographier(repository);
 
-        var courante = repository.GetCurrentMetadata(Patient)!;
+        var courante = await Courante(repository);
         courante.AmcCode.Should().Be("12345678");
         courante.FieldsInheritedFrom.Should().Be(datePremiere);
     }
 
     [Fact]
-    public void Valider_sur_la_nouvelle_photo_efface_la_mention_de_reprise()
+    public async Task Valider_sur_la_nouvelle_photo_efface_la_mention_de_reprise()
     {
         var repository = Repository();
-        Valider(repository, Photographier(repository), "12345678");
-        var seconde = Photographier(repository);
+        await Valider(repository, await Photographier(repository), "12345678");
+        var seconde = await Photographier(repository);
 
-        Valider(repository, seconde, "87654321");
+        await Valider(repository, seconde, "87654321");
 
-        var courante = repository.GetCurrentMetadata(Patient)!;
+        var courante = await Courante(repository);
         courante.AmcCode.Should().Be("87654321");
         courante.FieldsInheritedFrom.Should().BeNull();
     }
 
     [Fact]
-    public void Une_photo_precedente_jamais_validee_ne_transmet_rien()
+    public async Task Une_photo_precedente_jamais_validee_ne_transmet_rien()
     {
         var repository = Repository();
-        Photographier(repository);
+        await Photographier(repository);
 
-        Photographier(repository);
+        await Photographier(repository);
 
-        var courante = repository.GetCurrentMetadata(Patient)!;
+        var courante = await Courante(repository);
         courante.AmcCode.Should().BeNull();
         courante.FieldsInheritedFrom.Should().BeNull();
     }

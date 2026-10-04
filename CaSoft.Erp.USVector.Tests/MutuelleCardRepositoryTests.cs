@@ -29,15 +29,15 @@ public class MutuelleCardRepositoryTests
         };
 
     [Fact]
-    public void Save_then_GetImage_returns_bytes()
+    public async Task Save_then_GetImage_returns_bytes()
     {
         using var ctx = NewContext();
         var sut = new MutuelleCardRepository(ctx);
         var card = Card(new DateTime(2026, 6, 15, 10, 0, 0, DateTimeKind.Utc), 1, 2, 3);
 
-        sut.Save(card);
+        await sut.SaveAsync(card, CancellationToken.None);
 
-        var loaded = sut.GetImage(card.Id);
+        var loaded = (await sut.GetImageAsync(card.Id, CancellationToken.None));
         loaded.Should().NotBeNull();
         loaded!.Bytes.Should().Equal(1, 2, 3);
         loaded.ContentType.Should().Be("image/jpeg");
@@ -49,13 +49,13 @@ public class MutuelleCardRepositoryTests
     /// dans la construction du paquet terrain.
     /// </summary>
     [Fact]
-    public void GetCurrentMetadata_ne_charge_pas_le_binaire()
+    public async Task GetCurrentMetadata_ne_charge_pas_le_binaire()
     {
         using var ctx = NewContext();
         var sut = new MutuelleCardRepository(ctx);
-        sut.Save(Card(new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc), 1, 2, 3));
+        await sut.SaveAsync(Card(new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc), 1, 2, 3), CancellationToken.None);
 
-        var meta = sut.GetCurrentMetadata(Ben);
+        var meta = (await sut.GetCurrentMetadataAsync(Ben, CancellationToken.None));
 
         meta.Should().NotBeNull();
         meta!.ByteSize.Should().Be(3, "la taille reste une métadonnée, elle");
@@ -69,20 +69,20 @@ public class MutuelleCardRepositoryTests
     /// sans avoir demandé ligne par ligne.
     /// </summary>
     [Fact]
-    public void ListPresence_rend_la_plus_recente_et_ignore_les_beneficiaires_sans_carte()
+    public async Task ListPresence_rend_la_plus_recente_et_ignore_les_beneficiaires_sans_carte()
     {
         using var ctx = NewContext();
         var sut = new MutuelleCardRepository(ctx);
         var autre = Guid.Parse("dddddddd-0000-0000-0000-000000000002");
         var sansCarte = Guid.Parse("dddddddd-0000-0000-0000-000000000003");
 
-        sut.Save(Card(new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc), 1));
-        sut.Save(Card(new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc), 9));
+        await sut.SaveAsync(Card(new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc), 1), CancellationToken.None);
+        await sut.SaveAsync(Card(new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc), 9), CancellationToken.None);
         var carteAutre = Card(new DateTime(2026, 6, 12, 0, 0, 0, DateTimeKind.Utc), 7);
         carteAutre.BeneficiaryId = autre;
-        sut.Save(carteAutre);
+        await sut.SaveAsync(carteAutre, CancellationToken.None);
 
-        var presences = sut.ListPresence(new[] { Ben, autre, sansCarte });
+        var presences = (await sut.ListPresenceAsync(new[] { Ben, autre, sansCarte }, CancellationToken.None));
 
         presences.Should().HaveCount(2);
         presences.Single(p => p.BeneficiaryId == Ben).CapturedAt
@@ -91,42 +91,42 @@ public class MutuelleCardRepositoryTests
     }
 
     [Fact]
-    public void ListPresence_sur_un_lot_vide_ne_touche_pas_la_base()
+    public async Task ListPresence_sur_un_lot_vide_ne_touche_pas_la_base()
     {
         using var ctx = NewContext();
         var sut = new MutuelleCardRepository(ctx);
 
-        sut.ListPresence(Array.Empty<Guid>()).Should().BeEmpty();
+        (await sut.ListPresenceAsync(Array.Empty<Guid>(), CancellationToken.None)).Should().BeEmpty();
     }
 
     [Fact]
-    public void GetCurrentMetadata_returns_most_recent_capture()
+    public async Task GetCurrentMetadata_returns_most_recent_capture()
     {
         using var ctx = NewContext();
         var sut = new MutuelleCardRepository(ctx);
-        sut.Save(Card(new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc), 1));
+        await sut.SaveAsync(Card(new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc), 1), CancellationToken.None);
         var recent = Card(new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc), 9);
-        sut.Save(recent);
+        await sut.SaveAsync(recent, CancellationToken.None);
 
-        sut.GetCurrentMetadata(Ben)!.Id.Should().Be(recent.Id);
+        (await sut.GetCurrentMetadataAsync(Ben, CancellationToken.None))!.Id.Should().Be(recent.Id);
     }
 
     [Fact]
-    public void GetCurrentMetadata_returns_null_when_no_card()
+    public async Task GetCurrentMetadata_returns_null_when_no_card()
     {
         using var ctx = NewContext();
         var sut = new MutuelleCardRepository(ctx);
 
-        sut.GetCurrentMetadata(Ben).Should().BeNull();
+        (await sut.GetCurrentMetadataAsync(Ben, CancellationToken.None)).Should().BeNull();
     }
 
     [Fact]
-    public void Update_sets_mutuelle_fields_and_keeps_image()
+    public async Task Update_sets_mutuelle_fields_and_keeps_image()
     {
         using var ctx = NewContext();
         var sut = new MutuelleCardRepository(ctx);
         var card = Card(new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc), 1, 2);
-        sut.Save(card);
+        await sut.SaveAsync(card, CancellationToken.None);
 
         var patch = new ClMutuelleCard
         {
@@ -139,20 +139,20 @@ public class MutuelleCardRepositoryTests
             OcrValidatedAt = new DateTime(2026, 6, 15, 12, 0, 0, DateTimeKind.Utc),
         };
 
-        var updated = sut.Update(patch);
+        var updated = (await sut.UpdateAsync(patch, CancellationToken.None));
 
         updated.Should().NotBeNull();
         updated!.AmcCode.Should().Be("AMC123");
         updated.OcrStatus.Should().Be("validated");
-        sut.GetImage(card.Id)!.Bytes.Should().Equal(1, 2); // image intacte
+        (await sut.GetImageAsync(card.Id, CancellationToken.None))!.Bytes.Should().Equal(1, 2); // image intacte
     }
 
     [Fact]
-    public void Update_returns_null_when_card_unknown()
+    public async Task Update_returns_null_when_card_unknown()
     {
         using var ctx = NewContext();
         var sut = new MutuelleCardRepository(ctx);
 
-        sut.Update(new ClMutuelleCard { Id = Guid.NewGuid(), AmcCode = "X" }).Should().BeNull();
+        (await sut.UpdateAsync(new ClMutuelleCard { Id = Guid.NewGuid(), AmcCode = "X" }, CancellationToken.None)).Should().BeNull();
     }
 }

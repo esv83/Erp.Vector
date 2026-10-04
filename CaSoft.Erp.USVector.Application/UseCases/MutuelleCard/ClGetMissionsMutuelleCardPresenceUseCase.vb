@@ -42,7 +42,7 @@ Public Class ClGetMissionsMutuelleCardPresenceUseCase
         Dim connus = patients.Values.Where(Function(b) b.HasValue).Select(Function(b) b.Value).Distinct().ToList()
         Dim presences = If(connus.Count = 0,
                            New Dictionary(Of Guid, DateTime)(),
-                           _repository.ListPresence(connus).ToDictionary(Function(p) p.BeneficiaryId, Function(p) p.CapturedAt))
+                           (Await _repository.ListPresenceAsync(connus, ct)).ToDictionary(Function(p) p.BeneficiaryId, Function(p) p.CapturedAt))
 
         ' Une ligne par mission demandée, dans l'ordre de la demande.
         Dim lignes As New List(Of ClMissionMutuelleCardPresenceDtoOut)

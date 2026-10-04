@@ -1,14 +1,16 @@
-﻿Public Interface ISignatureRepository
+﻿Imports System.Threading
 
-    Function Fetch(jobId As Guid) As ClSignatureDtoOut
-    Sub Insert(gJobId As Guid, strSignData As String)
-    Sub Update(gJobId As Guid, strSignData As String)
-    Sub Delete(gJobId As Guid, strSignData As String)
+Public Interface ISignatureRepository
+
+    Function FetchAsync(jobId As Guid, ct As CancellationToken) As Task(Of ClSignatureDtoOut)
+    Function InsertAsync(gJobId As Guid, strSignData As String, ct As CancellationToken) As Task
+    Function UpdateAsync(gJobId As Guid, strSignData As String, ct As CancellationToken) As Task
+    Function DeleteAsync(gJobId As Guid, strSignData As String, ct As CancellationToken) As Task
 
     ''' <summary>MOB-8 — Présence d'une signature (clé seule, sans charger le base64).</summary>
-    Function Exists(jobId As Guid) As Boolean
+    Function ExistsAsync(jobId As Guid, ct As CancellationToken) As Task(Of Boolean)
 
     ''' <summary>MOB-8 — Sous-ensemble des missions disposant d'une signature (overlay liste, 1 requête).</summary>
-    Function ExistingFor(jobIds As IEnumerable(Of Guid)) As HashSet(Of Guid)
+    Function ExistingForAsync(jobIds As IEnumerable(Of Guid), ct As CancellationToken) As Task(Of HashSet(Of Guid))
 
 End Interface

@@ -28,7 +28,7 @@ Public Class ClGetJobUseCase
         ' une lecture indexée, sans l'image.
         Dim patient = detail.Beneficiary.BeneficiaryId
         If patient.HasValue Then
-            detail.ApplyMutuelleCard(_cards.GetCurrentMetadata(patient.Value))
+            detail.ApplyMutuelleCard(Await _cards.GetCurrentMetadataAsync(patient.Value, ct))
         End If
 
         Return ClResult(Of ClJobDetailModel).Ok(detail)

@@ -49,22 +49,22 @@ public class MissionsMutuelleCardPresenceTests
         }
     }
 
-    private static MutuelleCardRepository Repository()
+    private static async Task<MutuelleCardRepository> Repository()
     {
         var ctx = new MobileDbContext(new DbContextOptionsBuilder<MobileDbContext>()
             .UseInMemoryDatabase($"presence-missions-{Guid.NewGuid()}").Options);
         var repository = new MutuelleCardRepository(ctx);
-        repository.Save(new ClMutuelleCard
+        await repository.SaveAsync(new ClMutuelleCard
         {
             Id = Guid.NewGuid(), BeneficiaryId = PatientA, Image = new byte[] { 1 }, ContentType = "image/jpeg",
             ByteSize = 1, CapturedAt = Photo, OcrStatus = "pending"
-        });
+        }, CancellationToken.None);
         return repository;
     }
 
-    private static Task<CaSoft.Framework.ClResult<IReadOnlyList<ClMissionMutuelleCardPresenceDtoOut>>> Presence(
+    private static async Task<CaSoft.Framework.ClResult<IReadOnlyList<ClMissionMutuelleCardPresenceDtoOut>>> Presence(
         IReadOnlyCollection<Guid> missionIds, FakeBeneficiaries? beneficiaries = null)
-        => new ClGetMissionsMutuelleCardPresenceUseCase(missionIds, beneficiaries ?? new FakeBeneficiaries(), Repository())
+        => await new ClGetMissionsMutuelleCardPresenceUseCase(missionIds, beneficiaries ?? new FakeBeneficiaries(), await Repository())
             .HandleAsync(CancellationToken.None);
 
     [Fact]

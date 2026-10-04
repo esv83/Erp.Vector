@@ -20,38 +20,38 @@ public class AnomalyRepositoryTests
         => new() { Id = Guid.NewGuid(), MissionId = Mission, Type = type, Text = text, ReportedAt = at };
 
     [Fact]
-    public void Save_then_ListByMission_returns_anomaly()
+    public async Task Save_then_ListByMission_returns_anomaly()
     {
         using var ctx = NewContext();
         var sut = new AnomalyRepository(ctx);
 
-        sut.Save(Anomaly(EnAnomalyType.Address, new DateTime(2026, 6, 20, 8, 0, 0, DateTimeKind.Utc), "mauvaise adresse"));
+        await sut.SaveAsync(Anomaly(EnAnomalyType.Address, new DateTime(2026, 6, 20, 8, 0, 0, DateTimeKind.Utc), "mauvaise adresse"), CancellationToken.None);
 
-        var list = sut.ListByMission(Mission);
+        var list = (await sut.ListByMissionAsync(Mission, CancellationToken.None));
         list.Should().HaveCount(1);
         list[0].Type.Should().Be(EnAnomalyType.Address);
         list[0].Text.Should().Be("mauvaise adresse");
     }
 
     [Fact]
-    public void ListByMission_returns_most_recent_first()
+    public async Task ListByMission_returns_most_recent_first()
     {
         using var ctx = NewContext();
         var sut = new AnomalyRepository(ctx);
-        sut.Save(Anomaly(EnAnomalyType.Phone, new DateTime(2026, 6, 20, 8, 0, 0, DateTimeKind.Utc)));
-        sut.Save(Anomaly(EnAnomalyType.Patient, new DateTime(2026, 6, 20, 9, 0, 0, DateTimeKind.Utc)));
+        await sut.SaveAsync(Anomaly(EnAnomalyType.Phone, new DateTime(2026, 6, 20, 8, 0, 0, DateTimeKind.Utc)), CancellationToken.None);
+        await sut.SaveAsync(Anomaly(EnAnomalyType.Patient, new DateTime(2026, 6, 20, 9, 0, 0, DateTimeKind.Utc)), CancellationToken.None);
 
-        var list = sut.ListByMission(Mission);
+        var list = (await sut.ListByMissionAsync(Mission, CancellationToken.None));
         list.Should().HaveCount(2);
         list[0].Type.Should().Be(EnAnomalyType.Patient); // plus récente d'abord
     }
 
     [Fact]
-    public void ListByMission_empty_when_none()
+    public async Task ListByMission_empty_when_none()
     {
         using var ctx = NewContext();
         var sut = new AnomalyRepository(ctx);
 
-        sut.ListByMission(Mission).Should().BeEmpty();
+        (await sut.ListByMissionAsync(Mission, CancellationToken.None)).Should().BeEmpty();
     }
 }

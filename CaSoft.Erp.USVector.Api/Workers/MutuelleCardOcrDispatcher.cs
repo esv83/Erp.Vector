@@ -76,14 +76,14 @@ public sealed class MutuelleCardOcrDispatcher : BackgroundService
         var cartes = scope.ServiceProvider.GetRequiredService<IMutuelleCardRepository>();
         var lecture = scope.ServiceProvider.GetRequiredService<IMutuelleCardOcrService>();
 
-        foreach (var cardId in cartes.ListPendingOcr(_options.BatchSize))
+        foreach (var cardId in await cartes.ListPendingOcrAsync(_options.BatchSize, ct))
         {
             if (ct.IsCancellationRequested) return;
 
-            var image = cartes.GetImage(cardId);
+            var image = await cartes.GetImageAsync(cardId, ct);
             if (image is null)
             {
-                cartes.MarkOcrFailure(cardId, "Image introuvable.", maxAttempts: 1);
+                await cartes.MarkOcrFailureAsync(cardId, "Image introuvable.", maxAttempts: 1, ct);
                 continue;
             }
 
@@ -95,19 +95,19 @@ public sealed class MutuelleCardOcrDispatcher : BackgroundService
                 {
                     // Le modèle a répondu, et n'a rien lu : c'est un résultat, pas un échec. La carte
                     // sort de la file — une photo floue ne deviendra pas lisible à la dixième relance.
-                    cartes.SaveOcrProposal(cardId, proposition);
+                    await cartes.SaveOcrProposalAsync(cardId, proposition, ct);
                     _logger.LogInformation("Carte {Carte} : aucune valeur lue, rien n'est proposé.", cardId);
                     continue;
                 }
 
-                cartes.SaveOcrProposal(cardId, proposition);
+                await cartes.SaveOcrProposalAsync(cardId, proposition, ct);
                 _logger.LogInformation("Carte {Carte} : {Champs} champ(s) proposé(s), confiance {Confiance}.",
                     cardId, Comptes(proposition), proposition.Confidence);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // Échec technique : on retente, jusqu'à MaxAttempts. Le motif reste sur la carte.
-                var issue = cartes.MarkOcrFailure(cardId, ex.Message, _options.MaxAttempts);
+                var issue = await cartes.MarkOcrFailureAsync(cardId, ex.Message, _options.MaxAttempts, ct);
                 _logger.LogWarning(ex, "Carte {Carte} : lecture impossible (tentative {Tentative}/{Max}){Suite}.",
                     cardId, issue.Attempts, _options.MaxAttempts, issue.GaveUp ? " — abandon" : string.Empty);
             }

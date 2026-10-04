@@ -21,12 +21,12 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         /// <summary>Signale une anomalie sur la mission. Bloqué (409) si la mission est déjà transférée.</summary>
         [HttpPost("missions/{gJobId:guid}/anomalies")]
         [FreezeOnTransfer("gJobId")]
-        public IActionResult Report(Guid gJobId, [FromBody] ClReportAnomalyDtoIn input)
-            => new ClReportAnomalyUseCase(new ClReportAnomalyCommand(gJobId, input), _repository).Handle().ToActionResult();
+        public async Task<IActionResult> Report(Guid gJobId, [FromBody] ClReportAnomalyDtoIn input, CancellationToken ct)
+            => (await new ClReportAnomalyUseCase(new ClReportAnomalyCommand(gJobId, input), _repository).HandleAsync(ct)).ToActionResult();
 
         /// <summary>Anomalies de la mission (de la plus récente à la plus ancienne).</summary>
         [HttpGet("missions/{gJobId:guid}/anomalies")]
-        public IActionResult List(Guid gJobId)
-            => Ok(_repository.ListByMission(gJobId).Select(a => a.ToDtoOut()));
+        public async Task<IActionResult> List(Guid gJobId, CancellationToken ct)
+            => Ok((await _repository.ListByMissionAsync(gJobId, ct)).Select(a => a.ToDtoOut()));
     }
 }

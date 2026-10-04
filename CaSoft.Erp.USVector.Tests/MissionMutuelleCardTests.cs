@@ -86,7 +86,7 @@ public class MissionMutuelleCardTests
         var result = await Upload(repository, Ben);
 
         result.IsSucces.Should().BeTrue();
-        var stored = repository.GetCurrentMetadata(Ben);
+        var stored = (await repository.GetCurrentMetadataAsync(Ben, CancellationToken.None));
         stored.Should().NotBeNull();
         stored!.Id.Should().Be(result.Value.Id);
         stored.MissionId.Should().Be(Mission);
@@ -128,8 +128,8 @@ public class MissionMutuelleCardTests
         var repository = new MutuelleCardRepository(ctx);
         var older = NewCard(new DateTime(2026, 9, 1, 8, 0, 0, DateTimeKind.Utc));
         var newer = NewCard(new DateTime(2026, 9, 10, 8, 0, 0, DateTimeKind.Utc));
-        repository.Save(older);
-        repository.Save(newer);
+        await repository.SaveAsync(older, CancellationToken.None);
+        await repository.SaveAsync(newer, CancellationToken.None);
 
         var result = await new ClGetMissionMutuelleCardUseCase(Mission, new FakeBeneficiaries { BeneficiaryId = Ben }, repository)
             .HandleAsync(CancellationToken.None);

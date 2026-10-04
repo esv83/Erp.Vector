@@ -18,16 +18,17 @@ public class ClMarkMissionSeenUseCaseTests
         public int SaveCount;
         public Exception? Throws;
         public FakeJobTime(ClJobTimeData? existing) => Stored = existing;
-        public void Save(Guid id, ClJobTimeData d) { Stored = d; SaveCount++; }
-        public ClJobTimeData? GetJobTimeData(Guid id) => Throws is null ? Stored : throw Throws;
+        public Task SaveAsync(Guid id, ClJobTimeData d, CancellationToken ct) { Stored = d; SaveCount++; return Task.CompletedTask; }
+        public Task<ClJobTimeData> GetJobTimeDataAsync(Guid id, CancellationToken ct)
+            => Throws is null ? Task.FromResult(Stored!) : throw Throws;
     }
 
     [Fact]
-    public void Premiere_vue_pose_ReadTime_et_sauvegarde()
+    public async Task Premiere_vue_pose_ReadTime_et_sauvegarde()
     {
         var repo = new FakeJobTime(null);
 
-        var result = new ClMarkMissionSeenUseCase(Guid.NewGuid(), repo).Handle();
+        var result = await new ClMarkMissionSeenUseCase(Guid.NewGuid(), repo).HandleAsync(CancellationToken.None);
 
         result.IsSucces.Should().BeTrue();
         result.Value.Should().BeTrue();
@@ -36,7 +37,7 @@ public class ClMarkMissionSeenUseCaseTests
     }
 
     [Fact]
-    public void Deja_vue_est_idempotent_sans_re_sauvegarde()
+    public async Task Deja_vue_est_idempotent_sans_re_sauvegarde()
     {
         var existing = ClJobTimeData.GetBuilder()
             .WithId(Guid.NewGuid())
@@ -44,7 +45,7 @@ public class ClMarkMissionSeenUseCaseTests
             .Build();
         var repo = new FakeJobTime(existing);
 
-        var result = new ClMarkMissionSeenUseCase(Guid.NewGuid(), repo).Handle();
+        var result = await new ClMarkMissionSeenUseCase(Guid.NewGuid(), repo).HandleAsync(CancellationToken.None);
 
         result.IsSucces.Should().BeTrue();
         result.Value.Should().BeTrue();
@@ -52,21 +53,21 @@ public class ClMarkMissionSeenUseCaseTests
     }
 
     [Fact]
-    public void Une_panne_de_la_base_remonte_au_lieu_de_devenir_un_400()
+    public async Task Une_panne_de_la_base_remonte_au_lieu_de_devenir_un_400()
     {
         // Règle du 04/10 : le gestionnaire de l'API la rendra en 503. Avant, l'ambulancier recevait
         // un 400 portant le message technique de SQL Server.
         var repo = new FakeJobTime(null) { Throws = new InvalidOperationException("transient failure") };
 
-        var act = () => new ClMarkMissionSeenUseCase(Guid.NewGuid(), repo).Handle();
+        var act = () => new ClMarkMissionSeenUseCase(Guid.NewGuid(), repo).HandleAsync(CancellationToken.None);
 
-        act.Should().Throw<InvalidOperationException>();
+        await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
     [Fact]
-    public void Une_signature_demandee_sans_mission_reste_un_400()
+    public async Task Une_signature_demandee_sans_mission_reste_un_400()
     {
-        var result = new ClGetSignatureUseCase(Guid.Empty, null!).Handle();
+        var result = await new ClGetSignatureUseCase(Guid.Empty, null!).HandleAsync(CancellationToken.None);
 
         result.IsFail.Should().BeTrue();
         result.InnerError!.ErrorText.Should().Be("Identifiant de mission vide.");

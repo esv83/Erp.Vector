@@ -120,20 +120,20 @@ public class JobDetailBeneficiaryIdTests
         public ClMutuelleCard? Current;
         public int Lectures;
 
-        public ClMutuelleCard GetCurrentMetadata(Guid beneficiaryId)
+        public Task<ClMutuelleCard> GetCurrentMetadataAsync(Guid beneficiaryId, CancellationToken ct)
         {
             Lectures++;
-            return Current!;
+            return Task.FromResult(Current!);
         }
 
-        public void Save(ClMutuelleCard card) => throw new NotSupportedException();
-        public ClMutuelleCardImage GetImage(Guid cardId) => throw new NotSupportedException();
-        public ClMutuelleCardImage GetCurrentImage(Guid beneficiaryId) => throw new NotSupportedException();
-        public IReadOnlyList<ClMutuelleCardPresence> ListPresence(IReadOnlyCollection<Guid> beneficiaryIds) => throw new NotSupportedException();
-        public ClMutuelleCard Update(ClMutuelleCard card) => throw new NotSupportedException();
-        public IReadOnlyList<Guid> ListPendingOcr(int take) => throw new NotSupportedException();
-        public void SaveOcrProposal(Guid cardId, ClMutuelleCardOcrProposal proposal) => throw new NotSupportedException();
-        public ClOcrFailureOutcome MarkOcrFailure(Guid cardId, string reason, int maxAttempts) => throw new NotSupportedException();
+        public Task SaveAsync(ClMutuelleCard card, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ClMutuelleCardImage> GetImageAsync(Guid cardId, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ClMutuelleCardImage> GetCurrentImageAsync(Guid beneficiaryId, CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<ClMutuelleCardPresence>> ListPresenceAsync(IReadOnlyCollection<Guid> beneficiaryIds, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ClMutuelleCard> UpdateAsync(ClMutuelleCard card, CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<Guid>> ListPendingOcrAsync(int take, CancellationToken ct) => throw new NotSupportedException();
+        public Task SaveOcrProposalAsync(Guid cardId, ClMutuelleCardOcrProposal proposal, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ClOcrFailureOutcome> MarkOcrFailureAsync(Guid cardId, string reason, int maxAttempts, CancellationToken ct) => throw new NotSupportedException();
     }
 
     // ── Harnais ──────────────────────────────────────────────────────────────────
@@ -190,17 +190,17 @@ public class JobDetailBeneficiaryIdTests
 
     private sealed class FakeJobTime : IJobTimeRepository
     {
-        public void Save(Guid gJobId, ClJobTimeData timeData) { }
-        public ClJobTimeData GetJobTimeData(Guid gJobId) => null!;
+        public Task SaveAsync(Guid gJobId, ClJobTimeData timeData, CancellationToken ct) => Task.CompletedTask;
+        public Task<ClJobTimeData> GetJobTimeDataAsync(Guid gJobId, CancellationToken ct) => Task.FromResult<ClJobTimeData>(null!);
     }
 
     private sealed class FakeSignature : ISignatureRepository
     {
-        public HashSet<Guid> ExistingFor(IEnumerable<Guid> ids) => new();
-        public ClSignatureDtoOut Fetch(Guid id) => throw new NotSupportedException();
-        public void Insert(Guid id, string d) => throw new NotSupportedException();
-        public void Update(Guid id, string d) => throw new NotSupportedException();
-        public void Delete(Guid id, string d) => throw new NotSupportedException();
-        public bool Exists(Guid id) => false;
+        public Task<HashSet<Guid>> ExistingForAsync(IEnumerable<Guid> ids, CancellationToken ct) => Task.FromResult(new HashSet<Guid>());
+        public Task<ClSignatureDtoOut> FetchAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
+        public Task InsertAsync(Guid id, string d, CancellationToken ct) => throw new NotSupportedException();
+        public Task UpdateAsync(Guid id, string d, CancellationToken ct) => throw new NotSupportedException();
+        public Task DeleteAsync(Guid id, string d, CancellationToken ct) => throw new NotSupportedException();
+        public Task<bool> ExistsAsync(Guid id, CancellationToken ct) => Task.FromResult(false);
     }
 }

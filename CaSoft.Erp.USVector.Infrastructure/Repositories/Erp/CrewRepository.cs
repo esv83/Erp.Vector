@@ -69,7 +69,7 @@ public class CrewRepository : IMobileCrewRepository
             .ToDictionaryAsync(s => s.MST_MISSION_ID, ct);
 
         // MOB-8 : overlay « signature existe » (MOB_SIGNATURE) — 1 requête clé seule.
-        var signed = _signatures.ExistingFor(ids);
+        var signed = await _signatures.ExistingForAsync(ids, ct);
 
         var result = new List<ClJobListItemModel>();
         var index = 1;

@@ -1,8 +1,10 @@
+Imports System.Threading
+
 ''' <summary>
 ''' P1 — Dépose une photo de carte mutuelle (validation type/poids), la persiste, et renvoie l'Id. Result pattern.
 ''' </summary>
 Public Class ClUploadMutuelleCardUseCase
-    Implements IResultUseCase(Of ClMutuelleCardCreatedDtoOut)
+    Implements IResultUseCaseAsync(Of ClMutuelleCardCreatedDtoOut)
 
     Private Const MaxBytes As Integer = 8 * 1024 * 1024   ' 8 Mo
 
@@ -14,7 +16,7 @@ Public Class ClUploadMutuelleCardUseCase
         _repository = repository
     End Sub
 
-    Public Function Handle() As ClResult(Of ClMutuelleCardCreatedDtoOut) Implements IResultUseCase(Of ClMutuelleCardCreatedDtoOut).Handle
+    Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of ClMutuelleCardCreatedDtoOut)) Implements IResultUseCaseAsync(Of ClMutuelleCardCreatedDtoOut).HandleAsync
         If _command.Image Is Nothing OrElse _command.Image.Length = 0 Then
             Return ClResult(Of ClMutuelleCardCreatedDtoOut).Fail(ClError.Application("Image manquante."))
         ElseIf String.IsNullOrWhiteSpace(_command.ContentType) _
@@ -38,9 +40,9 @@ Public Class ClUploadMutuelleCardUseCase
             .MissionId = _command.MissionId,
             .OcrStatus = "pending"
         }
-        HeriterDesChampsValides(card, _repository.GetCurrentMetadata(_command.BeneficiaryId))
+        HeriterDesChampsValides(card, Await _repository.GetCurrentMetadataAsync(_command.BeneficiaryId, ct))
 
-        _repository.Save(card)
+        Await _repository.SaveAsync(card, ct)
         Return ClResult(Of ClMutuelleCardCreatedDtoOut).Ok(New ClMutuelleCardCreatedDtoOut With {.Id = card.Id})
     End Function
 

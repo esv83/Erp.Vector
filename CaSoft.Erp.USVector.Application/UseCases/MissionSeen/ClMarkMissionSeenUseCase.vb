@@ -1,10 +1,11 @@
+Imports System.Threading
 
 ' MOB — « Mission vue » (spec_architecture_vector_mission_dmz §10 : le marqueur terrain retenu est
 ' « vue », pas un acquittement). L'ambulancier signale à la régulation qu'il a reçu/vu la mission
 ' depuis la JobList (icône « bien reçu »). Pose l'horodatage « vue » (MST_READ_AT via
 ' ClJobTimeData.ReadTime). Le Save projette aussi l'info vers Orders.Api (régulation, MissionSeen).
 Public Class ClMarkMissionSeenUseCase
-    Implements IResultUseCase(Of Boolean)
+    Implements IResultUseCaseAsync(Of Boolean)
 
     Private ReadOnly _repository As IJobTimeRepository
     Private ReadOnly _jobId As Guid
@@ -14,9 +15,9 @@ Public Class ClMarkMissionSeenUseCase
         _repository = repository
     End Sub
 
-    Public Function Handle() As ClResult(Of Boolean) Implements IResultUseCase(Of Boolean).Handle
+    Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of Boolean)) Implements IResultUseCaseAsync(Of Boolean).HandleAsync
 
-        Dim jobTime = _repository.GetJobTimeData(_jobId)
+        Dim jobTime = Await _repository.GetJobTimeDataAsync(_jobId, ct)
 
         ' Idempotent : si déjà vue, on conserve l'horodatage d'origine (no-op).
         If jobTime IsNot Nothing AndAlso jobTime.ReadTime.HasValue Then
@@ -30,7 +31,7 @@ Public Class ClMarkMissionSeenUseCase
         End If
 
         ' Upsert BD Mobile (MST_READ_AT) + projection (Outbox) vers Orders.Api (readAt).
-        _repository.Save(_jobId, jobTime)
+        Await _repository.SaveAsync(_jobId, jobTime, ct)
         Return ClResult(Of Boolean).Ok(True)
 
     End Function

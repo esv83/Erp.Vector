@@ -51,12 +51,12 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         // → pose MST_READ_AT + projette MissionSeen à la régulation. Idempotent.
         // L'UI masque l'icône quand IsSeen=true.
         [HttpPatch()]
-        public IActionResult PatchSeen(ClReadJobModel ReadModel)
+        public async Task<IActionResult> PatchSeen(ClReadJobModel ReadModel, CancellationToken ct)
         {
             if (!ReadModel.IsJob)
                 return BadRequest("Requête invalide : IsJob attendu à true.");
 
-            return _jobSce.MarkMissionSeen(ReadModel.JobId).ToActionResult();
+            return (await _jobSce.MarkMissionSeenAsync(ReadModel.JobId, ct)).ToActionResult();
         }
     }
 }

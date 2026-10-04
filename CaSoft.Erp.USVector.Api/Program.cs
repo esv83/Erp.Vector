@@ -298,7 +298,6 @@ builder.Services.AddScoped<ISignatureRepository, SignatureRepository>();
 builder.Services.AddScoped<IJobTimeRepository, JobTimeRepository>();
 // Synchro régulation garantie : worker qui vide l'Outbox de projection opérationnelle (debounce + retry).
 builder.Services.AddHostedService<OperationalOutboxDispatcher>();
-builder.Services.AddScoped<ISessionRepository, SessionRepository>();
 
 // Carte mutuelle (P1) : stockage BD Mobile.
 builder.Services.AddScoped<IMutuelleCardRepository, MutuelleCardRepository>();

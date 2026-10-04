@@ -44,16 +44,16 @@ public class BatchReadTests
 
     /// <summary>La facturation stocke l'image telle quelle : le lot doit servir la même valeur que la route unitaire.</summary>
     [Fact]
-    public void L_image_du_lot_est_celle_de_la_route_unitaire()
+    public async Task L_image_du_lot_est_celle_de_la_route_unitaire()
     {
         using var ctx = NewContext();
         var mission = Guid.NewGuid();
         var repository = new SignatureRepository(ctx);
-        repository.Insert(mission, "iVBORw0KGgoAAAANSUhEUg==");
+        await repository.InsertAsync(mission, "iVBORw0KGgoAAAANSUhEUg==", CancellationToken.None);
 
         var lot = new SignatureQueryService(ctx).ReadMany(new[] { mission });
 
-        lot.Single().Data.Should().Be(repository.Fetch(mission)!.Data);
+        lot.Single().Data.Should().Be((await repository.FetchAsync(mission, CancellationToken.None))!.Data);
     }
 
     [Fact]

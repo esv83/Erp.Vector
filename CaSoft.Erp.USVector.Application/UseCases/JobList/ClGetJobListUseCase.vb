@@ -1,4 +1,5 @@
 Imports System.Threading
+
 ' Liste des missions du personnel (crews actifs résolus du token Keycloak) — Result pattern.
 Public Class ClGetJobListUseCase
     Implements IResultUseCaseAsync(Of ClJobListModel)

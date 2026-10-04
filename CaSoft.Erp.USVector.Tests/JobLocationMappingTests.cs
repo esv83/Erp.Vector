@@ -56,18 +56,18 @@ public class JobLocationMappingTests
 
     private sealed class FakeJobTime : IJobTimeRepository
     {
-        public void Save(Guid gJobId, ClJobTimeData timeData) { }
-        public ClJobTimeData GetJobTimeData(Guid gJobId) => null!;
+        public Task SaveAsync(Guid gJobId, ClJobTimeData timeData, CancellationToken ct) => Task.CompletedTask;
+        public Task<ClJobTimeData> GetJobTimeDataAsync(Guid gJobId, CancellationToken ct) => Task.FromResult<ClJobTimeData>(null!);
     }
 
     private sealed class FakeSignature : ISignatureRepository
     {
-        public HashSet<Guid> ExistingFor(IEnumerable<Guid> ids) => new();
-        public ClSignatureDtoOut Fetch(Guid id) => throw new NotSupportedException();
-        public void Insert(Guid id, string d) => throw new NotSupportedException();
-        public void Update(Guid id, string d) => throw new NotSupportedException();
-        public void Delete(Guid id, string d) => throw new NotSupportedException();
-        public bool Exists(Guid id) => false;
+        public Task<HashSet<Guid>> ExistingForAsync(IEnumerable<Guid> ids, CancellationToken ct) => Task.FromResult(new HashSet<Guid>());
+        public Task<ClSignatureDtoOut> FetchAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
+        public Task InsertAsync(Guid id, string d, CancellationToken ct) => throw new NotSupportedException();
+        public Task UpdateAsync(Guid id, string d, CancellationToken ct) => throw new NotSupportedException();
+        public Task DeleteAsync(Guid id, string d, CancellationToken ct) => throw new NotSupportedException();
+        public Task<bool> ExistsAsync(Guid id, CancellationToken ct) => Task.FromResult(false);
     }
 
 

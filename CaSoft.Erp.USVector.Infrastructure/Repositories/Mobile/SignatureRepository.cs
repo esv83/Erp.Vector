@@ -2,6 +2,7 @@ using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Infrastructure.Mapping;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Persistence.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 
@@ -19,13 +20,13 @@ public class SignatureRepository : ISignatureRepository
         _ctx = ctx;
     }
 
-    public ClSignatureDtoOut? Fetch(Guid jobId)
+    public async Task<ClSignatureDtoOut?> FetchAsync(Guid jobId, CancellationToken ct)
     {
-        var entity = _ctx.Signatures.SingleOrDefault(s => s.SIG_MISSION_ID == jobId);
+        var entity = await _ctx.Signatures.SingleOrDefaultAsync(s => s.SIG_MISSION_ID == jobId, ct);
         return entity?.ToSignatureDto();
     }
 
-    public void Insert(Guid gJobId, string strSignData)
+    public async Task InsertAsync(Guid gJobId, string strSignData, CancellationToken ct)
     {
         _ctx.Signatures.Add(new MOB_SIGNATURE
         {
@@ -33,38 +34,39 @@ public class SignatureRepository : ISignatureRepository
             SIG_DATA = strSignData,
             SIG_DATETIME = DateTime.Now
         });
-        _ctx.SaveChanges();
+        await _ctx.SaveChangesAsync(ct);
     }
 
-    public void Update(Guid gJobId, string strSignData)
+    public async Task UpdateAsync(Guid gJobId, string strSignData, CancellationToken ct)
     {
-        var entity = _ctx.Signatures.Single(s => s.SIG_MISSION_ID == gJobId);
+        var entity = await _ctx.Signatures.SingleAsync(s => s.SIG_MISSION_ID == gJobId, ct);
         entity.SIG_DATA = strSignData;
         entity.SIG_DATETIME = DateTime.Now;
-        _ctx.SaveChanges();
+        await _ctx.SaveChangesAsync(ct);
     }
 
-    public void Delete(Guid gJobId, string strSignData)
+    public async Task DeleteAsync(Guid gJobId, string strSignData, CancellationToken ct)
     {
-        var entity = _ctx.Signatures.SingleOrDefault(s => s.SIG_MISSION_ID == gJobId);
+        var entity = await _ctx.Signatures.SingleOrDefaultAsync(s => s.SIG_MISSION_ID == gJobId, ct);
         if (entity is null) return;
 
         _ctx.Signatures.Remove(entity);
-        _ctx.SaveChanges();
+        await _ctx.SaveChangesAsync(ct);
     }
 
     // MOB-8 — Existence légère (clé seule) : alimente le flag MI_SIGNATURE_EXISTS du détail/liste.
-    public bool Exists(Guid jobId)
-        => _ctx.Signatures.Any(s => s.SIG_MISSION_ID == jobId);
+    public Task<bool> ExistsAsync(Guid jobId, CancellationToken ct)
+        => _ctx.Signatures.AnyAsync(s => s.SIG_MISSION_ID == jobId, ct);
 
-    public HashSet<Guid> ExistingFor(IEnumerable<Guid> jobIds)
+    public async Task<HashSet<Guid>> ExistingForAsync(IEnumerable<Guid> jobIds, CancellationToken ct)
     {
         var ids = jobIds as IReadOnlyCollection<Guid> ?? jobIds.ToList();
         if (ids.Count == 0) return new HashSet<Guid>();
 
-        return _ctx.Signatures
+        var signees = await _ctx.Signatures
             .Where(s => ids.Contains(s.SIG_MISSION_ID))
             .Select(s => s.SIG_MISSION_ID)
-            .ToHashSet();
+            .ToListAsync(ct);
+        return signees.ToHashSet();
     }
 }

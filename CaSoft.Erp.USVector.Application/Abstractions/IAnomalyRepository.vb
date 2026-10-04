@@ -1,3 +1,5 @@
+Imports System.Threading
+
 Namespace Port
 
     ''' <summary>
@@ -7,10 +9,10 @@ Namespace Port
     Public Interface IAnomalyRepository
 
         ''' <summary>Enregistre une anomalie (l'Id est porté par <paramref name="anomaly"/>).</summary>
-        Sub Save(anomaly As ClAnomaly)
+        Function SaveAsync(anomaly As ClAnomaly, ct As CancellationToken) As Task
 
         ''' <summary>Anomalies d'une mission, de la plus récente à la plus ancienne.</summary>
-        Function ListByMission(missionId As Guid) As IReadOnlyList(Of ClAnomaly)
+        Function ListByMissionAsync(missionId As Guid, ct As CancellationToken) As Task(Of IReadOnlyList(Of ClAnomaly))
 
     End Interface
 

@@ -60,13 +60,13 @@ public class CrewRepositoryJobListTests
     private sealed class FakeSignature : ISignatureRepository
     {
         public readonly HashSet<Guid> Signed = new();
-        public HashSet<Guid> ExistingFor(IEnumerable<Guid> ids) => Signed;
+        public Task<HashSet<Guid>> ExistingForAsync(IEnumerable<Guid> ids, CancellationToken ct) => Task.FromResult(Signed);
 
-        public ClSignatureDtoOut Fetch(Guid id) => throw new NotSupportedException();
-        public void Insert(Guid id, string d) => throw new NotSupportedException();
-        public void Update(Guid id, string d) => throw new NotSupportedException();
-        public void Delete(Guid id, string d) => throw new NotSupportedException();
-        public bool Exists(Guid id) => Signed.Contains(id);
+        public Task<ClSignatureDtoOut> FetchAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
+        public Task InsertAsync(Guid id, string d, CancellationToken ct) => throw new NotSupportedException();
+        public Task UpdateAsync(Guid id, string d, CancellationToken ct) => throw new NotSupportedException();
+        public Task DeleteAsync(Guid id, string d, CancellationToken ct) => throw new NotSupportedException();
+        public Task<bool> ExistsAsync(Guid id, CancellationToken ct) => Task.FromResult(Signed.Contains(id));
     }
 
     private static MobileDbContext NewContext()

@@ -26,7 +26,7 @@ Public Class ClGetMissionMutuelleCardUseCase
         End If
 
         ' Métadonnées seules : la réponse annonce l'image par son URL, elle ne la transporte pas.
-        Dim card = _repository.GetCurrentMetadata(beneficiaryId.Value)
+        Dim card = Await _repository.GetCurrentMetadataAsync(beneficiaryId.Value, ct)
         If card Is Nothing Then
             Return ClResult(Of ClMutuelleCardDtoOut).Fail(ClError.NotFound("Aucune carte mutuelle pour ce patient."))
         End If

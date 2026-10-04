@@ -14,7 +14,7 @@ namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Erp;
 /// découplage 4a) : détail mission, commande (mode/sens/fréquence), identité bénéficiaire.
 /// Le flag de présence de signature (MOB-8) vient de la BD Mobile via <see cref="ISignatureRepository"/>.</para>
 ///
-/// <para>La timeline opérationnelle (GetJobTime/SaveJobTime) reste BD Mobile (<see cref="IJobTimeRepository"/>).
+/// <para>La timeline opérationnelle (GetJobTimeAsync/SaveJobTimeAsync) reste BD Mobile (<see cref="IJobTimeRepository"/>).
 /// Les attributs de la mission ne passent plus par ici : Order les sert et les enregistre.</para>
 ///
 /// <para>Pont sync/async : le contrat legacy IJobRepository est synchrone. Sûr hors
@@ -53,9 +53,11 @@ public class JobRepository : IJobRepository
         if (order?.Order is not null && order.Order.BeneficiaryId != Guid.Empty)
             beneficiary = await _erp.GetBeneficiaryAsync(order.Order.BeneficiaryId, ct);
 
-        var domainMission = BuildMission(gJobId, mission, order);
+        // MOB-8 : présence d'une signature en BD Mobile.
+        var isSign = await _signatures.ExistsAsync(gJobId, ct);
+        var domainMission = BuildMission(gJobId, mission, order, isSign);
         var domainBeneficiary = BuildBeneficiary(beneficiary);
-        var timeData = GetJobTime(gJobId);
+        var timeData = await GetJobTimeAsync(gJobId, ct);
 
         return ClJob.GetBuilder()
             .WithId(gJobId)
@@ -67,17 +69,17 @@ public class JobRepository : IJobRepository
     }
 
     // ── Timeline opérationnelle : déléguée à la BD Mobile (MOB-2/MOB-7) ──────────
-    public ClJobTimeData GetJobTime(Guid jobId)
-        => _jobTimeRepository.GetJobTimeData(jobId)
+    public async Task<ClJobTimeData> GetJobTimeAsync(Guid jobId, CancellationToken ct)
+        => await _jobTimeRepository.GetJobTimeDataAsync(jobId, ct)
            ?? ClJobTimeData.GetBuilder().WithId(jobId).Build();
 
-    public void SaveJobTime(ClJobTimeData jobTime)
-        => _jobTimeRepository.Save(jobTime.JobId, jobTime);
+    public Task SaveJobTimeAsync(ClJobTimeData jobTime, CancellationToken ct)
+        => _jobTimeRepository.SaveAsync(jobTime.JobId, jobTime, ct);
 
 
     // ── Mapping ERP (DTO HTTP) → domaine mobile ──────────────────────────────────
 
-    private ClMission BuildMission(Guid jobId, ErpMissionFullDto mission, ErpOrderEditDto? order)
+    private ClMission BuildMission(Guid jobId, ErpMissionFullDto mission, ErpOrderEditDto? order, bool isSign)
     {
         var body = order?.Order;
 
@@ -100,8 +102,7 @@ public class JobRepository : IJobRepository
         {
             MissionId = mission.Id,
             ContactId = body?.BeneficiaryId ?? Guid.Empty,
-            // MOB-8 : présence d'une signature en BD Mobile.
-            IsSign = _signatures.Exists(jobId),
+            IsSign = isSign,
             Schedule = schedule,
             Appointment = appointment,
             IsAsap = mission.IsAsap,

@@ -1,4 +1,5 @@
 Imports System.Threading
+
 ' Désignation du conducteur d'un équipage — Result pattern.
 Public Class ClSetDriverUseCase
     Implements IResultUseCaseAsync(Of Boolean)

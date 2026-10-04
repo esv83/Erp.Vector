@@ -16,27 +16,27 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         }
 
         [HttpGet("{gJobId}")]
-        public IActionResult Get(Guid gJobId)
-            => _jobService.GetJobTime(gJobId).ToActionResult();
+        public async Task<IActionResult> Get(Guid gJobId, CancellationToken ct)
+            => (await _jobService.GetJobTimeAsync(gJobId, ct)).ToActionResult();
 
         // GET api/time/{id}/timeline — contrat riche (Option A) : liste ordonnée de jalons
         // { Order, Code, Label, At } prête à afficher, sans inférence côté UI. L'ancien endpoint
         // plat ci-dessus reste servi pour compatibilité (app mobile) le temps de la migration.
         [HttpGet("{gJobId}/timeline")]
-        public IActionResult GetTimeline(Guid gJobId)
-            => _jobService.GetJobTimeline(gJobId).ToActionResult();
+        public async Task<IActionResult> GetTimeline(Guid gJobId, CancellationToken ct)
+            => (await _jobService.GetJobTimelineAsync(gJobId, ct)).ToActionResult();
 
         // PATCH api/time/{id}
         [HttpPatch("{gJobId}")]
         [FreezeOnTransfer]
-        public IActionResult PatchJobTime(Guid gJobId, [FromBody] ClJobTimeModel JobTime)
-            => _jobService.SetJobTime(gJobId, JobTime).ToActionResult();
+        public async Task<IActionResult> PatchJobTime(Guid gJobId, [FromBody] ClJobTimeModel JobTime, CancellationToken ct)
+            => (await _jobService.SetJobTimeAsync(gJobId, JobTime, ct)).ToActionResult();
 
         // DELETE api/time/{id}/{jalon} — retour arrière : efface un jalon (seen | go | onsite | terminate).
         // L'effacement est projeté (Outbox) → régulation resynchronisée dès qu'Orders.Api gère « null = effacé ».
         [HttpDelete("{gJobId}/{jalon}")]
         [FreezeOnTransfer]
-        public IActionResult ClearJobTime(Guid gJobId, string jalon)
-            => _jobService.ClearJobTime(gJobId, jalon).ToActionResult();
+        public async Task<IActionResult> ClearJobTime(Guid gJobId, string jalon, CancellationToken ct)
+            => (await _jobService.ClearJobTimeAsync(gJobId, jalon, ct)).ToActionResult();
     }
 }

@@ -25,17 +25,17 @@ public class MutuelleCardRepository : IMutuelleCardRepository
 
     public MutuelleCardRepository(MobileDbContext ctx) => _ctx = ctx;
 
-    public void Save(ClMutuelleCard card)
+    public async Task SaveAsync(ClMutuelleCard card, CancellationToken ct)
     {
         _ctx.MutuelleCards.Add(card.ToEntity());
-        _ctx.SaveChanges();
+        await _ctx.SaveChangesAsync(ct);
     }
 
-    public ClMutuelleCard? GetCurrentMetadata(Guid beneficiaryId)
+    public async Task<ClMutuelleCard?> GetCurrentMetadataAsync(Guid beneficiaryId, CancellationToken ct)
     {
         // Projection nommée champ par champ : le jour où une colonne s'ajoute à l'entité, elle
         // n'entre pas ici par accident — et surtout pas si c'est un second binaire.
-        var row = _ctx.MutuelleCards.AsNoTracking()
+        var row = await _ctx.MutuelleCards.AsNoTracking()
             .Where(c => c.MMC_BENEFICIARY_ID == beneficiaryId)
             .OrderByDescending(c => c.MMC_CAPTURED_AT)
             .Select(c => new
@@ -65,7 +65,7 @@ public class MutuelleCardRepository : IMutuelleCardRepository
                 c.MMC_OCR_LAST_ERROR,
                 c.MMC_FIELDS_INHERITED_FROM   // MOB_011
             })
-            .FirstOrDefault();
+            .FirstOrDefaultAsync(ct);
 
         if (row is null) return null;
 
@@ -97,18 +97,18 @@ public class MutuelleCardRepository : IMutuelleCardRepository
         };
     }
 
-    public ClMutuelleCardImage? GetImage(Guid cardId)
-        => _ctx.MutuelleCards.AsNoTracking()
+    public async Task<ClMutuelleCardImage?> GetImageAsync(Guid cardId, CancellationToken ct)
+        => await _ctx.MutuelleCards.AsNoTracking()
             .Where(c => c.MMC_ID == cardId)
             .Select(c => new ClMutuelleCardImage
             {
                 Bytes = c.MMC_IMAGE,
                 ContentType = c.MMC_CONTENT_TYPE
             })
-            .FirstOrDefault();
+            .FirstOrDefaultAsync(ct);
 
-    public ClMutuelleCardImage? GetCurrentImage(Guid beneficiaryId)
-        => _ctx.MutuelleCards.AsNoTracking()
+    public async Task<ClMutuelleCardImage?> GetCurrentImageAsync(Guid beneficiaryId, CancellationToken ct)
+        => await _ctx.MutuelleCards.AsNoTracking()
             .Where(c => c.MMC_BENEFICIARY_ID == beneficiaryId)
             .OrderByDescending(c => c.MMC_CAPTURED_AT)
             .Select(c => new ClMutuelleCardImage
@@ -116,9 +116,9 @@ public class MutuelleCardRepository : IMutuelleCardRepository
                 Bytes = c.MMC_IMAGE,
                 ContentType = c.MMC_CONTENT_TYPE
             })
-            .FirstOrDefault();
+            .FirstOrDefaultAsync(ct);
 
-    public IReadOnlyList<ClMutuelleCardPresence> ListPresence(IReadOnlyCollection<Guid> beneficiaryIds)
+    public async Task<IReadOnlyList<ClMutuelleCardPresence>> ListPresenceAsync(IReadOnlyCollection<Guid> beneficiaryIds, CancellationToken ct)
     {
         if (beneficiaryIds is null || beneficiaryIds.Count == 0)
             return Array.Empty<ClMutuelleCardPresence>();
@@ -128,7 +128,7 @@ public class MutuelleCardRepository : IMutuelleCardRepository
         var ids = beneficiaryIds.Distinct().ToList();
 
         // Un GROUP BY, pas N requêtes — et aucune colonne binaire dans la projection.
-        return _ctx.MutuelleCards.AsNoTracking()
+        return await _ctx.MutuelleCards.AsNoTracking()
             .Where(c => ids.Contains(c.MMC_BENEFICIARY_ID))
             .GroupBy(c => c.MMC_BENEFICIARY_ID)
             .Select(g => new ClMutuelleCardPresence
@@ -136,12 +136,12 @@ public class MutuelleCardRepository : IMutuelleCardRepository
                 BeneficiaryId = g.Key,
                 CapturedAt = g.Max(c => c.MMC_CAPTURED_AT)
             })
-            .ToList();
+            .ToListAsync(ct);
     }
 
-    public ClMutuelleCard? Update(ClMutuelleCard card)
+    public async Task<ClMutuelleCard?> UpdateAsync(ClMutuelleCard card, CancellationToken ct)
     {
-        var entity = _ctx.MutuelleCards.SingleOrDefault(c => c.MMC_ID == card.Id);
+        var entity = await _ctx.MutuelleCards.SingleOrDefaultAsync(c => c.MMC_ID == card.Id, ct);
         if (entity is null) return null;
 
         // Seuls les champs mutuelle sont modifiables (image/traçabilité figées).
@@ -154,23 +154,23 @@ public class MutuelleCardRepository : IMutuelleCardRepository
         // Validés sur CETTE photo : ils ne sont plus « repris » d'une autre (MOB_011).
         entity.MMC_FIELDS_INHERITED_FROM = null;
 
-        _ctx.SaveChanges();
+        await _ctx.SaveChangesAsync(ct);
         return entity.ToDomain();
     }
 
     // ── P3 : la file de lecture automatique ──────────────────────────────────
 
-    public IReadOnlyList<Guid> ListPendingOcr(int take)
-        => _ctx.MutuelleCards.AsNoTracking()
+    public async Task<IReadOnlyList<Guid>> ListPendingOcrAsync(int take, CancellationToken ct)
+        => await _ctx.MutuelleCards.AsNoTracking()
             .Where(c => c.MMC_OCR_STATUS == PendingStatus)
             .OrderBy(c => c.MMC_CAPTURED_AT)
             .Take(take)
             .Select(c => c.MMC_ID)   // l'image se tire une par une, au moment de la lire
-            .ToList();
+            .ToListAsync(ct);
 
-    public void SaveOcrProposal(Guid cardId, ClMutuelleCardOcrProposal proposal)
+    public async Task SaveOcrProposalAsync(Guid cardId, ClMutuelleCardOcrProposal proposal, CancellationToken ct)
     {
-        var entity = _ctx.MutuelleCards.SingleOrDefault(c => c.MMC_ID == cardId);
+        var entity = await _ctx.MutuelleCards.SingleOrDefaultAsync(c => c.MMC_ID == cardId, ct);
         if (entity is null) return;
 
         // ⚠️ Les quatre champs officiels (MMC_MUTUELLE_NAME, MMC_AMC_CODE, …) ne sont PAS touchés :
@@ -185,12 +185,12 @@ public class MutuelleCardRepository : IMutuelleCardRepository
         entity.MMC_OCR_LAST_ERROR = null;
         entity.MMC_OCR_STATUS = ExtractedStatus;
 
-        _ctx.SaveChanges();
+        await _ctx.SaveChangesAsync(ct);
     }
 
-    public ClOcrFailureOutcome MarkOcrFailure(Guid cardId, string reason, int maxAttempts)
+    public async Task<ClOcrFailureOutcome> MarkOcrFailureAsync(Guid cardId, string reason, int maxAttempts, CancellationToken ct)
     {
-        var entity = _ctx.MutuelleCards.SingleOrDefault(c => c.MMC_ID == cardId);
+        var entity = await _ctx.MutuelleCards.SingleOrDefaultAsync(c => c.MMC_ID == cardId, ct);
         if (entity is null) return new ClOcrFailureOutcome { Attempts = 0, GaveUp = true };
 
         entity.MMC_OCR_ATTEMPTS += 1;
@@ -200,7 +200,7 @@ public class MutuelleCardRepository : IMutuelleCardRepository
         entity.MMC_OCR_LAST_ERROR = reason.Length > 400 ? reason[..400] : reason;
         if (giveUp) entity.MMC_OCR_STATUS = ErrorStatus;
 
-        _ctx.SaveChanges();
+        await _ctx.SaveChangesAsync(ct);
         return new ClOcrFailureOutcome { Attempts = entity.MMC_OCR_ATTEMPTS, GaveUp = giveUp };
     }
 

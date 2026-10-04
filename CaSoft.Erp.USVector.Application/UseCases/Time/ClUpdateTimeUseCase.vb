@@ -1,8 +1,9 @@
+Imports System.Threading
 
 ' Mise à jour des jalons opérationnels (En route / Sur place / Terminé) — Result pattern.
 ' Cumulatif : ne pose QUE les jalons fournis (non-null) ; les autres conservent leur valeur.
 Public Class ClUpdateTimeUseCase
-    Implements IResultUseCase(Of Boolean)
+    Implements IResultUseCaseAsync(Of Boolean)
 
     Private ReadOnly _repository As IJobRepository
     Private ReadOnly _command As ClJobTimeCommand
@@ -12,9 +13,9 @@ Public Class ClUpdateTimeUseCase
         _repository = repository
     End Sub
 
-    Public Function Handle() As ClResult(Of Boolean) Implements IResultUseCase(Of Boolean).Handle
+    Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of Boolean)) Implements IResultUseCaseAsync(Of Boolean).HandleAsync
 
-        Dim jobTime As ClJobTimeData = _repository.GetJobTime(_command.JobId)
+        Dim jobTime As ClJobTimeData = Await _repository.GetJobTimeAsync(_command.JobId, ct)
 
         ' Cumulatif : on ne pose QUE les jalons réellement fournis (non-null) ; les autres
         ' conservent leur valeur existante. Le client peut ainsi n'envoyer que le jalon franchi
@@ -28,7 +29,7 @@ Public Class ClUpdateTimeUseCase
         Dim terminateTime = New ClTimeFormatAdapter(_command.JobTime.TerminatedTime).ToDateTime
         If terminateTime.HasValue Then jobTime.TerminateTime = terminateTime
 
-        _repository.SaveJobTime(jobTime)
+        Await _repository.SaveJobTimeAsync(jobTime, ct)
         Return ClResult(Of Boolean).Ok(True)
 
     End Function

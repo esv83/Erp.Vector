@@ -3,6 +3,7 @@ using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.Mapping;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Persistence.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 
@@ -22,9 +23,9 @@ public class JobTimeRepository : IJobTimeRepository
 
     public JobTimeRepository(MobileDbContext ctx) => _ctx = ctx;
 
-    public void Save(Guid gJobId, ClJobTimeData timeData)
+    public async Task SaveAsync(Guid gJobId, ClJobTimeData timeData, CancellationToken ct)
     {
-        var entity = _ctx.MissionStates.SingleOrDefault(s => s.MST_MISSION_ID == gJobId);
+        var entity = await _ctx.MissionStates.SingleOrDefaultAsync(s => s.MST_MISSION_ID == gJobId, ct);
 
         if (entity is null)
         {
@@ -40,16 +41,16 @@ public class JobTimeRepository : IJobTimeRepository
         // Marque la mission à projeter — MÊME transaction que le changement de jalon (zéro perte).
         // Debounce : la projection est repoussée de DebounceSeconds à chaque nouveau changement ;
         // le worker projette l'état consolidé après la rafale.
-        EnqueueProjection(gJobId);
+        await EnqueueProjectionAsync(gJobId, ct);
 
-        _ctx.SaveChanges();
+        await _ctx.SaveChangesAsync(ct);
     }
 
-    private void EnqueueProjection(Guid gJobId)
+    private async Task EnqueueProjectionAsync(Guid gJobId, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
         var dispatchAfter = now.AddSeconds(DebounceSeconds);
-        var ob = _ctx.OperationalOutbox.SingleOrDefault(o => o.OOB_MISSION_ID == gJobId);
+        var ob = await _ctx.OperationalOutbox.SingleOrDefaultAsync(o => o.OOB_MISSION_ID == gJobId, ct);
 
         if (ob is null)
         {
@@ -71,9 +72,9 @@ public class JobTimeRepository : IJobTimeRepository
         }
     }
 
-    public ClJobTimeData? GetJobTimeData(Guid gJobId)
+    public async Task<ClJobTimeData?> GetJobTimeDataAsync(Guid gJobId, CancellationToken ct)
     {
-        var entity = _ctx.MissionStates.SingleOrDefault(s => s.MST_MISSION_ID == gJobId);
+        var entity = await _ctx.MissionStates.SingleOrDefaultAsync(s => s.MST_MISSION_ID == gJobId, ct);
         return entity?.ToJobTimeData();
     }
 }

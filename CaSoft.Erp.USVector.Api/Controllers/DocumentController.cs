@@ -38,25 +38,26 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         public async Task<IActionResult> Upload(
             Guid gJobId,
             [FromForm] UploadDocumentForm form,
-            [FromQuery] Guid? crewId)
+            [FromQuery] Guid? crewId,
+            CancellationToken ct)
         {
             var file = form.File;
             if (file is null || file.Length == 0)
                 return BadRequest("Fichier manquant.");
 
             using var ms = new MemoryStream();
-            await file.CopyToAsync(ms);
+            await file.CopyToAsync(ms, ct);
 
             var command = new ClUploadDocumentCommand(
                 gJobId, ms.ToArray(), file.ContentType, file.FileName, form.Category, crewId);
 
-            return new ClUploadDocumentUseCase(command, _repository).Handle().ToActionResult();
+            return (await new ClUploadDocumentUseCase(command, _repository).HandleAsync(ct)).ToActionResult();
         }
 
         /// <summary>Métadonnées des documents de la mission (du plus récent au plus ancien).</summary>
         [HttpGet("missions/{gJobId:guid}/documents")]
-        public IActionResult List(Guid gJobId)
-            => Ok(_repository.ListByMission(gJobId).Select(d => d.ToDtoOut()));
+        public async Task<IActionResult> List(Guid gJobId, CancellationToken ct)
+            => Ok((await _repository.ListByMissionAsync(gJobId, ct)).Select(d => d.ToDtoOut()));
 
         /// <summary>Octets d'un document (Content-Type d'origine).</summary>
         // Octets d'un document, annoncés par le paquet terrain (FileUrl) et tirés par la facturation — D8.
@@ -64,9 +65,9 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         // leur jeton. La politique de repli, elle, n'admettrait que l'app.
         [Authorize(Policy = ClKeycloakCallers.ServiceOrMobilePolicy)]
         [HttpGet("documents/{documentId:guid}/content")]
-        public IActionResult GetContent(Guid documentId)
+        public async Task<IActionResult> GetContent(Guid documentId, CancellationToken ct)
         {
-            var doc = _repository.GetById(documentId);
+            var doc = await _repository.GetByIdAsync(documentId, ct);
             if (doc?.Content is null || doc.Content.Length == 0)
                 return NotFound();
 

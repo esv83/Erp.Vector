@@ -13,17 +13,17 @@ public class DocumentRepository : IDocumentRepository
 
     public DocumentRepository(MobileDbContext ctx) => _ctx = ctx;
 
-    public void Save(ClDocument document)
+    public async Task SaveAsync(ClDocument document, CancellationToken ct)
     {
         _ctx.Documents.Add(document.ToEntity());
-        _ctx.SaveChanges();
+        await _ctx.SaveChangesAsync(ct);
     }
 
     // Projection nommée, SANS DOC_CONTENT : la liste de l'app n'en affiche que les métadonnées, et
     // chargeait jusqu'au 19/09 le contenu de chaque document pour rien. Les octets se servent un par
-    // un, par GetById. Même principe que FieldDataQueryService et la carte mutuelle.
-    public IReadOnlyList<ClDocument> ListByMission(Guid missionId)
-        => _ctx.Documents.AsNoTracking()
+    // un, par GetByIdAsync. Même principe que FieldDataQueryService et la carte mutuelle.
+    public async Task<IReadOnlyList<ClDocument>> ListByMissionAsync(Guid missionId, CancellationToken ct)
+        => await _ctx.Documents.AsNoTracking()
             .Where(d => d.DOC_MISSION_ID == missionId)
             .OrderByDescending(d => d.DOC_CAPTURED_AT)
             .Select(d => new ClDocument
@@ -37,8 +37,8 @@ public class DocumentRepository : IDocumentRepository
                 CapturedAt = d.DOC_CAPTURED_AT,
                 CapturedCrewId = d.DOC_CAPTURED_CREW_ID
             })
-            .ToList();
+            .ToListAsync(ct);
 
-    public ClDocument? GetById(Guid documentId)
-        => _ctx.Documents.SingleOrDefault(d => d.DOC_ID == documentId)?.ToDomain();
+    public async Task<ClDocument?> GetByIdAsync(Guid documentId, CancellationToken ct)
+        => (await _ctx.Documents.SingleOrDefaultAsync(d => d.DOC_ID == documentId, ct))?.ToDomain();
 }

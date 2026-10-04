@@ -1,10 +1,12 @@
+Imports System.Threading
+
 ''' <summary>
 ''' P2 — Renseigne manuellement les champs mutuelle (nom/AMC/concentrateur/télétransmission)
 ''' d'une carte. Saisie humaine = donnée fiable → statut <c>validated</c>. L'OCR (P3) ne fera
 ''' que pré-remplir ces mêmes champs avant validation. Result pattern.
 ''' </summary>
 Public Class ClSetMutuelleFieldsUseCase
-    Implements IResultUseCase(Of ClMutuelleCardDtoOut)
+    Implements IResultUseCaseAsync(Of ClMutuelleCardDtoOut)
 
     ''' <summary>Sans état : partagé entre les appels.</summary>
     Private Shared ReadOnly Validateur As New ClMutuelleFieldsDtoInValidator()
@@ -17,7 +19,7 @@ Public Class ClSetMutuelleFieldsUseCase
         _repository = repository
     End Sub
 
-    Public Function Handle() As ClResult(Of ClMutuelleCardDtoOut) Implements IResultUseCase(Of ClMutuelleCardDtoOut).Handle
+    Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of ClMutuelleCardDtoOut)) Implements IResultUseCaseAsync(Of ClMutuelleCardDtoOut).HandleAsync
         Dim f = _command.Fields
         If f Is Nothing Then
             Return ClResult(Of ClMutuelleCardDtoOut).Fail(ClError.Application("Corps de la saisie manquant."))
@@ -40,7 +42,7 @@ Public Class ClSetMutuelleFieldsUseCase
             .OcrValidatedAt = DateTime.UtcNow
         }
 
-        Dim updated = _repository.Update(patch)
+        Dim updated = Await _repository.UpdateAsync(patch, ct)
         If updated Is Nothing Then
             Return ClResult(Of ClMutuelleCardDtoOut).Fail(ClError.Application("Carte mutuelle introuvable."))
         End If

@@ -2,6 +2,7 @@ using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.Mapping;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 
@@ -12,17 +13,18 @@ public class AnomalyRepository : IAnomalyRepository
 
     public AnomalyRepository(MobileDbContext ctx) => _ctx = ctx;
 
-    public void Save(ClAnomaly anomaly)
+    public async Task SaveAsync(ClAnomaly anomaly, CancellationToken ct)
     {
         _ctx.Anomalies.Add(anomaly.ToEntity());
-        _ctx.SaveChanges();
+        await _ctx.SaveChangesAsync(ct);
     }
 
-    public IReadOnlyList<ClAnomaly> ListByMission(Guid missionId)
-        => _ctx.Anomalies
+    public async Task<IReadOnlyList<ClAnomaly>> ListByMissionAsync(Guid missionId, CancellationToken ct)
+    {
+        var lignes = await _ctx.Anomalies
             .Where(a => a.ANO_MISSION_ID == missionId)
             .OrderByDescending(a => a.ANO_REPORTED_AT)
-            .ToList()
-            .Select(e => e.ToDomain())
-            .ToList();
+            .ToListAsync(ct);
+        return lignes.Select(e => e.ToDomain()).ToList();
+    }
 }

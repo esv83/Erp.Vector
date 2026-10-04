@@ -74,7 +74,7 @@ public class MutuelleCardOcrTests
         using var ctx = NewContext();
         var repository = new MutuelleCardRepository(ctx);
         var carte = Carte();
-        repository.Save(carte);
+        await repository.SaveAsync(carte, CancellationToken.None);
 
         var ocr = new FakeOcr
         {
@@ -88,7 +88,7 @@ public class MutuelleCardOcrTests
 
         await Dispatcher(ctx, ocr).ReadPendingAsync(CancellationToken.None);
 
-        var relue = repository.GetCurrentMetadata(Ben)!;
+        var relue = (await repository.GetCurrentMetadataAsync(Ben, CancellationToken.None))!;
         relue.OcrStatus.Should().Be("extracted");
         relue.OcrMutuelleName.Should().Be("Harmonie Mutuelle");
         relue.OcrAmcCode.Should().Be("12345678");
@@ -103,7 +103,7 @@ public class MutuelleCardOcrTests
     public async Task Une_carte_deja_lue_ne_repart_pas_dans_la_file()
     {
         using var ctx = NewContext();
-        new MutuelleCardRepository(ctx).Save(Carte("extracted"));
+        await new MutuelleCardRepository(ctx).SaveAsync(Carte("extracted"), CancellationToken.None);
         var ocr = new FakeOcr();
 
         await Dispatcher(ctx, ocr).ReadPendingAsync(CancellationToken.None);
@@ -120,12 +120,12 @@ public class MutuelleCardOcrTests
     {
         using var ctx = NewContext();
         var repository = new MutuelleCardRepository(ctx);
-        repository.Save(Carte());
+        await repository.SaveAsync(Carte(), CancellationToken.None);
 
         await Dispatcher(ctx, new FakeOcr { Proposal = new ClMutuelleCardOcrProposal() })
             .ReadPendingAsync(CancellationToken.None);
 
-        var relue = repository.GetCurrentMetadata(Ben)!;
+        var relue = (await repository.GetCurrentMetadataAsync(Ben, CancellationToken.None))!;
         relue.OcrStatus.Should().Be("extracted");
         relue.OcrAmcCode.Should().BeNull();
         relue.OcrLastError.Should().BeNull();
@@ -142,17 +142,17 @@ public class MutuelleCardOcrTests
     {
         using var ctx = NewContext();
         var repository = new MutuelleCardRepository(ctx);
-        repository.Save(Carte());
+        await repository.SaveAsync(Carte(), CancellationToken.None);
         var ocr = new FakeOcr { Throws = new HttpRequestException("service indisponible") };
         var dispatcher = Dispatcher(ctx, ocr, new MutuelleCardOcrOptions { MaxAttempts = 3 });
 
         await dispatcher.ReadPendingAsync(CancellationToken.None);
-        repository.GetCurrentMetadata(Ben)!.OcrStatus.Should().Be("pending", "une panne peut passer");
+        (await repository.GetCurrentMetadataAsync(Ben, CancellationToken.None))!.OcrStatus.Should().Be("pending", "une panne peut passer");
 
         await dispatcher.ReadPendingAsync(CancellationToken.None);
         await dispatcher.ReadPendingAsync(CancellationToken.None);
 
-        var relue = repository.GetCurrentMetadata(Ben)!;
+        var relue = (await repository.GetCurrentMetadataAsync(Ben, CancellationToken.None))!;
         relue.OcrStatus.Should().Be("error");
         relue.OcrAttempts.Should().Be(3);
         relue.OcrLastError.Should().Contain("service indisponible");
@@ -160,18 +160,18 @@ public class MutuelleCardOcrTests
     }
 
     [Fact]
-    public void Le_motif_d_echec_est_borne_a_la_colonne()
+    public async Task Le_motif_d_echec_est_borne_a_la_colonne()
     {
         using var ctx = NewContext();
         var repository = new MutuelleCardRepository(ctx);
         var carte = Carte();
-        repository.Save(carte);
+        await repository.SaveAsync(carte, CancellationToken.None);
 
-        var issue = repository.MarkOcrFailure(carte.Id, new string('x', 900), maxAttempts: 5);
+        var issue = (await repository.MarkOcrFailureAsync(carte.Id, new string('x', 900), maxAttempts: 5, CancellationToken.None));
 
         issue.Attempts.Should().Be(1);
         issue.GaveUp.Should().BeFalse();
-        repository.GetCurrentMetadata(Ben)!.OcrLastError!.Length.Should().Be(400);
+        (await repository.GetCurrentMetadataAsync(Ben, CancellationToken.None))!.OcrLastError!.Length.Should().Be(400);
     }
 
     // ── Les réglages, et la sortie du modèle ─────────────────────────────────

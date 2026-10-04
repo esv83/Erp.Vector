@@ -33,7 +33,7 @@ Public Class ClUploadMissionMutuelleCardUseCase
 
         Dim command As New ClUploadMutuelleCardCommand(
             beneficiaryId.Value, _command.Image, _command.ContentType, _command.CrewId, _command.MissionId)
-        Return New ClUploadMutuelleCardUseCase(command, _repository).Handle()
+        Return Await New ClUploadMutuelleCardUseCase(command, _repository).HandleAsync(ct)
     End Function
 
 End Class

@@ -30,15 +30,15 @@ public class DocumentRepositoryTests
         };
 
     [Fact]
-    public void Save_then_GetById_returns_document_with_content()
+    public async Task Save_then_GetById_returns_document_with_content()
     {
         using var ctx = NewContext();
         var sut = new DocumentRepository(ctx);
         var doc = Doc(EnDocumentCategory.TransportOrder, new DateTime(2026, 6, 20, 8, 0, 0, DateTimeKind.Utc), 1, 2, 3);
 
-        sut.Save(doc);
+        await sut.SaveAsync(doc, CancellationToken.None);
 
-        var loaded = sut.GetById(doc.Id);
+        var loaded = (await sut.GetByIdAsync(doc.Id, CancellationToken.None));
         loaded.Should().NotBeNull();
         loaded!.Category.Should().Be(EnDocumentCategory.TransportOrder);
         loaded.Content.Should().Equal(1, 2, 3);
@@ -46,15 +46,15 @@ public class DocumentRepositoryTests
     }
 
     [Fact]
-    public void ListByMission_returns_most_recent_first()
+    public async Task ListByMission_returns_most_recent_first()
     {
         using var ctx = NewContext();
         var sut = new DocumentRepository(ctx);
-        sut.Save(Doc(EnDocumentCategory.Prescription, new DateTime(2026, 6, 20, 8, 0, 0, DateTimeKind.Utc), 1));
+        await sut.SaveAsync(Doc(EnDocumentCategory.Prescription, new DateTime(2026, 6, 20, 8, 0, 0, DateTimeKind.Utc), 1), CancellationToken.None);
         var recent = Doc(EnDocumentCategory.Administrative, new DateTime(2026, 6, 20, 9, 0, 0, DateTimeKind.Utc), 2);
-        sut.Save(recent);
+        await sut.SaveAsync(recent, CancellationToken.None);
 
-        var list = sut.ListByMission(Mission);
+        var list = (await sut.ListByMissionAsync(Mission, CancellationToken.None));
         list.Should().HaveCount(2);
         list[0].Id.Should().Be(recent.Id);
     }
@@ -64,27 +64,27 @@ public class DocumentRepositoryTests
     /// Le document entier reste servi, un par un, par GetById.
     /// </summary>
     [Fact]
-    public void ListByMission_ne_charge_pas_le_contenu()
+    public async Task ListByMission_ne_charge_pas_le_contenu()
     {
         using var ctx = NewContext();
         var sut = new DocumentRepository(ctx);
         var doc = Doc(EnDocumentCategory.TransportOrder, new DateTime(2026, 9, 19, 8, 0, 0, DateTimeKind.Utc), 1, 2, 3);
-        sut.Save(doc);
+        await sut.SaveAsync(doc, CancellationToken.None);
 
-        var listed = sut.ListByMission(Mission).Single();
+        var listed = (await sut.ListByMissionAsync(Mission, CancellationToken.None)).Single();
 
         listed.Content.Should().BeNull();
         listed.ByteSize.Should().Be(doc.ByteSize);
         listed.ContentType.Should().Be("application/pdf");
-        sut.GetById(doc.Id)!.Content.Should().Equal(1, 2, 3);
+        (await sut.GetByIdAsync(doc.Id, CancellationToken.None))!.Content.Should().Equal(1, 2, 3);
     }
 
     [Fact]
-    public void GetById_returns_null_when_unknown()
+    public async Task GetById_returns_null_when_unknown()
     {
         using var ctx = NewContext();
         var sut = new DocumentRepository(ctx);
 
-        sut.GetById(Guid.NewGuid()).Should().BeNull();
+        (await sut.GetByIdAsync(Guid.NewGuid(), CancellationToken.None)).Should().BeNull();
     }
 }

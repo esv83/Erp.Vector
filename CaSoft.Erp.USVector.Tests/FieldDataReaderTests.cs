@@ -98,20 +98,20 @@ public class FieldDataReaderTests
         ctx.MissionStates.Add(new MOB_MISSION_STATE { MST_MISSION_ID = Mission, MST_GO_AT = go });
         ctx.Signatures.Add(new MOB_SIGNATURE { SIG_MISSION_ID = Mission, SIG_DATA = "image", SIG_DATETIME = signed });
         ctx.SaveChanges();
-        new DocumentRepository(ctx).Save(new ClDocument
+        await new DocumentRepository(ctx).SaveAsync(new ClDocument
         {
             Id = Guid.NewGuid(), MissionId = Mission, Category = EnDocumentCategory.TransportOrder,
             Content = new byte[] { 1 }, ContentType = "application/pdf", ByteSize = 1, CapturedAt = docAt
-        });
-        new AnomalyRepository(ctx).Save(new ClAnomaly
+        }, CancellationToken.None);
+        await new AnomalyRepository(ctx).SaveAsync(new ClAnomaly
         {
             Id = Guid.NewGuid(), MissionId = Mission, Type = EnAnomalyType.Phone, Text = "tel KO", ReportedAt = anoAt
-        });
-        new MutuelleCardRepository(ctx).Save(new ClMutuelleCard
+        }, CancellationToken.None);
+        await new MutuelleCardRepository(ctx).SaveAsync(new ClMutuelleCard
         {
             Id = Guid.NewGuid(), BeneficiaryId = Ben, Image = new byte[] { 9 }, ContentType = "image/jpeg",
             ByteSize = 1, CapturedAt = go, AmcCode = "AMC1"
-        });
+        }, CancellationToken.None);
 
         var result = await Reader(ctx).GetAsync(Mission, CancellationToken.None);
 
@@ -252,11 +252,11 @@ public class FieldDataReaderTests
     public async Task Quand_Orders_porte_batch_refs_le_lot_n_appelle_ni_full_ni_la_commande()
     {
         using var ctx = NewContext();
-        new MutuelleCardRepository(ctx).Save(new ClMutuelleCard
+        await new MutuelleCardRepository(ctx).SaveAsync(new ClMutuelleCard
         {
             Id = Guid.NewGuid(), BeneficiaryId = Ben, Image = new byte[] { 9 }, ContentType = "image/jpeg",
             ByteSize = 1, CapturedAt = DateTime.UtcNow, AmcCode = "AMC1"
-        });
+        }, CancellationToken.None);
         var inconnue = Guid.NewGuid();
         var erp = new FakeErp { Batch = Connues(new Dictionary<Guid, Guid?> { [Mission] = Ben, [Retour] = null }) };
 

@@ -18,11 +18,10 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         // jusqu'au 19/09 faute de DEC-6. Le POST juste dessous reste réservé à l'app.
         [Authorize(Policy = ClKeycloakCallers.ServiceOrMobilePolicy)]
         [HttpGet("{gJobId}")]
-        public ActionResult<ClSignatureGetModel> GetSignature(Guid gJobId, [FromServices] ISignatureRepository getSignatureRepository)
+        public async Task<ActionResult<ClSignatureGetModel>> GetSignature(Guid gJobId, [FromServices] ISignatureRepository getSignatureRepository, CancellationToken ct)
         {
-            ClGetSignatureUseCase GetSignatureUseCase = new ClGetSignatureUseCase(gJobId, getSignatureRepository);
-            // Use case migré au Result pattern : consommé via le pont Result→ActionResult.
-            return GetSignatureUseCase.Handle().ToActionResult();
+            var useCase = new ClGetSignatureUseCase(gJobId, getSignatureRepository);
+            return (await useCase.HandleAsync(ct)).ToActionResult();
         }
 
         /// <summary>Plafond d'un lot : ~42 Ko par image, soit ~2 Mo par réponse.</summary>
@@ -59,36 +58,36 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         // de clé primaire sur MOB_SIGNATURE).
         [HttpPost("{gJobId}")]
         [FreezeOnTransfer]
-        public ActionResult PostSignature(Guid gJobId, ClSignatureGetModel signatureModel, [FromServices] ISignatureRepository repository)
+        public async Task<ActionResult> PostSignature(Guid gJobId, ClSignatureGetModel signatureModel, [FromServices] ISignatureRepository repository, CancellationToken ct)
         {
             // Pas d'attrape-tout (04/10) : une panne de la base remonte au gestionnaire (503) au lieu
             // de partir en 400 avec le message technique — 35 fois pendant les coupures.
-            if (repository.Exists(gJobId))
-                repository.Update(gJobId, signatureModel.Data);
+            if (await repository.ExistsAsync(gJobId, ct))
+                await repository.UpdateAsync(gJobId, signatureModel.Data, ct);
             else
-                repository.Insert(gJobId, signatureModel.Data);
+                await repository.InsertAsync(gJobId, signatureModel.Data, ct);
 
             return Ok();
         }
 
         [HttpPatch("{gJobId}")]
         [FreezeOnTransfer]
-        public ActionResult PatchSignature(Guid gJobId, ClSignatureGetModel signatureModel, [FromServices] ISignatureRepository repository)
+        public async Task<ActionResult> PatchSignature(Guid gJobId, ClSignatureGetModel signatureModel, [FromServices] ISignatureRepository repository, CancellationToken ct)
         {
             // Rien à modifier : le même 400 qu'avant, avec une phrase au lieu de « Sequence contains no elements ».
-            if (!repository.Exists(gJobId))
+            if (!await repository.ExistsAsync(gJobId, ct))
                 return BadRequest("Aucune signature à modifier pour cette mission.");
 
-            repository.Update(gJobId, signatureModel.Data);
+            await repository.UpdateAsync(gJobId, signatureModel.Data, ct);
             return Ok();
         }
 
         [HttpDelete("{gJobId}")]
         [FreezeOnTransfer]
-        public ActionResult DeleteSignature(Guid gJobId, [FromServices] ISignatureRepository Repository)
+        public async Task<ActionResult> DeleteSignature(Guid gJobId, [FromServices] ISignatureRepository Repository, CancellationToken ct)
         {
             // Suppression d'une signature absente : sans effet, 200 comme avant.
-            Repository.Delete(gJobId, string.Empty);
+            await Repository.DeleteAsync(gJobId, string.Empty, ct);
             return Ok();
         }
     }

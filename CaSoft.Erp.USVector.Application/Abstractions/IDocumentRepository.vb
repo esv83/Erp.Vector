@@ -1,3 +1,5 @@
+Imports System.Threading
+
 Namespace Port
 
     ''' <summary>
@@ -7,16 +9,16 @@ Namespace Port
     Public Interface IDocumentRepository
 
         ''' <summary>Enregistre un document (l'Id est porté par <paramref name="document"/>).</summary>
-        Sub Save(document As ClDocument)
+        Function SaveAsync(document As ClDocument, ct As CancellationToken) As Task
 
         ''' <summary>
         ''' Documents d'une mission, du plus récent au plus ancien — <b>métadonnées seules</b> :
-        ''' <c>Content</c> vaut Nothing. Les octets se servent un par un, par <see cref="GetById"/>.
+        ''' <c>Content</c> vaut Nothing. Les octets se servent un par un, par <see cref="GetByIdAsync"/>.
         ''' </summary>
-        Function ListByMission(missionId As Guid) As IReadOnlyList(Of ClDocument)
+        Function ListByMissionAsync(missionId As Guid, ct As CancellationToken) As Task(Of IReadOnlyList(Of ClDocument))
 
         ''' <summary>Document par identifiant (pour servir le binaire), ou Nothing.</summary>
-        Function GetById(documentId As Guid) As ClDocument
+        Function GetByIdAsync(documentId As Guid, ct As CancellationToken) As Task(Of ClDocument)
 
     End Interface
 
