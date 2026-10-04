@@ -1,7 +1,7 @@
 # Livré — Vector (module terrain ambulanciers)
 
-> **Mis à jour le** 2026-10-04 · **En production** : `4ff99ce` (`main`), rechargé le 2026-10-04 à
-> 11:14:40, constaté par `api/version`, sourcelink et journal.
+> **Mis à jour le** 2026-10-04 (soir) · **En production** : `106e5cd` (`main`), rechargé le
+> 2026-10-04 à 15:10:08, constaté par `api/version`, sourcelink et journal.
 >
 > Ce document porte **ce qui est livré** : ce que le module fait, le journal daté des livraisons,
 > les décisions appliquées, la configuration qui a déjà cassé la production, les pistes retirées.
@@ -101,6 +101,41 @@ Principe constant : **le terrain n'écrase jamais la donnée officielle de l'ERP
 # 2. Journal des livraisons
 
 *Du plus récent au plus ancien.*
+
+## 2026-10-04 (après-midi) — Publication : l'itération des dettes de forme, et une panne qui cesse d'être un refus
+
+*En production — `106e5cd` (`main`), rechargé à 15:10:08. **Constaté par `GET /vector/api/version`** :
+commit `106e5cd`, `Tree: clean`, environnement Production ; `.pdb` concordant ; schéma 8 sur 8.
+**Aucun trafic du terrain encore vu sous ce binaire** — dimanche après-midi.*
+
+- **Plus aucun pont synchrone** (`4ade3c8`, `6c76059`, `106e5cd`) : identité, équipage et détail de
+  mission sont asynchrones jusqu'aux contrôleurs. Le garde-fou d'équipage, par lequel passe chaque
+  requête du terrain, bloquait un thread pendant chaque appel à Orders. Nouveau contrat
+  `IResultUseCaseAsync(Of T)` — `ClResult(Of T)` et sa traduction HTTP inchangés.
+- **Plus aucun cas d'usage qui attrape tout** (`6c76059`, `106e5cd`) : 16 cas d'usage et les 3 `catch` de
+  `SignatureController` rendaient toute exception en 400 avec son message technique — **~230 réponses
+  ainsi pendant les coupures des 22/09 et 02/10**. Seul le refus métier devient un `Fail` ; une panne
+  remonte au gestionnaire, qui rend **503**. Les refus gardent leur code et leur texte ; quatre
+  messages de 400 deviennent des phrases (signature à modifier absente, identifiant vide).
+- **Le gestionnaire 503 couvre la base Vector** (`6c76059`) : l'épuisement du réessai EF
+  (`RetryLimitExceededException`) — posé lui-même ce jour (`b10d54d`, 3 essais, 5 s).
+- **`ShiftConfirmationController`** (`b10d54d`) : ses `catch` restent — 503 en texte, au contrat du front
+  depuis le 15/09 — mais trient comme le gestionnaire, disjoncteur compris.
+- **Route retirée : `api/Kilometers`** (`6c76059`) — 15 `GET` du 16/08 au 04/10, tous 404, aucune
+  saisie ; l'écriture enregistrait le *conducteur*, sans garde d'équipage. Même 404 pour l'app. Note
+  au dev web : [routes retirées](note_web_alexandre_routes_retirees.md).
+- **Retirés, sans appelant** : 4 DTO, 6 cas d'usage, 2 caches (dont un cache de mission vidé à chaque
+  requête), `IsExist`. **11 DTO renommés en `…DtoOut`** (`b10d54d`) — JSON inchangé.
+- 263 tests verts.
+
+## 2026-10-04 (après-midi) — Constats sous `4ff99ce`, de 11:14 à 15:09
+
+- **1 551 jetons validés, aucun rejeté ; 1 493 réponses en 200, aucun 500, aucune exception non
+  gérée.** Le seul 400 est un refus d'Orders sur la saisie (12:58).
+- **Le serveur SQL de la base Vector a redémarré à 15:00:22** (« SHUTDOWN en cours »), injoignable
+  jusqu'à 15:01:48 au moins. Seule la file de projection l'a senti — 6 cycles en échec, reprise
+  seule ; 3 requêtes du terrain dans la fenêtre, sans erreur. Cause non établie.
+- **Orders sert la 1.8.5** et `POST /missions/batch-refs` répond — **sans jeton**, en 200.
 
 ## 2026-10-04 — Publication : une panne d'Orders se dit 503, la facturation lit Orders par lot
 
@@ -586,7 +621,7 @@ terrain dans la foulée.*
 | Fermeture des routes de la facturation | 2026-09-19 : 559 appels en 200 avec jeton après publication, aucun 401/403 |
 | Ce qui tourne | 2026-09-21 : `api/version` rend le commit publié et `Tree: clean`, en production |
 | Schéma de la base | 2026-09-21 : 8 scripts sur 8, constaté au démarrage |
-| Suite complète | 126 verts (2026-08-25) → 112 (2026-09-13) → 172 (2026-09-15) → 191 (2026-09-19) → 235 (2026-09-21) → **254 verts (2026-10-04)** |
+| Suite complète | 126 verts (2026-08-25) → 112 (2026-09-13) → 172 (2026-09-15) → 191 (2026-09-19) → 235 (2026-09-21) → 254 (2026-10-04) → **263 verts (2026-10-04, soir)** |
 | Disjoncteur vers Orders | 2026-10-04 : vu sur les coupures des 22/09 et 02/10 — 52 ouvertures, seuls les 5xx retentés |
 | Garde de publication | 2026-10-04 : premier refus réel (arbre sale) |
 | Facturation sous `f000ad0` | 21/09 → 04/10 : 1 389 appels de lot en 200, aucun 401/403 |
@@ -779,6 +814,7 @@ depuis un arbre modifié annonce un commit qui ne contient pas le code servi (§
 
 | Date | Incident | Ce qui l'a révélé | Suite |
 |---|---|---|---|
+| **2026-10-04** *(15:00 → 15:02)* | **Redémarrage du serveur SQL** de la base Vector (« SHUTDOWN en cours ») | relevé du journal après publication | file de projection seule touchée, reprise seule ; cause à demander à l'exploitation |
 | **2026-10-04** *(10:23 → 10:25)* | **Publication d'Orders `1.8.3`** : « Mise a jour Orders.Api en cours », 36 requêtes du terrain en 500 brut | relevé du journal pour l'itération de constat | gestionnaire 503 (`8ff7ce7`), publié à 11:14 |
 | **2026-10-02** *(16:38 → 16:52)* | **Coupure d'infrastructure** : SQL de la base Vector, Orders et DNS tombent ensemble — 441 requêtes en 500 brut | relevé du journal, le 04/10 | idem ; cause réseau non établie, hors de ce dépôt |
 | **2026-09-22** *(14:58 → 15:38)* | **Même coupure, plus longue** : 2 112 requêtes en 500 brut, dont `Crew/mine` — l'ambulancier ne pouvait pas entrer, sans savoir pourquoi | relevé du journal, le 04/10 — **douze jours après** | idem |
