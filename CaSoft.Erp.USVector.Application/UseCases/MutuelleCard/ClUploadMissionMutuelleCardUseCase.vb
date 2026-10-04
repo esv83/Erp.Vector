@@ -6,7 +6,7 @@ Imports System.Threading
 ''' tracée d'office. Result pattern.
 ''' </summary>
 ''' <remarks>
-''' Le terrain n'a jamais reçu l'identifiant du patient (<c>ClPatientDto</c> ne le porte pas) : la
+''' Le terrain n'a jamais reçu l'identifiant du patient (<c>ClPatientDtoOut</c> ne le porte pas) : la
 ''' route par bénéficiaire lui était inatteignable. Résoudre ici évite aussi de rattacher une carte
 ''' au patient que désignerait le client.
 ''' </remarks>

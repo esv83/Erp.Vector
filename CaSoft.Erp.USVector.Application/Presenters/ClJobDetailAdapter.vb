@@ -59,8 +59,8 @@ Public Class ClJobDetailAdapter
         Return dte.ToString("dddd dd/MM/yyyy 'à' HH:mm", fr)
     End Function
 
-    Private Shared Function ToLocationDto(loc As ClJobLocation) As ClJobLocationDto
-        Dim dto As New ClJobLocationDto
+    Private Shared Function ToLocationDto(loc As ClJobLocation) As ClJobLocationDtoOut
+        Dim dto As New ClJobLocationDtoOut
         If loc IsNot Nothing Then
             dto.Nom = loc.Nom
             dto.Service = loc.Service
@@ -73,7 +73,7 @@ Public Class ClJobDetailAdapter
             ' Sous-objet présent seulement si le lieu est réellement géocodé : l'UI teste
             ' sa présence plutôt que deux 0.0 qui pointeraient au large du golfe de Guinée.
             If loc.Latitude.HasValue AndAlso loc.Longitude.HasValue Then
-                dto.Coordinates = New ClJobCoordinatesDto With {
+                dto.Coordinates = New ClJobCoordinatesDtoOut With {
                     .Latitude = loc.Latitude.Value,
                     .Longitude = loc.Longitude.Value
                 }

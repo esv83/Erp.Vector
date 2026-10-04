@@ -182,7 +182,7 @@ public sealed class FieldDataReader : IFieldDataReader
     private static ClFieldEnrichmentDtoOut Assemble(Guid missionId, Guid orderId, Guid? beneficiaryId, ClFieldSilos silos)
     {
         silos.Timelines.TryGetValue(missionId, out var time);
-        var timeline = new ClFieldTimelineDto
+        var timeline = new ClFieldTimelineDtoOut
         {
             AckAt = time?.AckTime,
             ReadAt = time?.ReadTime,
@@ -193,7 +193,7 @@ public sealed class FieldDataReader : IFieldDataReader
 
         // Signature : présence + horodatage ; les octets sont servis par api/Signature/{id}.
         DateTime? signedAt = silos.SignedAt.TryGetValue(missionId, out var at) ? at : null;
-        var signature = new ClFieldSignatureDto
+        var signature = new ClFieldSignatureDtoOut
         {
             Exists = signedAt.HasValue,
             SignedAt = signedAt,

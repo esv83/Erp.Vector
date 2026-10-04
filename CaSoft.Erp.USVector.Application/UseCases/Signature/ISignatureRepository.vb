@@ -1,6 +1,6 @@
 ﻿Public Interface ISignatureRepository
 
-    Function Fetch(jobId As Guid) As ClSignatureDto
+    Function Fetch(jobId As Guid) As ClSignatureDtoOut
     Sub Insert(gJobId As Guid, strSignData As String)
     Sub Update(gJobId As Guid, strSignData As String)
     Sub Delete(gJobId As Guid, strSignData As String)

@@ -33,7 +33,7 @@ public sealed class ContextOrderCatalogService : IContextOrderCatalogService
         _logger = logger;
     }
 
-    public async Task<List<ClContractChoiceDto>> GetChoicesAsync(Guid missionId, CancellationToken ct)
+    public async Task<List<ClContractChoiceDtoOut>> GetChoicesAsync(Guid missionId, CancellationToken ct)
     {
         ErpMissionContextOrderDto? context;
         try
@@ -50,15 +50,15 @@ public sealed class ContextOrderCatalogService : IContextOrderCatalogService
             _logger.LogWarning(ex,
                 "OC-3b : catalogue des types indisponible pour la mission {MissionId}, liste vide servie.",
                 missionId);
-            return new List<ClContractChoiceDto>(0);
+            return new List<ClContractChoiceDtoOut>(0);
         }
 
         // Mission inconnue d'Order : rien de sélectionnable, et le POST serait refusé en 404.
-        if (context is null) return new List<ClContractChoiceDto>(0);
+        if (context is null) return new List<ClContractChoiceDtoOut>(0);
 
         return context.AvailableContextOrders
             .OrderBy(c => c.Index)
-            .Select(c => new ClContractChoiceDto
+            .Select(c => new ClContractChoiceDtoOut
             {
                 Id = c.Id,
                 Display = c.Display,

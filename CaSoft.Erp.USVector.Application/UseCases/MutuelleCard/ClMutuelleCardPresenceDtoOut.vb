@@ -4,7 +4,7 @@
 ''' </summary>
 ''' <remarks>
 ''' <b>Chemin relatif</b>, comme partout ailleurs dans ce contrat (<c>ClMutuelleCardDtoOut.ImageUrl</c>,
-''' <c>ClFieldSignatureDto.ImageUrl</c>) : c'est à l'appelant de le composer avec la base de l'API
+''' <c>ClFieldSignatureDtoOut.ImageUrl</c>) : c'est à l'appelant de le composer avec la base de l'API
 ''' Vector, qu'il connaît par sa propre configuration. Servir une URL absolue obligerait Vector à
 ''' savoir sous quel nom d'hôte on l'atteint — ce qu'il ignore derrière un répertoire virtuel IIS.
 ''' <para>

@@ -62,7 +62,7 @@ public class CrewRepositoryJobListTests
         public readonly HashSet<Guid> Signed = new();
         public HashSet<Guid> ExistingFor(IEnumerable<Guid> ids) => Signed;
 
-        public ClSignatureDto Fetch(Guid id) => throw new NotSupportedException();
+        public ClSignatureDtoOut Fetch(Guid id) => throw new NotSupportedException();
         public void Insert(Guid id, string d) => throw new NotSupportedException();
         public void Update(Guid id, string d) => throw new NotSupportedException();
         public void Delete(Guid id, string d) => throw new NotSupportedException();

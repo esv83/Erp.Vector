@@ -19,7 +19,7 @@ public class SignatureRepository : ISignatureRepository
         _ctx = ctx;
     }
 
-    public ClSignatureDto? Fetch(Guid jobId)
+    public ClSignatureDtoOut? Fetch(Guid jobId)
     {
         var entity = _ctx.Signatures.SingleOrDefault(s => s.SIG_MISSION_ID == jobId);
         return entity?.ToSignatureDto();

@@ -34,9 +34,9 @@ public static class MobileStateMappings
         entity.MST_UPDATED_AT = DateTime.UtcNow;
     }
 
-    public static ClSignatureDto ToSignatureDto(this MOB_SIGNATURE entity)
+    public static ClSignatureDtoOut ToSignatureDto(this MOB_SIGNATURE entity)
     {
-        return new ClSignatureDto
+        return new ClSignatureDtoOut
         {
             JobId = entity.SIG_MISSION_ID,
             Data = entity.SIG_DATA,

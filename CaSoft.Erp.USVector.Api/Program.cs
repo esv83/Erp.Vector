@@ -186,8 +186,12 @@ builder.Services.AddSingleton(new CaSoft.Erp.USVector.Infrastructure.Persistence
 builder.Services.AddHostedService<SchemaCheckAtStartup>();
 
 // BD Mobile dédiée (MOB_* : sessions, timeline statuts, signatures)
+// Réessai EF sur les erreurs SQL passagères : absorbe une micro-coupure, pas une panne de 40 min
+// (22/09). Sûr parce qu'aucune écriture n'ouvre de transaction explicite — une seule SaveChanges par
+// opération. Ouvrir une transaction à la main imposera CreateExecutionStrategy().
 builder.Services.AddDbContext<MobileDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("MobileDb")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("MobileDb"),
+        sql => sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null)));
 
 // BaseAddress DOIT finir par '/' : sinon la résolution d'URI relative supprime le dernier
 // segment de la base (ex. ".../order" + "personnel/x" => ".../personnel/x" — le "/order" est

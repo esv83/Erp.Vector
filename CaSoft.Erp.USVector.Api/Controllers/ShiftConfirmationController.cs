@@ -46,9 +46,11 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             {
                 return Ok(await _shiftConfirmation.GetMineAsync(personnelId, ct));
             }
-            catch (HttpRequestException ex)
+            catch (Exception ex) when (OrdersUnavailableExceptionHandler.IsOrdersUnavailable(ex))
             {
                 // Rejouable à l'identique : ce n'est pas la requête qui est mauvaise.
+                // Même tri que le gestionnaire global (disjoncteur et délai compris) ; ce catch ne garde
+                // que son message, propre à la prise de service et au contrat du front depuis le 15/09.
                 _logger.LogError(ex, "GET api/personnel/me/shift-confirmations/pending — PER_ID={PerId} : Orders.Api indisponible.", personnelId);
                 return StatusCode(503, "Confirmation de prise de service momentanément indisponible.");
             }
@@ -70,7 +72,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             {
                 result = await _shiftConfirmation.ConfirmAsync(crewId, requestId, personnelId, ct);
             }
-            catch (HttpRequestException ex)
+            catch (Exception ex) when (OrdersUnavailableExceptionHandler.IsOrdersUnavailable(ex))
             {
                 _logger.LogError(ex, "POST api/ShiftConfirmation/{CrewId}/{RequestId}/confirm — PER_ID={PerId} : Orders.Api indisponible.",
                     crewId, requestId, personnelId);

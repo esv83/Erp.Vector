@@ -63,7 +63,7 @@ public class JobLocationMappingTests
     private sealed class FakeSignature : ISignatureRepository
     {
         public HashSet<Guid> ExistingFor(IEnumerable<Guid> ids) => new();
-        public ClSignatureDto Fetch(Guid id) => throw new NotSupportedException();
+        public ClSignatureDtoOut Fetch(Guid id) => throw new NotSupportedException();
         public void Insert(Guid id, string d) => throw new NotSupportedException();
         public void Update(Guid id, string d) => throw new NotSupportedException();
         public void Delete(Guid id, string d) => throw new NotSupportedException();
@@ -81,7 +81,7 @@ public class JobLocationMappingTests
     private static ClJobLocation MapPickup(ErpStageDto stage) => BuildJob(stage).PickupLocation;
 
     /// <summary>Lieu tel que le mobile le reçoit réellement (domaine → DTO exposé).</summary>
-    private static ClJobDetailModel.ClJobLocationDto PickupDto(ErpStageDto stage)
+    private static ClJobDetailModel.ClJobLocationDtoOut PickupDto(ErpStageDto stage)
         => new ClJobDetailAdapter(BuildJob(stage)).PickupLocation;
 
     // ── Le service quitte BatEtage (cœur de DET-1) ────────────────────────────
@@ -221,7 +221,7 @@ public class JobLocationMappingTests
     // ── DET-2 : affichage piloté serveur (sections de lignes) ─────────────────
 
     /// <summary>Affichage tel que le mobile le reçoit (domaine → graphe piloté serveur).</summary>
-    private static ClLocationDisplayDto PickupDisplay(ErpStageDto stage)
+    private static ClLocationDisplayDtoOut PickupDisplay(ErpStageDto stage)
         => new ClJobDetailAdapter(BuildJob(stage)).PickupDisplay;
 
     [Fact]

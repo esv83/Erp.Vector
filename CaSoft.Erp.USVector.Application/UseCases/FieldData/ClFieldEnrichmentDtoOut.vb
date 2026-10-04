@@ -13,9 +13,9 @@ Public Class ClFieldEnrichmentDtoOut
     ''' <summary>Max des horodatages des silos. Nothing si aucun enrichissement.</summary>
     Public Property UpdatedAt As DateTime?
 
-    Public Property Timeline As ClFieldTimelineDto
-    Public Property Signature As ClFieldSignatureDto
-    Public Property Attributes As ClFieldAttributesDto
+    Public Property Timeline As ClFieldTimelineDtoOut
+    Public Property Signature As ClFieldSignatureDtoOut
+    Public Property Attributes As ClFieldAttributesDtoOut
     ''' <summary>Carte mutuelle courante du bénéficiaire (Nothing si aucune).</summary>
     Public Property Mutuelle As ClMutuelleCardDtoOut
     ''' <summary>
@@ -28,7 +28,7 @@ Public Class ClFieldEnrichmentDtoOut
 End Class
 
 ''' <summary>Jalons opérationnels terrain (TRF-3, BD Mobile).</summary>
-Public Class ClFieldTimelineDto
+Public Class ClFieldTimelineDtoOut
     Public Property AckAt As DateTime?
     Public Property ReadAt As DateTime?
     Public Property GoAt As DateTime?
@@ -37,20 +37,20 @@ Public Class ClFieldTimelineDto
 End Class
 
 ''' <summary>Signature patient (présence + url du binaire).</summary>
-Public Class ClFieldSignatureDto
+Public Class ClFieldSignatureDtoOut
     Public Property Exists As Boolean
     Public Property SignedAt As DateTime?
     Public Property ImageUrl As String
 End Class
 
 ''' <summary>Attributs de facturation dynamiques saisis (overlay MOB-13).</summary>
-Public Class ClFieldAttributesDto
+Public Class ClFieldAttributesDtoOut
     Public Property ContractId As Integer
     Public Property ContractDisplay As String
-    Public Property Values As IReadOnlyList(Of ClFieldAttributeValueDto)
+    Public Property Values As IReadOnlyList(Of ClFieldAttributeValueDtoOut)
 End Class
 
-Public Class ClFieldAttributeValueDto
+Public Class ClFieldAttributeValueDtoOut
     Public Property Name As String
     Public Property Value As String
 End Class

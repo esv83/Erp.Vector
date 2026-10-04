@@ -3,11 +3,11 @@
 Public Class ClJobDetailModel
 
     Public Sub New()
-        Beneficiary = New ClPatientDto
-        PickupLocation = New ClJobLocationDto
-        DropoffLocation = New ClJobLocationDto
-        PickupDisplay = New ClLocationDisplayDto
-        DropoffDisplay = New ClLocationDisplayDto
+        Beneficiary = New ClPatientDtoOut
+        PickupLocation = New ClJobLocationDtoOut
+        DropoffLocation = New ClJobLocationDtoOut
+        PickupDisplay = New ClLocationDisplayDtoOut
+        DropoffDisplay = New ClLocationDisplayDtoOut
     End Sub
 
     ' ── Champs historiques (compat — seront retirés une fois l'UI basculée) ──────────
@@ -22,7 +22,7 @@ Public Class ClJobDetailModel
     Public Property IsLastDay As Boolean
     ''' <summary>MOB-8 — Présence d'une signature patient (reflète MI_SIGNATURE_EXISTS).</summary>
     Public Property IsSign As Boolean
-    Public Property Beneficiary As ClPatientDto
+    Public Property Beneficiary As ClPatientDtoOut
 
     ' ── Nouveaux champs (règles côté serveur, UI = affichage seul) ───────────────────
     ''' <summary>Prise en charge formatée : « à HH:mm » le jour même, sinon « dddd dd/MM/yyyy à HH:mm ».</summary>
@@ -30,16 +30,16 @@ Public Class ClJobDetailModel
     ''' <summary>Mode de transport : sous-catégorie (secondaire) si présente, sinon mode principal.</summary>
     Public Property TransportModeLabel As String = String.Empty
     ''' <summary>Lieu de prise en charge, détaillé (l'UI affiche les champs non vides).</summary>
-    Public Property PickupLocation As ClJobLocationDto
+    Public Property PickupLocation As ClJobLocationDtoOut
     ''' <summary>Lieu de dépose, détaillé (l'UI affiche les champs non vides).</summary>
-    Public Property DropoffLocation As ClJobLocationDto
+    Public Property DropoffLocation As ClJobLocationDtoOut
 
     ''' <summary>DET-2 — prise en charge : affichage piloté serveur (sections de lignes + coords). L'UI rend tel quel.</summary>
-    Public Property PickupDisplay As ClLocationDisplayDto
+    Public Property PickupDisplay As ClLocationDisplayDtoOut
     ''' <summary>DET-2 — dépose : affichage piloté serveur (sections de lignes + coords). L'UI rend tel quel.</summary>
-    Public Property DropoffDisplay As ClLocationDisplayDto
+    Public Property DropoffDisplay As ClLocationDisplayDtoOut
 
-    Public Class ClPatientDto
+    Public Class ClPatientDtoOut
 
         ''' <summary>
         ''' Identifiant du bénéficiaire côté ERP. <b>Nothing</b> quand la mission n'en résout aucun.
@@ -70,7 +70,7 @@ Public Class ClJobDetailModel
     End Class
 
     ''' <summary>Lieu détaillé multi-lignes. Chaque champ peut être vide → l'UI ne l'affiche pas.</summary>
-    Public Class ClJobLocationDto
+    Public Class ClJobLocationDtoOut
         Public Property Nom As String = String.Empty
         ''' <summary>Service médical (ex. « Cardiologie »), à afficher après Nom. Vide hors établissement de santé / FreeText.</summary>
         Public Property Service As String = String.Empty
@@ -88,11 +88,11 @@ Public Class ClJobDetailModel
         ''' les champs texte non vides, et consomme celui-ci séparément (carto).
         ''' Nothing si l'ERP n'a pas géocodé le lieu.
         ''' </summary>
-        Public Property Coordinates As ClJobCoordinatesDto
+        Public Property Coordinates As ClJobCoordinatesDtoOut
     End Class
 
     ''' <summary>Coordonnées WGS84 d'un lieu.</summary>
-    Public Class ClJobCoordinatesDto
+    Public Class ClJobCoordinatesDtoOut
         Public Property Latitude As Double
         Public Property Longitude As Double
     End Class

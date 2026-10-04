@@ -7,7 +7,7 @@ Namespace Port
     ''' Order</b>, à la place de <c>MOB_CONTRACT_TYPE</c>.
     ''' <para>
     ''' La <b>forme</b> rendue au mobile ne change pas (D14) : c'est toujours un tableau de
-    ''' <see cref="ClContractChoiceDto"/> — seule la <b>source</b> change. Le passage du tableau à un
+    ''' <see cref="ClContractChoiceDtoOut"/> — seule la <b>source</b> change. Le passage du tableau à un
     ''' objet et le renommage de la route attendent que le front ait basculé.
     ''' </para>
     ''' <para>
@@ -35,7 +35,7 @@ Namespace Port
         ''' partirait de travers en facturation.
         ''' </para>
         ''' </summary>
-        Function GetChoicesAsync(missionId As Guid, ct As CancellationToken) As Task(Of List(Of ClContractChoiceDto))
+        Function GetChoicesAsync(missionId As Guid, ct As CancellationToken) As Task(Of List(Of ClContractChoiceDtoOut))
 
     End Interface
 

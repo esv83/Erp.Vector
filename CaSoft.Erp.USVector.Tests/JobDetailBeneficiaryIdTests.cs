@@ -126,7 +126,7 @@ public class JobDetailBeneficiaryIdTests
     private sealed class FakeSignature : ISignatureRepository
     {
         public HashSet<Guid> ExistingFor(IEnumerable<Guid> ids) => new();
-        public ClSignatureDto Fetch(Guid id) => throw new NotSupportedException();
+        public ClSignatureDtoOut Fetch(Guid id) => throw new NotSupportedException();
         public void Insert(Guid id, string d) => throw new NotSupportedException();
         public void Update(Guid id, string d) => throw new NotSupportedException();
         public void Delete(Guid id, string d) => throw new NotSupportedException();

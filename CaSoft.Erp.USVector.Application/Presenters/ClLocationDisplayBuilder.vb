@@ -5,19 +5,19 @@
 ''' </summary>
 Public Class ClLocationDisplayBuilder
 
-    Public Shared Function Build(loc As ClJobLocation) As ClLocationDisplayDto
-        Dim display As New ClLocationDisplayDto
-        Dim blocks As New List(Of IReadOnlyList(Of ClLocationLineDto))
+    Public Shared Function Build(loc As ClJobLocation) As ClLocationDisplayDtoOut
+        Dim display As New ClLocationDisplayDtoOut
+        Dim blocks As New List(Of IReadOnlyList(Of ClLocationLineDtoOut))
 
         If loc IsNot Nothing Then
             ' Section 1 — identité : nom (en gras) puis service.
-            Dim identity As New List(Of ClLocationLineDto)
+            Dim identity As New List(Of ClLocationLineDtoOut)
             AddLine(identity, Nothing, loc.Nom, bold:=True)
             AddLine(identity, "Service", loc.Service)
             If identity.Count > 0 Then blocks.Add(identity)
 
             ' Section 2 — adresse : lignes non vides, dans l'ordre.
-            Dim address As New List(Of ClLocationLineDto)
+            Dim address As New List(Of ClLocationLineDtoOut)
             AddLine(address, Nothing, loc.Adresse)
             AddLine(address, Nothing, loc.Residence)
             AddLine(address, Nothing, loc.BatEtage)
@@ -27,7 +27,7 @@ Public Class ClLocationDisplayBuilder
 
             ' Coordonnées : sous-objet présent seulement si le lieu est réellement géocodé.
             If loc.Latitude.HasValue AndAlso loc.Longitude.HasValue Then
-                display.Coordinates = New ClJobDetailModel.ClJobCoordinatesDto With {
+                display.Coordinates = New ClJobDetailModel.ClJobCoordinatesDtoOut With {
                     .Latitude = loc.Latitude.Value,
                     .Longitude = loc.Longitude.Value
                 }
@@ -39,10 +39,10 @@ Public Class ClLocationDisplayBuilder
     End Function
 
     ''' <summary>Ajoute une ligne si la valeur est non vide ; Index = position dans la section.</summary>
-    Private Shared Sub AddLine(section As List(Of ClLocationLineDto), label As String, value As String,
+    Private Shared Sub AddLine(section As List(Of ClLocationLineDtoOut), label As String, value As String,
                                Optional bold As Boolean = False, Optional color As String = Nothing)
         If String.IsNullOrWhiteSpace(value) Then Return
-        section.Add(New ClLocationLineDto With {
+        section.Add(New ClLocationLineDtoOut With {
             .Index = section.Count + 1,
             .Label = label,
             .Value = value,

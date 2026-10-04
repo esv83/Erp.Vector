@@ -2,7 +2,7 @@
 ''' DET-2 — Ligne d'affichage pilotée par le serveur : contenu (label/valeur) + style (gras, couleur).
 ''' L'UI la rend telle quelle, sans logique de mise en forme.
 ''' </summary>
-Public Class ClLocationLineDto
+Public Class ClLocationLineDtoOut
     ''' <summary>Ordre de la ligne dans sa section (1-based).</summary>
     Public Property Index As Integer
     ''' <summary>Libellé optionnel (vide → valeur seule).</summary>
