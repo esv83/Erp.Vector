@@ -114,9 +114,6 @@ Public Class ClJob
 #End Region
 
 #Region "Methodes"
-    Public Sub SetRead()
-        TimeData.ReadTime = DateTime.Now
-    End Sub
     Public Sub SetBeneficiary(beneficiary As ClJobBeneficiary)
         SetProperty(beneficiaryProperty, beneficiary)
     End Sub

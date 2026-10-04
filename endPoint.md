@@ -22,6 +22,7 @@ appelle ces routes ; il suffit de les implémenter/ajuster côté Orders au cont
 | `crewId` | exactement l'`id` renvoyé par `GET /crews?personnelId=&date=` (Vector enchaîne les deux) |
 | `members[].id` / `personnelId` | **PER_ID** — même identifiant que renvoie `by-keycloak` |
 | Introuvable | **404** (Vector le gère proprement : `GetOrNullAsync` → `null`) |
+| Fuseau des horodatages | **UTC**, sauf deux champs en **heure locale** : `read` (§3, « mission vue ») et `from` (§2, prise de volant). Aucun n'est suffixé (`Z` ou décalage) : le fuseau est celui-ci, il ne se lit pas dans le JSON. Convention **partagée** avec Orders (`ModOperationalTime`, `ClCrew.AssignDriver`) et la facturation — elle se change en une publication coordonnée des trois modules, jamais d'un côté seul (`ClHorloge`, 04/10) |
 | Panne (base, dépendance) | **5xx, jamais 400** : Vector retente les 5xx, jamais un 4xx — un 400 est lu comme un refus métier. *539 pannes SQL rendues en 400 du 21/09 au 04/10, signalées au plan d'Order le 04/10* |
 
 > ⚠️ Les noms de champs doivent correspondre **exactement** : c'est ainsi que Vector désérialise
@@ -110,7 +111,7 @@ Content-Type: application/json
 ```jsonc
 {
   "driverPersonnelId": "81cc3fd1-c2e9-4a40-b798-68da7f29b907",  // PER_ID du conducteur choisi
-  "from": "2026-07-04T21:10:00"                                 // horodatage de la désignation
+  "from": "2026-07-04T21:10:00"                                 // horodatage de la désignation — HEURE LOCALE
 }
 ```
 ```csharp
@@ -152,10 +153,10 @@ Content-Type: application/json
 ```jsonc
 {
   "ack":       null,                   // legacy/dormant — généralement null
-  "read":      "2026-07-05T15:20:00",  // « Mission vue » (Seen)
-  "go":        "2026-07-05T15:30:00",  // « En route »
-  "onsite":    "2026-07-05T15:45:00",  // « Sur place »
-  "terminate": null,                   // « Terminé » — ici NON atteint / annulé
+  "read":      "2026-07-05T17:20:00",  // « Mission vue » (Seen) — HEURE LOCALE (cf. Conventions)
+  "go":        "2026-07-05T15:30:00",  // « En route » — UTC
+  "onsite":    "2026-07-05T15:45:00",  // « Sur place » — UTC
+  "terminate": null,                   // « Terminé » — UTC ; ici NON atteint / annulé
   "sourceCrewId": null
 }
 ```

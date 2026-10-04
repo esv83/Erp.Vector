@@ -4,6 +4,7 @@ Imports System.Threading
 ' « vue », pas un acquittement). L'ambulancier signale à la régulation qu'il a reçu/vu la mission
 ' depuis la JobList (icône « bien reçu »). Pose l'horodatage « vue » (MST_READ_AT via
 ' ClJobTimeData.ReadTime). Le Save projette aussi l'info vers Orders.Api (régulation, MissionSeen).
+' ⚖️ En heure LOCALE, par convention partagée avec Orders (MOP_READ_AT) — voir ClHorloge.
 Public Class ClMarkMissionSeenUseCase
     Implements IResultUseCaseAsync(Of Boolean)
 
@@ -25,9 +26,9 @@ Public Class ClMarkMissionSeenUseCase
         End If
 
         If jobTime Is Nothing Then
-            jobTime = ClJobTimeData.GetBuilder.WithId(_jobId).WithReadTime(DateTime.Now).Build
+            jobTime = ClJobTimeData.GetBuilder.WithId(_jobId).WithReadTime(ClHorloge.MaintenantLocal()).Build
         Else
-            jobTime.ReadTime = DateTime.Now
+            jobTime.ReadTime = ClHorloge.MaintenantLocal()
         End If
 
         ' Upsert BD Mobile (MST_READ_AT) + projection (Outbox) vers Orders.Api (readAt).

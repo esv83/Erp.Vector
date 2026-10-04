@@ -1,4 +1,5 @@
 using CaSoft.Erp.USVector.Application;
+using CaSoft.Framework;
 using CaSoft.Erp.USVector.Infrastructure.Mapping;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Persistence.Entities;
@@ -10,6 +11,8 @@ namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 /// Signature patient (MOB_SIGNATURE, 1:1 mission ERP).
 /// Sémantique reprise du ClSignatureRepository legacy (T_SIGNATURE_SIGN) ;
 /// Delete, non implémenté côté legacy, est ici réellement supporté (le contrat expose DELETE api/signature).
+/// <para>⚖️ L'horodatage est en heure LOCALE, par convention partagée avec la facturation (C62) — voir
+/// <see cref="ClHorloge"/>.</para>
 /// </summary>
 public class SignatureRepository : ISignatureRepository
 {
@@ -32,7 +35,7 @@ public class SignatureRepository : ISignatureRepository
         {
             SIG_MISSION_ID = gJobId,
             SIG_DATA = strSignData,
-            SIG_DATETIME = DateTime.Now
+            SIG_DATETIME = ClHorloge.MaintenantLocal()
         });
         await _ctx.SaveChangesAsync(ct);
     }
@@ -41,7 +44,7 @@ public class SignatureRepository : ISignatureRepository
     {
         var entity = await _ctx.Signatures.SingleAsync(s => s.SIG_MISSION_ID == gJobId, ct);
         entity.SIG_DATA = strSignData;
-        entity.SIG_DATETIME = DateTime.Now;
+        entity.SIG_DATETIME = ClHorloge.MaintenantLocal();
         await _ctx.SaveChangesAsync(ct);
     }
 

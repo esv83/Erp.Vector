@@ -35,7 +35,7 @@ Public Class ClUploadMutuelleCardUseCase
             .Image = _command.Image,
             .ContentType = _command.ContentType,
             .ByteSize = _command.Image.Length,
-            .CapturedAt = DateTime.UtcNow,
+            .CapturedAt = ClHorloge.MaintenantUtc(),
             .CapturedCrewId = _command.CrewId,
             .MissionId = _command.MissionId,
             .OcrStatus = "pending"

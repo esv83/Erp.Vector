@@ -28,7 +28,7 @@ Public Class ClReportAnomalyUseCase
             .MissionId = _command.MissionId,
             .Type = CType(_command.Input.Type, EnAnomalyType),
             .Text = _command.Input.Text,
-            .ReportedAt = DateTime.UtcNow,
+            .ReportedAt = ClHorloge.MaintenantUtc(),
             .ReportedCrewId = _command.Input.CrewId
         }
 

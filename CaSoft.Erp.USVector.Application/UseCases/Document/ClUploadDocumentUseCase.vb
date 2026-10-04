@@ -34,7 +34,7 @@ Public Class ClUploadDocumentUseCase
             .ContentType = _command.ContentType,
             .ByteSize = _command.Content.Length,
             .FileName = _command.FileName,
-            .CapturedAt = DateTime.UtcNow,
+            .CapturedAt = ClHorloge.MaintenantUtc(),
             .CapturedCrewId = _command.CrewId
         }
 

@@ -39,7 +39,7 @@ Public Class ClSetMutuelleFieldsUseCase
             .Concentrateur = f.Concentrateur,
             .Teletransmission = f.Teletransmission,
             .OcrStatus = "validated",
-            .OcrValidatedAt = DateTime.UtcNow
+            .OcrValidatedAt = ClHorloge.MaintenantUtc()
         }
 
         Dim updated = Await _repository.UpdateAsync(patch, ct)

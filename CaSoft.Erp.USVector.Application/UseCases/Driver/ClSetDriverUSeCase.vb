@@ -28,7 +28,8 @@ Public Class ClSetDriverUseCase
                 ClError.Application($"le salarié {_command.DriverId.ToString} ne fait pas parti de l'equipage {_command.CrewId} "))
         End If
 
-        Dim lastDriver = New ClLastDriver(employee, DateTime.Now)
+        ' En heure LOCALE : Orders compare la prise de volant à la fin de vacation, locale — voir ClHorloge.
+        Dim lastDriver = New ClLastDriver(employee, ClHorloge.MaintenantLocal())
         Crew.SetLastDriver(lastDriver)
         ' Un refus d'Orders part tel quel : son motif est la seule phrase qui dise à l'ambulancier
         ' pourquoi. Même code HTTP qu'avant (400, erreur applicative), seul le texte change (D14).
