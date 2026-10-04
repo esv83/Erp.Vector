@@ -6,6 +6,9 @@
 Public Class ClSetMutuelleFieldsUseCase
     Implements IResultUseCase(Of ClMutuelleCardDtoOut)
 
+    ''' <summary>Sans état : partagé entre les appels.</summary>
+    Private Shared ReadOnly Validateur As New ClMutuelleFieldsDtoInValidator()
+
     Private ReadOnly _command As ClSetMutuelleFieldsCommand
     Private ReadOnly _repository As IMutuelleCardRepository
 
@@ -16,6 +19,17 @@ Public Class ClSetMutuelleFieldsUseCase
 
     Public Function Handle() As ClResult(Of ClMutuelleCardDtoOut) Implements IResultUseCase(Of ClMutuelleCardDtoOut).Handle
         Dim f = _command.Fields
+        If f Is Nothing Then
+            Return ClResult(Of ClMutuelleCardDtoOut).Fail(ClError.Application("Corps de la saisie manquant."))
+        End If
+
+        ' Refus métier, en 400 avec leur motif — rien n'est écrit (04/10).
+        Dim verdict = Validateur.Validate(f)
+        If Not verdict.IsValid Then
+            Return ClResult(Of ClMutuelleCardDtoOut).Fail(
+                ClError.Application(String.Join(" ", verdict.Errors.Select(Function(e) e.ErrorMessage))))
+        End If
+
         Dim patch As New ClMutuelleCard With {
             .Id = _command.CardId,
             .MutuelleName = f.MutuelleName,

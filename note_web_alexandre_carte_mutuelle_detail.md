@@ -35,8 +35,18 @@ Quand l'équipage reprend la photo d'une carte déjà connue, la nouvelle carte 
 validés** de la précédente (au lieu de repartir vide), avec `FieldsInheritedFrom`. S'il les corrige ou
 les confirme par le `PATCH`, la mention disparaît.
 
+## La saisie des quatre champs refuse désormais l'enregistrement vide
+
+`PATCH api/mutuelle-card/{Id}` remplace toujours les quatre champs (rien ne change si tu les envoies
+tous). Deux cas, qui passaient, répondent maintenant **`400` avec une phrase à afficher** :
+- **les quatre champs vides** — « Saisie vide : renseignez au moins un des quatre champs. Rien n'a été
+  enregistré. » (avant, la carte était effacée et marquée validée) ;
+- **un champ trop long** — mutuelle 200, code AMC 50, concentrateur 100, télétransmission 50
+  caractères au plus (avant, un `500`).
+
 ## ✅ Récap
 
 - [ ] Afficher « carte connue, photo du … » depuis le détail, sans attendre le `404` de la route carte
 - [ ] « Voir la carte » : `fetch` avec le jeton + blob
 - [ ] Afficher « repris de la photo du … » quand `MutuelleCardFieldsInheritedFrom` est renseigné
+- [ ] Saisie des champs : afficher le motif d'un `400` ; borner les zones de saisie aux longueurs ci-dessus

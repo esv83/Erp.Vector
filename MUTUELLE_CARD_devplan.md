@@ -81,9 +81,11 @@ homogène et élevé. Rappel `M7` : même validés, ces champs n'alimentent pas 
 
 ### 3.3 ⏳ Saisie manuelle : deux faiblesses connues
 
-- Le `PATCH` **remplace** les quatre champs (un champ absent repasse à `null`) et accepte un corps
-  vide, qu'il marque pourtant `validated`. Signalé au dev web ; une validation FluentValidation reste
-  à décider.
+- Le `PATCH` **remplace** les quatre champs (un champ absent repasse à `null`) — **gardé tel quel le
+  04/10** (contrat du front). ~~Il accepte un corps vide, qu'il marque pourtant `validated`~~ —
+  **résolu le 04/10** : un corps entièrement vide, et un champ plus long que sa colonne, sont refusés
+  en `400` avec leur motif (`ClMutuelleFieldsDtoInValidator`, premier validateur FluentValidation de
+  Vector).
 - ~~Une nouvelle photo crée une carte aux champs vides~~ — **résolu le 04/10** (`M11`) : elle hérite
   des champs validés, marqués comme repris.
 
