@@ -1,7 +1,7 @@
 # Livré — Vector (module terrain ambulanciers)
 
-> **Mis à jour le** 2026-10-04 (soir) · **En production** : `106e5cd` (`main`), rechargé le
-> 2026-10-04 à 15:10:08, constaté par `api/version`, sourcelink et journal.
+> **Mis à jour le** 2026-10-04 (nuit) · **En production** : `9c15f94` (`main`), rechargé le
+> 2026-10-04 à 16:04:21, constaté par `api/version`, sourcelink, journal et état du schéma.
 >
 > Ce document porte **ce qui est livré** : ce que le module fait, le journal daté des livraisons,
 > les décisions appliquées, la configuration qui a déjà cassé la production, les pistes retirées.
@@ -101,6 +101,30 @@ Principe constant : **le terrain n'écrase jamais la donnée officielle de l'ERP
 # 2. Journal des livraisons
 
 *Du plus récent au plus ancien.*
+
+## 2026-10-04 (16:04) — Publication : la carte mutuelle lue par les écrans et annoncée à l'équipage
+
+*En production — `9c15f94` (`main`), rechargé à 16:04:21. **Constaté par `GET /vector/api/version`** :
+commit `9c15f94`, `Tree: clean`, environnement Production ; `.pdb` concordant. **`MOB_011` joué avant
+la publication** : « Schéma : 9 script(s) inscrit(s) sur 9 attendus · à jour ».*
+
+- **Les écrans de régulation et de certification peuvent lire la carte**, avec le jeton de
+  l'utilisateur, par **mission** : `POST api/missions/mutuelle-card/presence` (200 missions, une ligne
+  par mission, patient résolu en un appel `batch-refs`) et `GET api/missions/{id}/mutuelle-card/image`.
+  Ils entrent par un azp dédié (`Keycloak:ScreenAzp`) sur quatre routes de lecture figées par un test.
+  **Inerte en production** : la liste est vide tant que les clients Keycloak des écrans ne sont pas
+  connus. Note à Jules : [`note_front_jules_carte_mutuelle.md`](note_front_jules_carte_mutuelle.md).
+- **L'équipage voit la carte dans le détail de la mission** : connue ou non, date de la dernière photo,
+  champs repris, lien vers l'image — sans appel à Orders de plus. Note à Alexandre :
+  [`note_web_alexandre_carte_mutuelle_detail.md`](note_web_alexandre_carte_mutuelle_detail.md).
+- **Une nouvelle photo garde les données validées** (`MOB_011`) : elle hérite des champs de la
+  précédente, marqués « repris de la photo du JJ/MM » ; une validation efface la mention.
+- **Journal d'accès** `Vector.CarteMutuelle.Acces` : qui, quelle route, combien — sans identifiant de
+  patient. Première ligne vue à 16:04, pour l'app mobile.
+- **Constaté après publication** (35 s de trafic) : aucun avertissement ni erreur ; 17 jetons validés ;
+  sélecteur, conducteur, liste, **détail**, timeline, formulaire et type de mission en 200 — premier
+  trafic du terrain sur les routes rendues asynchrones l'après-midi.
+- 287 tests verts.
 
 ## 2026-10-04 (après-midi) — Publication : l'itération des dettes de forme, et une panne qui cesse d'être un refus
 
@@ -620,8 +644,8 @@ terrain dans la foulée.*
 | Lots pour la facturation | 2026-09-19 : bascule de BillingGateway, part Vector 12,8 s → 6,8 s par journée, résultat identique à l'octet |
 | Fermeture des routes de la facturation | 2026-09-19 : 559 appels en 200 avec jeton après publication, aucun 401/403 |
 | Ce qui tourne | 2026-09-21 : `api/version` rend le commit publié et `Tree: clean`, en production |
-| Schéma de la base | 2026-09-21 : 8 scripts sur 8, constaté au démarrage |
-| Suite complète | 126 verts (2026-08-25) → 112 (2026-09-13) → 172 (2026-09-15) → 191 (2026-09-19) → 235 (2026-09-21) → 254 (2026-10-04) → **263 verts (2026-10-04, soir)** |
+| Schéma de la base | 2026-09-21 : 8 scripts sur 8, constaté au démarrage · **2026-10-04 : 9 sur 9** (`MOB_011` joué avant publication) |
+| Suite complète | 126 verts (2026-08-25) → 112 (2026-09-13) → 172 (2026-09-15) → 191 (2026-09-19) → 235 (2026-09-21) → 254 (2026-10-04) → 263 (2026-10-04, soir) → **287 verts (2026-10-04, nuit)** |
 | Disjoncteur vers Orders | 2026-10-04 : vu sur les coupures des 22/09 et 02/10 — 52 ouvertures, seuls les 5xx retentés |
 | Garde de publication | 2026-10-04 : premier refus réel (arbre sale) |
 | Facturation sous `f000ad0` | 21/09 → 04/10 : 1 389 appels de lot en 200, aucun 401/403 |
