@@ -40,6 +40,17 @@ public sealed class HttpErpReadApiClient : IErpReadApiClient
     public async Task<ErpOrderEditDto?> GetOrderAsync(Guid orderId, CancellationToken ct = default)
         => await GetOrNullAsync<ErpOrderEditDto>($"orders/{orderId}", ct);
 
+    public async Task<IReadOnlyList<ErpMissionBatchRefDto>?> GetMissionBatchRefsAsync(
+        IReadOnlyCollection<Guid> missionIds, CancellationToken ct = default)
+    {
+        // 404 / 405 : Orders ne porte pas encore la route (avant 1.8.5) — ce n'est pas une panne.
+        var response = await _http.PostAsJsonAsync("missions/batch-refs", new { missionIds }, JsonOptions, ct);
+        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed) return null;
+        await EnsureSuccessAsync(response, "POST missions/batch-refs", ct);
+        var list = await response.Content.ReadFromJsonAsync<List<ErpMissionBatchRefDto>>(JsonOptions, ct);
+        return list ?? new List<ErpMissionBatchRefDto>(0);
+    }
+
     public async Task<ErpBeneficiaryDetailDto?> GetBeneficiaryAsync(Guid beneficiaryId, CancellationToken ct = default)
         => await GetOrNullAsync<ErpBeneficiaryDetailDto>($"beneficiaries/{beneficiaryId}", ct);
 

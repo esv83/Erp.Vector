@@ -76,6 +76,18 @@ public sealed class ErpOrderBodyDto
     public int Frequency { get; set; }
 }
 
+/// <summary>
+/// POST /missions/batch-refs — une ligne par mission CONNUE (une mission inconnue est absente, jamais
+/// une ligne à champs nuls). Contrat arrêté avec Orders le 21/09.
+/// </summary>
+public sealed class ErpMissionBatchRefDto
+{
+    public Guid MissionId { get; set; }
+    public Guid OrderId { get; set; }
+    /// <summary>Nul quand la commande ne désigne aucun bénéficiaire — cas normal.</summary>
+    public Guid? BeneficiaryId { get; set; }
+}
+
 /// <summary>GET /beneficiaries/{id}</summary>
 public sealed class ErpBeneficiaryDetailDto
 {

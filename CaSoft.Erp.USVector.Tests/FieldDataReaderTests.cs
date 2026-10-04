@@ -32,9 +32,23 @@ public class FieldDataReaderTests
         public HashSet<Guid> Unknown { get; } = new();
         public HashSet<Guid> Failing { get; } = new();
         public int OrderCalls;
+        public int FullCalls;
+
+        /// <summary>batch-refs simulé ; nul = Orders ne porte pas la route (avant 1.8.5).</summary>
+        public Func<IReadOnlyCollection<Guid>, IReadOnlyList<ErpMissionBatchRefDto>>? Batch;
+        public List<int> BatchSizes { get; } = new();
+
+        public Task<IReadOnlyList<ErpMissionBatchRefDto>?> GetMissionBatchRefsAsync(
+            IReadOnlyCollection<Guid> ids, CancellationToken ct = default)
+        {
+            if (Batch is null) return Task.FromResult<IReadOnlyList<ErpMissionBatchRefDto>?>(null);
+            lock (BatchSizes) BatchSizes.Add(ids.Count);
+            return Task.FromResult<IReadOnlyList<ErpMissionBatchRefDto>?>(Batch(ids));
+        }
 
         public Task<ErpMissionFullDto?> GetMissionFullAsync(Guid id, CancellationToken ct = default)
         {
+            Interlocked.Increment(ref FullCalls);
             if (Failing.Contains(id)) throw new HttpRequestException("Orders.Api → 503");
             return Task.FromResult(Unknown.Contains(id) ? null : new ErpMissionFullDto { Id = id, OrderId = Order });
         }
@@ -223,5 +237,82 @@ public class FieldDataReaderTests
 
         lot.Should().BeEmpty();
         erp.OrderCalls.Should().Be(0);
+    }
+
+    // ── Par lot chez Orders : batch-refs (1.8.5), et son repli ────────────────
+
+    /// <summary>Orders 1.8.5 : rend chaque mission connue, avec la commande et le bénéficiaire donnés.</summary>
+    private static Func<IReadOnlyCollection<Guid>, IReadOnlyList<ErpMissionBatchRefDto>> Connues(
+        IReadOnlyDictionary<Guid, Guid?> beneficiaireParMission)
+        => ids => ids.Where(beneficiaireParMission.ContainsKey)
+            .Select(id => new ErpMissionBatchRefDto { MissionId = id, OrderId = Order, BeneficiaryId = beneficiaireParMission[id] })
+            .ToList();
+
+    [Fact]
+    public async Task Quand_Orders_porte_batch_refs_le_lot_n_appelle_ni_full_ni_la_commande()
+    {
+        using var ctx = NewContext();
+        new MutuelleCardRepository(ctx).Save(new ClMutuelleCard
+        {
+            Id = Guid.NewGuid(), BeneficiaryId = Ben, Image = new byte[] { 9 }, ContentType = "image/jpeg",
+            ByteSize = 1, CapturedAt = DateTime.UtcNow, AmcCode = "AMC1"
+        });
+        var inconnue = Guid.NewGuid();
+        var erp = new FakeErp { Batch = Connues(new Dictionary<Guid, Guid?> { [Mission] = Ben, [Retour] = null }) };
+
+        var lot = await Reader(ctx, erp).GetManyAsync(new[] { Mission, inconnue, Retour }, CancellationToken.None);
+
+        lot.Select(i => i.MissionId).Should().Equal(Mission, inconnue, Retour);
+        lot[0].Status.Should().Be(ClFieldEnrichmentBatchItemDtoOut.StatusFound);
+        lot[0].Data.OrderId.Should().Be(Order);
+        lot[0].Data.Mutuelle!.AmcCode.Should().Be("AMC1");
+        // Absente de la réponse = inconnue d'Orders : c'est le contrat, pas une erreur.
+        lot[1].Status.Should().Be(ClFieldEnrichmentBatchItemDtoOut.StatusNotFound);
+        // Sans bénéficiaire : un paquet, sans carte — cas normal.
+        lot[2].Status.Should().Be(ClFieldEnrichmentBatchItemDtoOut.StatusFound);
+        lot[2].Data.Mutuelle.Should().BeNull();
+
+        erp.BatchSizes.Should().Equal(3);
+        erp.FullCalls.Should().Be(0);
+        erp.OrderCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Quand_Orders_ne_porte_pas_batch_refs_le_lot_se_replie_mission_par_mission()
+    {
+        using var ctx = NewContext();
+        var erp = new FakeErp();   // Batch nul : la route est absente
+
+        var lot = await Reader(ctx, erp).GetManyAsync(new[] { Mission, Retour }, CancellationToken.None);
+
+        lot.Should().OnlyContain(i => i.Status == ClFieldEnrichmentBatchItemDtoOut.StatusFound);
+        erp.FullCalls.Should().Be(2);
+        erp.OrderCalls.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Une_panne_de_batch_refs_rend_Error_sans_relancer_mission_par_mission()
+    {
+        using var ctx = NewContext();
+        var erp = new FakeErp { Batch = _ => throw new HttpRequestException("Orders.Api POST missions/batch-refs → 503.") };
+
+        var lot = await Reader(ctx, erp).GetManyAsync(new[] { Mission, Retour }, CancellationToken.None);
+
+        lot.Should().OnlyContain(i => i.Status == ClFieldEnrichmentBatchItemDtoOut.StatusError);
+        lot[0].Error.Should().Contain("503");
+        erp.FullCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Batch_refs_se_demande_par_tranches_de_200()
+    {
+        using var ctx = NewContext();
+        var ids = Enumerable.Range(0, 450).Select(_ => Guid.NewGuid()).ToList();
+        var erp = new FakeErp { Batch = Connues(ids.ToDictionary(id => id, _ => (Guid?)null)) };
+
+        var lot = await Reader(ctx, erp).GetManyAsync(ids, CancellationToken.None);
+
+        erp.BatchSizes.Should().Equal(200, 200, 50);
+        lot.Should().HaveCount(450).And.OnlyContain(i => i.Status == ClFieldEnrichmentBatchItemDtoOut.StatusFound);
     }
 }

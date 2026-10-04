@@ -19,9 +19,11 @@ namespace CaSoft.Erp.USVector.Infrastructure.Repositories;
 /// demande chaque commande qu'une fois — l'aller et le retour la partagent.
 /// </para>
 /// <para>
-/// <b>Ce qui reste par mission : l'appel à Orders</b> pour la mission (existence, commande). Orders
-/// n'a pas de lecture par liste d'identifiants ; ces appels partent en parallèle, bornés à
-/// <see cref="OrdersConcurrency"/> — la même charge que la facturation s'imposait déjà.
+/// <b>Orders aussi, par lot (04/10)</b> : <c>POST /missions/batch-refs</c> rend mission → commande →
+/// bénéficiaire pour 200 missions en un appel, au lieu de 200 <c>/full</c> — sa lecture la plus chère —
+/// puis une par commande. Tant qu'Orders ne la porte pas en production (avant 1.8.5), le lot se
+/// <b>replie</b> sur ces appels unitaires, en parallèle bornés à <see cref="OrdersConcurrency"/> :
+/// Vector se publie donc avant ou après Orders, indifféremment.
 /// </para>
 /// <para>
 /// <b>Un échec n'emporte pas le lot.</b> Une mission dont la lecture échoue chez Orders sort en
@@ -32,6 +34,9 @@ public sealed class FieldDataReader : IFieldDataReader
 {
     /// <summary>Appels simultanés vers Orders pour un lot.</summary>
     public const int OrdersConcurrency = 8;
+
+    /// <summary>Plafond de <c>POST /missions/batch-refs</c> chez Orders (contrat du 21/09).</summary>
+    public const int OrdersBatchSize = 200;
 
     private readonly IErpReadApiClient _erp;
     private readonly IFieldDataQueryService _silos;
@@ -64,20 +69,14 @@ public sealed class FieldDataReader : IFieldDataReader
         var ids = (missionIds ?? Array.Empty<Guid>()).Where(id => id != Guid.Empty).Distinct().ToList();
         if (ids.Count == 0) return Array.Empty<ClFieldEnrichmentBatchItemDtoOut>();
 
-        // 1. Orders : la mission (existence, commande), puis chaque commande une seule fois.
-        var missions = await ForEachBoundedAsync(ids, id => _erp.GetMissionFullAsync(id, ct), ct);
-
-        var orderIds = missions.Values
-            .Where(r => r.Error is null && r.Value is not null)
-            .Select(r => r.Value!.OrderId)
-            .Distinct()
-            .ToList();
-        var orders = await ForEachBoundedAsync(orderIds, id => _erp.GetOrderAsync(id, ct), ct);
+        // 1. Orders : mission → commande → bénéficiaire. Par lot quand Orders porte batch-refs ; sinon
+        //    mission par mission — repli à retirer une fois la 1.8.5 d'Orders constatée en production.
+        var refs = await ReadRefsByBatchAsync(ids, ct) ?? await ReadRefsOneByOneAsync(ids, ct);
 
         // 2. Base Vector : une requête par silo pour tout le lot.
-        var found = ids.Where(id => missions[id].Error is null && missions[id].Value is not null).ToList();
+        var found = ids.Where(id => refs[id].Error is null && refs[id].Value is not null).ToList();
         var beneficiaries = found
-            .Select(id => orders.TryGetValue(missions[id].Value!.OrderId, out var o) ? o.Value?.Order?.BeneficiaryId : null)
+            .Select(id => refs[id].Value!.BeneficiaryId)
             .Where(b => b.HasValue)
             .Select(b => b!.Value)
             .Distinct()
@@ -87,19 +86,97 @@ public sealed class FieldDataReader : IFieldDataReader
         // 3. Une entrée par mission demandée, dans l'ordre de la demande.
         return ids.Select(id =>
         {
+            var lecture = refs[id];
+            if (lecture.Error is not null)
+                return ClFieldEnrichmentBatchItemDtoOut.Failed(id, lecture.Error);
+            if (lecture.Value is null)
+                return ClFieldEnrichmentBatchItemDtoOut.NotFound(id);
+
+            return ClFieldEnrichmentBatchItemDtoOut.Found(
+                Assemble(id, lecture.Value.OrderId, lecture.Value.BeneficiaryId, silos));
+        }).ToList();
+    }
+
+    /// <summary>Ce que le paquet demande à Orders : la commande, et son bénéficiaire.</summary>
+    private sealed record Refs(Guid OrderId, Guid? BeneficiaryId);
+
+    /// <summary>
+    /// Références d'une mission. <c>Value</c> et <c>Error</c> nuls = mission inconnue d'Orders ;
+    /// <c>Error</c> = le motif, prêt pour l'entrée <c>Error</c> du lot.
+    /// </summary>
+    private sealed record RefsLecture(Refs? Value, string? Error);
+
+    /// <summary>
+    /// <c>POST /missions/batch-refs</c>, par tranches de <see cref="OrdersBatchSize"/>. <c>null</c> si
+    /// Orders ne porte pas la route : tout le lot passe alors par le repli. Une panne n'est PAS un
+    /// repli — relancer 200 lectures unitaires sur un Orders à terre ne le relèverait pas ; la tranche
+    /// sort en <c>Error</c>, que la facturation retente.
+    /// </summary>
+    private async Task<Dictionary<Guid, RefsLecture>?> ReadRefsByBatchAsync(List<Guid> ids, CancellationToken ct)
+    {
+        var result = new Dictionary<Guid, RefsLecture>();
+
+        foreach (var tranche in ids.Chunk(OrdersBatchSize))
+        {
+            IReadOnlyList<ErpMissionBatchRefDto>? rows;
+            try
+            {
+                rows = await _erp.GetMissionBatchRefsAsync(tranche, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                _logger.LogWarning(ex, "field-data en lot : batch-refs impossible chez Orders ({Count} missions).", tranche.Length);
+                foreach (var id in tranche)
+                    result[id] = new RefsLecture(null, $"Lecture des références chez Orders impossible : {ex.Message}");
+                continue;
+            }
+
+            if (rows is null)
+            {
+                _logger.LogInformation("field-data en lot : Orders ne porte pas batch-refs, lecture mission par mission.");
+                return null;
+            }
+
+            // Une mission absente de la réponse est inconnue d'Orders : c'est le contrat.
+            var parMission = rows.ToDictionary(r => r.MissionId);
+            foreach (var id in tranche)
+                result[id] = parMission.TryGetValue(id, out var r)
+                    ? new RefsLecture(new Refs(r.OrderId, r.BeneficiaryId), null)
+                    : new RefsLecture(null, null);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Repli : <c>/missions/{id}/full</c> pour chaque mission, puis chaque commande une seule fois —
+    /// l'aller et le retour la partagent. Le chemin d'avant batch-refs, inchangé.
+    /// </summary>
+    private async Task<Dictionary<Guid, RefsLecture>> ReadRefsOneByOneAsync(List<Guid> ids, CancellationToken ct)
+    {
+        var missions = await ForEachBoundedAsync(ids, id => _erp.GetMissionFullAsync(id, ct), ct);
+
+        var orderIds = missions.Values
+            .Where(r => r.Error is null && r.Value is not null)
+            .Select(r => r.Value!.OrderId)
+            .Distinct()
+            .ToList();
+        var orders = await ForEachBoundedAsync(orderIds, id => _erp.GetOrderAsync(id, ct), ct);
+
+        return ids.ToDictionary(id => id, id =>
+        {
             var mission = missions[id];
             if (mission.Error is not null)
-                return ClFieldEnrichmentBatchItemDtoOut.Failed(id, $"Lecture de la mission chez Orders impossible : {mission.Error.Message}");
+                return new RefsLecture(null, $"Lecture de la mission chez Orders impossible : {mission.Error.Message}");
             if (mission.Value is null)
-                return ClFieldEnrichmentBatchItemDtoOut.NotFound(id);
+                return new RefsLecture(null, null);
 
             var order = orders[mission.Value.OrderId];
             if (order.Error is not null)
-                return ClFieldEnrichmentBatchItemDtoOut.Failed(id, $"Lecture de la commande chez Orders impossible : {order.Error.Message}");
+                return new RefsLecture(null, $"Lecture de la commande chez Orders impossible : {order.Error.Message}");
 
-            return ClFieldEnrichmentBatchItemDtoOut.Found(
-                Assemble(id, mission.Value.OrderId, order.Value?.Order?.BeneficiaryId, silos));
-        }).ToList();
+            return new RefsLecture(new Refs(mission.Value.OrderId, order.Value?.Order?.BeneficiaryId), null);
+        });
     }
 
     private static ClFieldEnrichmentDtoOut Assemble(Guid missionId, Guid orderId, Guid? beneficiaryId, ClFieldSilos silos)
