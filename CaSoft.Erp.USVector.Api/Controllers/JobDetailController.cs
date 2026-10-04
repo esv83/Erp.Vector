@@ -10,18 +10,19 @@ namespace CaSoft.Erp.USVector.Api.Controllers
     public class JobDetailController : Controller
     {
         [HttpGet("{gJobId}")]
-        public IActionResult GetDetail(
+        public async Task<IActionResult> GetDetail(
             Guid gJobId,
             [FromServices] IJobCache jobCache,
-            [FromServices] IMobileIdentityResolver identity)
+            [FromServices] IMobileIdentityResolver identity,
+            CancellationToken ct)
         {
             // MOB-4a : personnel résolu depuis le token (sub → personnel via Orders.Api),
             // via le chokepoint mutualisé CrewAccess.
-            var error = CrewAccess.ResolvePersonnel(this, identity, out var personnelId);
+            var (error, personnelId) = await CrewAccess.ResolvePersonnelAsync(this, identity, ct);
             if (error is not null) return error;
 
             // Le personnel ne voit que les missions de ses crews.
-            if (!identity.IsMissionAccessible(personnelId, gJobId))
+            if (!await identity.IsMissionAccessibleAsync(personnelId, gJobId, ct))
                 return StatusCode(403, "Mission hors de vos équipages.");
 
             ClGetJobUseCase useCase = new ClGetJobUseCase(gJobId, jobCache);

@@ -28,9 +28,9 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         // L'équipage est TOUJOURS explicite (crew épinglé par l'app via /api/crew/mine) : plus de
         // résolution « canonique » arbitraire quand le personnel a plusieurs équipages le même jour.
         [HttpGet("{crewId}")]
-        public IActionResult GetDriver(Guid crewId)
+        public async Task<IActionResult> GetDriver(Guid crewId, CancellationToken ct)
         {
-            var error = CrewAccess.Authorize(this, _identity, crewId);
+            var error = await CrewAccess.AuthorizeAsync(this, _identity, crewId, ct);
             if (error is not null) return error;
 
             return _crewService.GetDriver(crewId).ToActionResult();
@@ -38,9 +38,9 @@ namespace CaSoft.Erp.USVector.Api.Controllers
 
         // POST api/driver/{crewId} — change le conducteur de l'équipage. Corps = Guid du conducteur (un membre).
         [HttpPost("{crewId}")]
-        public IActionResult PostDriver(Guid crewId, [FromBody] Guid DriverId)
+        public async Task<IActionResult> PostDriver(Guid crewId, [FromBody] Guid DriverId, CancellationToken ct)
         {
-            var error = CrewAccess.Authorize(this, _identity, crewId);
+            var error = await CrewAccess.AuthorizeAsync(this, _identity, crewId, ct);
             if (error is not null) return error;
 
             _logger.LogInformation("POST api/driver/{CrewId} — nouveau conducteur {DriverId}.", crewId, DriverId);

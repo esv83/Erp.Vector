@@ -28,14 +28,14 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         // Réponse décision-complète : l'UI force le choix si RequiresSelection, sinon prend l'unique crew.
         // Rappelé tel quel pour le « changement d'équipage » en cours de journée (tous les crews du jour y figurent).
         [HttpGet("mine")]
-        public IActionResult Mine()
+        public async Task<IActionResult> Mine(CancellationToken ct)
         {
-            var error = CrewAccess.ResolvePersonnel(this, _identity, out var personnelId);
+            var (error, personnelId) = await CrewAccess.ResolvePersonnelAsync(this, _identity, ct);
             if (error is not null) return error;
 
             // Lecture FRAÎCHE : la (re)sélection est le seul moment où un crew créé le jour même doit
             // apparaître ; on contourne le cache (et on le rafraîchit pour le garde-fou qui suivra).
-            var crewIds = _identity.ResolveActiveCrewIdsFresh(personnelId, DateOnly.FromDateTime(DateTime.Now));
+            var crewIds = await _identity.ResolveActiveCrewIdsFreshAsync(personnelId, DateOnly.FromDateTime(DateTime.Now), ct);
             if (crewIds.Count == 0)
             {
                 _logger.LogWarning("GET api/crew/mine — PER_ID={PerId} sans équipage actif aujourd'hui.", personnelId);

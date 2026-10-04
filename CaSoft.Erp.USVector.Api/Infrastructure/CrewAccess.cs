@@ -19,19 +19,19 @@ namespace CaSoft.Erp.USVector.Api.Infrastructure;
 public static class CrewAccess
 {
     /// <summary>
-    /// Résout le personnel depuis le token (sans exiger d'équipage). <c>null</c> = OK (<paramref name="personnelId"/> posé).
+    /// Résout le personnel depuis le token (sans exiger d'équipage). <c>Error</c> nul = OK, et
+    /// <c>PersonnelId</c> est posé.
     /// </summary>
-    public static IActionResult? ResolvePersonnel(ControllerBase ctrl, IMobileIdentityResolver identity, out Guid personnelId)
+    public static async Task<(IActionResult? Error, Guid PersonnelId)> ResolvePersonnelAsync(
+        ControllerBase ctrl, IMobileIdentityResolver identity, CancellationToken ct)
     {
-        personnelId = Guid.Empty;
-
         var http = ctrl.HttpContext;
         var jwtError = http.GetJwtError();
         if (jwtError is not null)
-            return ctrl.Unauthorized($"Token rejeté par l'authentification Keycloak : {jwtError}");
+            return (ctrl.Unauthorized($"Token rejeté par l'authentification Keycloak : {jwtError}"), Guid.Empty);
 
         if (!http.HasAuthorizationHeader())
-            return ctrl.Unauthorized("Aucun token d'authentification fourni (header « Authorization: Bearer … » absent).");
+            return (ctrl.Unauthorized("Aucun token d'authentification fourni (header « Authorization: Bearer … » absent)."), Guid.Empty);
 
         var sub = ctrl.User.GetKeycloakSubject();
         if (sub is null)
@@ -44,32 +44,32 @@ public static class CrewAccess
                 .GetRequiredService<IConfiguration>()
                 .GetValue("Keycloak:Enabled", false);
             if (!keycloakEnabled)
-                return ctrl.StatusCode(500,
+                return (ctrl.StatusCode(500,
                     "Authentification Keycloak désactivée côté serveur (Keycloak:Enabled=false) : le token n'est pas "
                     + "décodé, le claim « sub » est donc introuvable. Activer Keycloak sur le serveur "
-                    + "(variable Keycloak__Enabled=true, ou appsettings.{Environnement}.json).");
+                    + "(variable Keycloak__Enabled=true, ou appsettings.{Environnement}.json)."), Guid.Empty);
 
-            return ctrl.Unauthorized("Token valide mais claim « sub » (identifiant Keycloak) absent ou non-Guid.");
+            return (ctrl.Unauthorized("Token valide mais claim « sub » (identifiant Keycloak) absent ou non-Guid."), Guid.Empty);
         }
 
-        var pid = identity.ResolvePersonnelId(sub.Value);
+        var pid = await identity.ResolvePersonnelIdAsync(sub.Value, ct);
         if (pid is null)
-            return ctrl.StatusCode(403, $"Compte Keycloak {sub.Value} non rattaché à un personnel. Contactez la régulation.");
+            return (ctrl.StatusCode(403, $"Compte Keycloak {sub.Value} non rattaché à un personnel. Contactez la régulation."), Guid.Empty);
 
-        personnelId = pid.Value;
-        return null;
+        return (null, pid.Value);
     }
 
     /// <summary>
     /// Autorise l'accès à <paramref name="crewId"/> : vérifie qu'il fait partie des équipages actifs
     /// du personnel aujourd'hui. <c>null</c> = accès accordé.
     /// </summary>
-    public static IActionResult? Authorize(ControllerBase ctrl, IMobileIdentityResolver identity, Guid crewId)
+    public static async Task<IActionResult?> AuthorizeAsync(
+        ControllerBase ctrl, IMobileIdentityResolver identity, Guid crewId, CancellationToken ct)
     {
-        var error = ResolvePersonnel(ctrl, identity, out var personnelId);
+        var (error, personnelId) = await ResolvePersonnelAsync(ctrl, identity, ct);
         if (error is not null) return error;
 
-        var activeCrews = identity.ResolveActiveCrewIds(personnelId, DateOnly.FromDateTime(DateTime.Now));
+        var activeCrews = await identity.ResolveActiveCrewIdsAsync(personnelId, DateOnly.FromDateTime(DateTime.Now), ct);
         if (!activeCrews.Contains(crewId))
             return ctrl.StatusCode(403,
                 $"L'équipage {crewId} ne fait pas partie de vos équipages actifs aujourd'hui.");

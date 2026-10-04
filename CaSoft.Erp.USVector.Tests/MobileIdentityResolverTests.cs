@@ -53,7 +53,7 @@ public class MobileIdentityResolverTests
         };
 
     [Fact]
-    public void Ecarte_un_crew_partageant_seulement_le_vehicule()
+    public async Task Ecarte_un_crew_partageant_seulement_le_vehicule()
     {
         // Cas Jeremy Lautard : Orders.Api remonte 2 crews non clôturés partageant le VÉHICULE ;
         // Jeremy n'est membre que du premier → le crew « véhicule seul » doit être écarté.
@@ -71,13 +71,13 @@ public class MobileIdentityResolverTests
                 [crewMemeVehicule] = Crew(crewMemeVehicule, coequipier, autre), // pas Jeremy
             });
 
-        var result = new MobileIdentityResolver(erp).ResolveActiveCrewIds(jeremy, new DateOnly(2026, 7, 6));
+        var result = await new MobileIdentityResolver(erp).ResolveActiveCrewIdsAsync(jeremy, new DateOnly(2026, 7, 6), CancellationToken.None);
 
         result.Should().ContainSingle().Which.Should().Be(crewDeJeremy);
     }
 
     [Fact]
-    public void Conserve_tous_les_crews_dont_le_personnel_est_reellement_membre()
+    public async Task Conserve_tous_les_crews_dont_le_personnel_est_reellement_membre()
     {
         var jeremy = Guid.NewGuid();
         var crewMatin = Guid.NewGuid();
@@ -91,7 +91,7 @@ public class MobileIdentityResolverTests
                 [crewApresMidi] = Crew(crewApresMidi, jeremy),
             });
 
-        var result = new MobileIdentityResolver(erp).ResolveActiveCrewIds(jeremy, new DateOnly(2026, 7, 6));
+        var result = await new MobileIdentityResolver(erp).ResolveActiveCrewIdsAsync(jeremy, new DateOnly(2026, 7, 6), CancellationToken.None);
 
         result.Should().BeEquivalentTo(new[] { crewMatin, crewApresMidi });
     }

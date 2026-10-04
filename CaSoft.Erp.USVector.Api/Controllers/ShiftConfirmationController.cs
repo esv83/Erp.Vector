@@ -9,7 +9,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
     /// Confirmation de prise de service <b>depuis l'application</b> : savoir au lancement si une
     /// confirmation attend, et la donner — utile quand le lien du courriel n'est jamais arrivé.
     /// <para>
-    /// ⚖️ <b>Routes scopées au porteur du jeton, pas à un équipage actif</b> : <c>CrewAccess.Authorize</c>
+    /// ⚖️ <b>Routes scopées au porteur du jeton, pas à un équipage actif</b> : <c>CrewAccess.AuthorizeAsync</c>
     /// n'ouvre un équipage que 30 min avant sa prise de service, alors qu'une demande part souvent la
     /// veille. L'ambulancier est résolu du jeton ; c'est Order qui vérifie que la demande est la sienne.
     /// </para>
@@ -39,7 +39,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         [HttpGet("~/api/personnel/me/shift-confirmations/pending")]
         public async Task<IActionResult> ListMyPending(CancellationToken ct)
         {
-            var error = CrewAccess.ResolvePersonnel(this, _identity, out var personnelId);
+            var (error, personnelId) = await CrewAccess.ResolvePersonnelAsync(this, _identity, ct);
             if (error is not null) return error;
 
             try
@@ -64,7 +64,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         [HttpPost("{crewId:guid}/{requestId:guid}/confirm")]
         public async Task<IActionResult> Confirm(Guid crewId, Guid requestId, CancellationToken ct)
         {
-            var error = CrewAccess.ResolvePersonnel(this, _identity, out var personnelId);
+            var (error, personnelId) = await CrewAccess.ResolvePersonnelAsync(this, _identity, ct);
             if (error is not null) return error;
 
             ClShiftConfirmationConfirmResult result;

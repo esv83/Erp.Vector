@@ -11,11 +11,11 @@ namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Erp;
 ///   <item><b>sub → personnelId</b> : quasi-immuable → TTL long. Seules les résolutions positives
 ///   sont mises en cache (un compte pas encore rattaché peut l'être plus tard dans la journée).</item>
 ///   <item><b>personnel → crews actifs du jour</b> : volatile intra-journée (création de crew,
-///   changement d'équipage) → TTL court. La (re)sélection (<see cref="ResolveActiveCrewIdsFresh"/>)
+///   changement d'équipage) → TTL court. La (re)sélection (<see cref="ResolveActiveCrewIdsFreshAsync"/>)
 ///   contourne le cache et le rafraîchit → un crew créé le jour même apparaît dès l'ouverture du
 ///   sélecteur, seul endroit où il peut être choisi.</item>
 /// </list>
-/// <see cref="IsMissionAccessible"/> est délégué tel quel (fréquence faible : ouverture d'un détail).
+/// <see cref="IsMissionAccessibleAsync"/> est délégué tel quel (fréquence faible : ouverture d'un détail).
 /// </summary>
 public class CachingMobileIdentityResolver : IMobileIdentityResolver
 {
@@ -34,13 +34,13 @@ public class CachingMobileIdentityResolver : IMobileIdentityResolver
         _activeCrewsTtl = activeCrewsTtl;
     }
 
-    public Guid? ResolvePersonnelId(Guid keyCloakSub)
+    public async Task<Guid?> ResolvePersonnelIdAsync(Guid keyCloakSub, CancellationToken ct)
     {
         var key = $"mid:per:{keyCloakSub}";
         if (_cache.TryGetValue<Guid>(key, out var cached))
             return cached;
 
-        var resolved = _inner.ResolvePersonnelId(keyCloakSub);
+        var resolved = await _inner.ResolvePersonnelIdAsync(keyCloakSub, ct);
         // On ne cache QUE le positif : une résolution nulle (compte non rattaché) doit pouvoir
         // se corriger le jour même sans attendre l'expiration.
         if (resolved is not null)
@@ -49,23 +49,23 @@ public class CachingMobileIdentityResolver : IMobileIdentityResolver
         return resolved;
     }
 
-    public IReadOnlyList<Guid> ResolveActiveCrewIds(Guid personnelId, DateOnly onDate)
-        => _cache.GetOrCreate(CrewsKey(personnelId, onDate), entry =>
+    public async Task<IReadOnlyList<Guid>> ResolveActiveCrewIdsAsync(Guid personnelId, DateOnly onDate, CancellationToken ct)
+        => (await _cache.GetOrCreateAsync(CrewsKey(personnelId, onDate), entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = _activeCrewsTtl;
-            return _inner.ResolveActiveCrewIds(personnelId, onDate);
-        })!;
+            return _inner.ResolveActiveCrewIdsAsync(personnelId, onDate, ct);
+        }))!;
 
-    public IReadOnlyList<Guid> ResolveActiveCrewIdsFresh(Guid personnelId, DateOnly onDate)
+    public async Task<IReadOnlyList<Guid>> ResolveActiveCrewIdsFreshAsync(Guid personnelId, DateOnly onDate, CancellationToken ct)
     {
         // Lecture fraîche (bypass) puis on rafraîchit l'entrée pour le garde-fou qui suivra.
-        var fresh = _inner.ResolveActiveCrewIds(personnelId, onDate);
+        var fresh = await _inner.ResolveActiveCrewIdsAsync(personnelId, onDate, ct);
         _cache.Set(CrewsKey(personnelId, onDate), fresh, _activeCrewsTtl);
         return fresh;
     }
 
-    public bool IsMissionAccessible(Guid personnelId, Guid missionId)
-        => _inner.IsMissionAccessible(personnelId, missionId);
+    public Task<bool> IsMissionAccessibleAsync(Guid personnelId, Guid missionId, CancellationToken ct)
+        => _inner.IsMissionAccessibleAsync(personnelId, missionId, ct);
 
     private static string CrewsKey(Guid personnelId, DateOnly onDate)
         => $"mid:crews:{personnelId}:{onDate:yyyyMMdd}";

@@ -35,9 +35,9 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         // avec l'autre crewId et la liste suit. Le garde-fou vérifie que l'équipage est bien l'un
         // de ceux du personnel aujourd'hui (l'UI ne peut pas cibler un équipage étranger).
         [HttpGet("{crewId}")]
-        public IActionResult Get(Guid crewId)
+        public async Task<IActionResult> Get(Guid crewId, CancellationToken ct)
         {
-            var error = CrewAccess.Authorize(this, _identity, crewId);
+            var error = await CrewAccess.AuthorizeAsync(this, _identity, crewId, ct);
             if (error is not null) return error;
 
             _logger.LogInformation("GET api/joblist/{CrewId} — début.", crewId);
