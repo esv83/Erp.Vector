@@ -1,25 +1,26 @@
+Imports System.Threading
 
-' Détail d'une mission (assemblé depuis le cache) — Result pattern.
+' Détail d'une mission, assemblé depuis Orders et la base Vector — Result pattern.
 Public Class ClGetJobUseCase
-    Implements IResultUseCase(Of ClJobDetailModel)
+    Implements IResultUseCaseAsync(Of ClJobDetailModel)
 
     Private ReadOnly _query As Guid
-    Private ReadOnly _cache As IJobCache
+    Private ReadOnly _repository As IJobRepository
 
-    Public Sub New(Query As Guid, cache As IJobCache)
+    Public Sub New(Query As Guid, repository As IJobRepository)
         _query = Query
-        _cache = cache
+        _repository = repository
     End Sub
 
-    Public Function Handle() As ClResult(Of ClJobDetailModel) Implements IResultUseCase(Of ClJobDetailModel).Handle
+    Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of ClJobDetailModel)) Implements IResultUseCaseAsync(Of ClJobDetailModel).HandleAsync
 
-        Try
-            Dim job = _cache.GetJob(_query)
-            Dim jobDetail As ClJobDetailModel = New ClJobDetailAdapter(job)
-            Return ClResult(Of ClJobDetailModel).Ok(jobDetail)
-        Catch ex As Exception
-            Return ClResult(Of ClJobDetailModel).Fail(ClError.Application(ex.Message, ex))
-        End Try
+        ' Le garde-fou d'accès a déjà vérifié la mission ; ce refus ne sert que si elle disparaît entre-temps.
+        Dim job = Await _repository.GetJobAsync(_query, ct)
+        If job Is Nothing Then
+            Return ClResult(Of ClJobDetailModel).Fail(ClError.Application($"Mission {_query} introuvable côté ERP."))
+        End If
+
+        Return ClResult(Of ClJobDetailModel).Ok(New ClJobDetailAdapter(job))
 
     End Function
 

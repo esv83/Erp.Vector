@@ -14,34 +14,30 @@ Public Class ClUploadDocumentUseCase
     End Sub
 
     Public Function Handle() As ClResult(Of ClDocumentDtoOut) Implements IResultUseCase(Of ClDocumentDtoOut).Handle
-        Try
-            If _command.MissionId = Guid.Empty Then
-                Return ClResult(Of ClDocumentDtoOut).Fail(ClError.Application("Mission obligatoire."))
-            End If
-            If _command.Content Is Nothing OrElse _command.Content.Length = 0 Then
-                Return ClResult(Of ClDocumentDtoOut).Fail(ClError.Application("Fichier manquant."))
-            End If
-            If Not [Enum].IsDefined(GetType(EnDocumentCategory), _command.Category) Then
-                Return ClResult(Of ClDocumentDtoOut).Fail(ClError.Application("Catégorie de document invalide."))
-            End If
+        If _command.MissionId = Guid.Empty Then
+            Return ClResult(Of ClDocumentDtoOut).Fail(ClError.Application("Mission obligatoire."))
+        End If
+        If _command.Content Is Nothing OrElse _command.Content.Length = 0 Then
+            Return ClResult(Of ClDocumentDtoOut).Fail(ClError.Application("Fichier manquant."))
+        End If
+        If Not [Enum].IsDefined(GetType(EnDocumentCategory), _command.Category) Then
+            Return ClResult(Of ClDocumentDtoOut).Fail(ClError.Application("Catégorie de document invalide."))
+        End If
 
-            Dim document As New ClDocument With {
-                .Id = Guid.NewGuid(),
-                .MissionId = _command.MissionId,
-                .Category = CType(_command.Category, EnDocumentCategory),
-                .Content = _command.Content,
-                .ContentType = _command.ContentType,
-                .ByteSize = _command.Content.Length,
-                .FileName = _command.FileName,
-                .CapturedAt = DateTime.UtcNow,
-                .CapturedCrewId = _command.CrewId
-            }
+        Dim document As New ClDocument With {
+            .Id = Guid.NewGuid(),
+            .MissionId = _command.MissionId,
+            .Category = CType(_command.Category, EnDocumentCategory),
+            .Content = _command.Content,
+            .ContentType = _command.ContentType,
+            .ByteSize = _command.Content.Length,
+            .FileName = _command.FileName,
+            .CapturedAt = DateTime.UtcNow,
+            .CapturedCrewId = _command.CrewId
+        }
 
-            _repository.Save(document)
-            Return ClResult(Of ClDocumentDtoOut).Ok(document.ToDtoOut())
-        Catch ex As Exception
-            Return ClResult(Of ClDocumentDtoOut).Fail(ClError.Application(ex.Message, ex))
-        End Try
+        _repository.Save(document)
+        Return ClResult(Of ClDocumentDtoOut).Ok(document.ToDtoOut())
     End Function
 
 End Class

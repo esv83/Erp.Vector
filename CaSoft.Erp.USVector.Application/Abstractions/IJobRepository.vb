@@ -1,8 +1,8 @@
 Namespace Port
     Public Interface IJobRepository
 
-        Function GetJob(gJobId As Guid) As ClJob
-        Function IsExist(jobId As Guid) As Boolean
+        ''' <summary>La mission assemblée, ou <c>Nothing</c> si elle est inconnue d'Orders.</summary>
+        Function GetJobAsync(gJobId As Guid, ct As Threading.CancellationToken) As Task(Of ClJob)
         Function GetJobTime(jobId As Guid) As ClJobTimeData
         Sub SaveJobTime(jobTime As ClJobTimeData)
 

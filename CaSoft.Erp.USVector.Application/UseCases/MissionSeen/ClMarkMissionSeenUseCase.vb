@@ -16,27 +16,22 @@ Public Class ClMarkMissionSeenUseCase
 
     Public Function Handle() As ClResult(Of Boolean) Implements IResultUseCase(Of Boolean).Handle
 
-        Try
-            Dim jobTime = _repository.GetJobTimeData(_jobId)
+        Dim jobTime = _repository.GetJobTimeData(_jobId)
 
-            ' Idempotent : si déjà vue, on conserve l'horodatage d'origine (no-op).
-            If jobTime IsNot Nothing AndAlso jobTime.ReadTime.HasValue Then
-                Return ClResult(Of Boolean).Ok(True)
-            End If
-
-            If jobTime Is Nothing Then
-                jobTime = ClJobTimeData.GetBuilder.WithId(_jobId).WithReadTime(DateTime.Now).Build
-            Else
-                jobTime.ReadTime = DateTime.Now
-            End If
-
-            ' Upsert BD Mobile (MST_READ_AT) + projection (Outbox) vers Orders.Api (readAt).
-            _repository.Save(_jobId, jobTime)
+        ' Idempotent : si déjà vue, on conserve l'horodatage d'origine (no-op).
+        If jobTime IsNot Nothing AndAlso jobTime.ReadTime.HasValue Then
             Return ClResult(Of Boolean).Ok(True)
+        End If
 
-        Catch ex As Exception
-            Return ClResult(Of Boolean).Fail(ClError.Application(ex.Message, ex))
-        End Try
+        If jobTime Is Nothing Then
+            jobTime = ClJobTimeData.GetBuilder.WithId(_jobId).WithReadTime(DateTime.Now).Build
+        Else
+            jobTime.ReadTime = DateTime.Now
+        End If
+
+        ' Upsert BD Mobile (MST_READ_AT) + projection (Outbox) vers Orders.Api (readAt).
+        _repository.Save(_jobId, jobTime)
+        Return ClResult(Of Boolean).Ok(True)
 
     End Function
 

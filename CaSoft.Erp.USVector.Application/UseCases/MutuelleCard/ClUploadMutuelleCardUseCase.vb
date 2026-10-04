@@ -15,36 +15,32 @@ Public Class ClUploadMutuelleCardUseCase
     End Sub
 
     Public Function Handle() As ClResult(Of ClMutuelleCardCreatedDtoOut) Implements IResultUseCase(Of ClMutuelleCardCreatedDtoOut).Handle
-        Try
-            If _command.Image Is Nothing OrElse _command.Image.Length = 0 Then
-                Return ClResult(Of ClMutuelleCardCreatedDtoOut).Fail(ClError.Application("Image manquante."))
-            ElseIf String.IsNullOrWhiteSpace(_command.ContentType) _
-                   OrElse Not _command.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) Then
-                Return ClResult(Of ClMutuelleCardCreatedDtoOut).Fail(ClError.Application("Le fichier doit être une image."))
-            ElseIf _command.Image.Length > MaxBytes Then
-                Return ClResult(Of ClMutuelleCardCreatedDtoOut).Fail(ClError.Application("Image trop volumineuse (max 8 Mo)."))
-            End If
+        If _command.Image Is Nothing OrElse _command.Image.Length = 0 Then
+            Return ClResult(Of ClMutuelleCardCreatedDtoOut).Fail(ClError.Application("Image manquante."))
+        ElseIf String.IsNullOrWhiteSpace(_command.ContentType) _
+               OrElse Not _command.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) Then
+            Return ClResult(Of ClMutuelleCardCreatedDtoOut).Fail(ClError.Application("Le fichier doit être une image."))
+        ElseIf _command.Image.Length > MaxBytes Then
+            Return ClResult(Of ClMutuelleCardCreatedDtoOut).Fail(ClError.Application("Image trop volumineuse (max 8 Mo)."))
+        End If
 
-            ' P3 — la carte part EN FILE de lecture automatique (« pending »). Sans worker
-            ' configuré, ce statut ne fait rien : personne ne dépile, et la saisie manuelle reste
-            ' le seul chemin, exactement comme avant.
-            Dim card As New ClMutuelleCard With {
-                .Id = Guid.NewGuid(),
-                .BeneficiaryId = _command.BeneficiaryId,
-                .Image = _command.Image,
-                .ContentType = _command.ContentType,
-                .ByteSize = _command.Image.Length,
-                .CapturedAt = DateTime.UtcNow,
-                .CapturedCrewId = _command.CrewId,
-                .MissionId = _command.MissionId,
-                .OcrStatus = "pending"
-            }
+        ' P3 — la carte part EN FILE de lecture automatique (« pending »). Sans worker
+        ' configuré, ce statut ne fait rien : personne ne dépile, et la saisie manuelle reste
+        ' le seul chemin, exactement comme avant.
+        Dim card As New ClMutuelleCard With {
+            .Id = Guid.NewGuid(),
+            .BeneficiaryId = _command.BeneficiaryId,
+            .Image = _command.Image,
+            .ContentType = _command.ContentType,
+            .ByteSize = _command.Image.Length,
+            .CapturedAt = DateTime.UtcNow,
+            .CapturedCrewId = _command.CrewId,
+            .MissionId = _command.MissionId,
+            .OcrStatus = "pending"
+        }
 
-            _repository.Save(card)
-            Return ClResult(Of ClMutuelleCardCreatedDtoOut).Ok(New ClMutuelleCardCreatedDtoOut With {.Id = card.Id})
-        Catch ex As Exception
-            Return ClResult(Of ClMutuelleCardCreatedDtoOut).Fail(ClError.Application(ex.Message, ex))
-        End Try
+        _repository.Save(card)
+        Return ClResult(Of ClMutuelleCardCreatedDtoOut).Ok(New ClMutuelleCardCreatedDtoOut With {.Id = card.Id})
     End Function
 
 End Class

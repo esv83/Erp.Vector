@@ -72,7 +72,7 @@ public class JobDetailBeneficiaryIdTests
         var erp = new FakeErp { WithBeneficiary = withBeneficiary };
         var repo = new JobRepository(erp, new FakeJobTime(), new FakeSignature(),
                                      NullLogger<JobRepository>.Instance);
-        return new ClJobDetailAdapter(repo.GetJob(JobId));
+        return new ClJobDetailAdapter(repo.GetJobAsync(JobId, CancellationToken.None).GetAwaiter().GetResult()!);
     }
 
     private sealed class FakeErp : IErpReadApiClient

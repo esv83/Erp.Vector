@@ -75,7 +75,7 @@ public class JobLocationMappingTests
     {
         var erp = new FakeErp { Pickup = stage };
         var repo = new JobRepository(erp, new FakeJobTime(), new FakeSignature(), NullLogger<JobRepository>.Instance);
-        return repo.GetJob(JobId);
+        return repo.GetJobAsync(JobId, CancellationToken.None).GetAwaiter().GetResult()!;
     }
 
     private static ClJobLocation MapPickup(ErpStageDto stage) => BuildJob(stage).PickupLocation;

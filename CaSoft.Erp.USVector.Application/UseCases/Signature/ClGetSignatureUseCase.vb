@@ -13,13 +13,12 @@ Public Class ClGetSignatureUseCase
 
     Public Function Handle() As ClResult(Of ClSignatureDtoOut) Implements IResultUseCase(Of ClSignatureDtoOut).Handle
 
-        Try
-            Dim SignGuid As New ClValidGuid(_query)
-            Dim signature As ClSignatureDtoOut = _repository.Fetch(SignGuid.Value)
-            Return ClResult(Of ClSignatureDtoOut).Ok(signature)
-        Catch ex As Exception
-            Return ClResult(Of ClSignatureDtoOut).Fail(ClError.Application(ex.Message, ex))
-        End Try
+        If _query = Guid.Empty Then
+            Return ClResult(Of ClSignatureDtoOut).Fail(ClError.Application("Identifiant de mission vide."))
+        End If
+
+        Dim signature As ClSignatureDtoOut = _repository.Fetch(_query)
+        Return ClResult(Of ClSignatureDtoOut).Ok(signature)
 
     End Function
 

@@ -20,22 +20,18 @@ Public Class ClGetMissionMutuelleCardUseCase
     End Sub
 
     Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of ClMutuelleCardDtoOut))
-        Try
-            Dim beneficiaryId = Await _beneficiaries.GetBeneficiaryIdAsync(_missionId, ct)
-            If Not beneficiaryId.HasValue Then
-                Return ClResult(Of ClMutuelleCardDtoOut).Fail(ClError.NotFound("Patient introuvable pour cette mission."))
-            End If
+        Dim beneficiaryId = Await _beneficiaries.GetBeneficiaryIdAsync(_missionId, ct)
+        If Not beneficiaryId.HasValue Then
+            Return ClResult(Of ClMutuelleCardDtoOut).Fail(ClError.NotFound("Patient introuvable pour cette mission."))
+        End If
 
-            ' Métadonnées seules : la réponse annonce l'image par son URL, elle ne la transporte pas.
-            Dim card = _repository.GetCurrentMetadata(beneficiaryId.Value)
-            If card Is Nothing Then
-                Return ClResult(Of ClMutuelleCardDtoOut).Fail(ClError.NotFound("Aucune carte mutuelle pour ce patient."))
-            End If
+        ' Métadonnées seules : la réponse annonce l'image par son URL, elle ne la transporte pas.
+        Dim card = _repository.GetCurrentMetadata(beneficiaryId.Value)
+        If card Is Nothing Then
+            Return ClResult(Of ClMutuelleCardDtoOut).Fail(ClError.NotFound("Aucune carte mutuelle pour ce patient."))
+        End If
 
-            Return ClResult(Of ClMutuelleCardDtoOut).Ok(card.ToDtoOut())
-        Catch ex As Exception When Not TypeOf ex Is OperationCanceledException
-            Return ClResult(Of ClMutuelleCardDtoOut).Fail(ClError.Application(ex.Message, ex))
-        End Try
+        Return ClResult(Of ClMutuelleCardDtoOut).Ok(card.ToDtoOut())
     End Function
 
 End Class

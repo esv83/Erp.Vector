@@ -25,12 +25,7 @@ Public Class ClUploadMissionMutuelleCardUseCase
     End Sub
 
     Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of ClMutuelleCardCreatedDtoOut))
-        Dim beneficiaryId As Guid?
-        Try
-            beneficiaryId = Await _beneficiaries.GetBeneficiaryIdAsync(_command.MissionId, ct)
-        Catch ex As Exception When Not TypeOf ex Is OperationCanceledException
-            Return ClResult(Of ClMutuelleCardCreatedDtoOut).Fail(ClError.Application(ex.Message, ex))
-        End Try
+        Dim beneficiaryId = Await _beneficiaries.GetBeneficiaryIdAsync(_command.MissionId, ct)
 
         If Not beneficiaryId.HasValue Then
             Return ClResult(Of ClMutuelleCardCreatedDtoOut).Fail(ClError.NotFound("Patient introuvable pour cette mission."))

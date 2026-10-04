@@ -18,31 +18,26 @@ Public Class ClClearJobTimeUseCase
 
     Public Function Handle() As ClResult(Of Boolean) Implements IResultUseCase(Of Boolean).Handle
 
-        Try
-            Dim jobTime As ClJobTimeData = _repository.GetJobTime(_jobId)
+        Dim jobTime As ClJobTimeData = _repository.GetJobTime(_jobId)
 
-            'TODO remplacer par enum quand VB.NET le supportera.
-            Select Case _jalon?.Trim().ToLowerInvariant()
-                Case "seen", "read"
-                    jobTime.ReadTime = Nothing
-                Case "go", "enroute"
-                    jobTime.GoTime = Nothing
-                Case "onsite", "surplace"
-                    jobTime.OnSiteTime = Nothing
-                Case "terminate", "terminated", "termine", "disponible"
-                    jobTime.TerminateTime = Nothing
-                Case Else
-                    Return ClResult(Of Boolean).Fail(
-                        ClError.Application($"Jalon inconnu : « {_jalon} ». Attendu : seen | go | onsite | terminate | disponible."))
-            End Select
+        'TODO remplacer par enum quand VB.NET le supportera.
+        Select Case _jalon?.Trim().ToLowerInvariant()
+            Case "seen", "read"
+                jobTime.ReadTime = Nothing
+            Case "go", "enroute"
+                jobTime.GoTime = Nothing
+            Case "onsite", "surplace"
+                jobTime.OnSiteTime = Nothing
+            Case "terminate", "terminated", "termine", "disponible"
+                jobTime.TerminateTime = Nothing
+            Case Else
+                Return ClResult(Of Boolean).Fail(
+                    ClError.Application($"Jalon inconnu : « {_jalon} ». Attendu : seen | go | onsite | terminate | disponible."))
+        End Select
 
-            ' Upsert BD Mobile (jalon effacé) + enqueue Outbox → projection consolidée (retour arrière).
-            _repository.SaveJobTime(jobTime)
-            Return ClResult(Of Boolean).Ok(True)
-
-        Catch ex As Exception
-            Return ClResult(Of Boolean).Fail(ClError.Application(ex.Message, ex))
-        End Try
+        ' Upsert BD Mobile (jalon effacé) + enqueue Outbox → projection consolidée (retour arrière).
+        _repository.SaveJobTime(jobTime)
+        Return ClResult(Of Boolean).Ok(True)
 
     End Function
 

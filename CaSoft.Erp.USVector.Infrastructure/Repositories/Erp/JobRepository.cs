@@ -39,20 +39,19 @@ public class JobRepository : IJobRepository
         _logger = logger;
     }
 
-    public ClJob GetJob(Guid gJobId)
+    public async Task<ClJob?> GetJobAsync(Guid gJobId, CancellationToken ct)
     {
-        var mission = _erp.GetMissionFullAsync(gJobId, CancellationToken.None).GetAwaiter().GetResult();
+        var mission = await _erp.GetMissionFullAsync(gJobId, ct);
         if (mission is null)
-            throw new InvalidOperationException($"Mission {gJobId} introuvable côté ERP.");
+            return null;
 
         // La commande porte mode de transport, aller/retour, fréquence (itératif).
-        var order = _erp.GetOrderAsync(mission.OrderId, CancellationToken.None).GetAwaiter().GetResult();
+        var order = await _erp.GetOrderAsync(mission.OrderId, ct);
 
         // Identité patient (le bénéficiaire est rattaché à la commande).
         ErpBeneficiaryDetailDto? beneficiary = null;
         if (order?.Order is not null && order.Order.BeneficiaryId != Guid.Empty)
-            beneficiary = _erp.GetBeneficiaryAsync(order.Order.BeneficiaryId, CancellationToken.None)
-                .GetAwaiter().GetResult();
+            beneficiary = await _erp.GetBeneficiaryAsync(order.Order.BeneficiaryId, ct);
 
         var domainMission = BuildMission(gJobId, mission, order);
         var domainBeneficiary = BuildBeneficiary(beneficiary);
@@ -66,9 +65,6 @@ public class JobRepository : IJobRepository
             .WithPersistentSource()
             .Build();
     }
-
-    public bool IsExist(Guid jobId)
-        => _erp.GetMissionFullAsync(jobId, CancellationToken.None).GetAwaiter().GetResult() is not null;
 
     // ── Timeline opérationnelle : déléguée à la BD Mobile (MOB-2/MOB-7) ──────────
     public ClJobTimeData GetJobTime(Guid jobId)

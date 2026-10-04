@@ -14,17 +14,12 @@ Public Class ClGetJobTimelineUseCase
 
     Public Function Handle() As ClResult(Of ClJobTimelineDtoOut) Implements IResultUseCase(Of ClJobTimelineDtoOut).Handle
 
-        Try
-            Dim jobTime As ClJobTimeData = _repository.GetJobTime(_jobId)
-            If jobTime Is Nothing Then
-                jobTime = ClJobTimeData.GetBuilder.WithId(_jobId).Build
-            End If
+        Dim jobTime As ClJobTimeData = _repository.GetJobTime(_jobId)
+        If jobTime Is Nothing Then
+            jobTime = ClJobTimeData.GetBuilder.WithId(_jobId).Build
+        End If
 
-            Return ClResult(Of ClJobTimelineDtoOut).Ok(jobTime.ToJobTimelineDtoOut)
-
-        Catch ex As Exception
-            Return ClResult(Of ClJobTimelineDtoOut).Fail(ClError.Application(ex.Message, ex))
-        End Try
+        Return ClResult(Of ClJobTimelineDtoOut).Ok(jobTime.ToJobTimelineDtoOut)
 
     End Function
 

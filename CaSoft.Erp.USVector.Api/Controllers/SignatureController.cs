@@ -61,53 +61,35 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         [FreezeOnTransfer]
         public ActionResult PostSignature(Guid gJobId, ClSignatureGetModel signatureModel, [FromServices] ISignatureRepository repository)
         {
-            try
-            {
-                if (repository.Exists(gJobId))
-                    repository.Update(gJobId, signatureModel.Data);
-                else
-                    repository.Insert(gJobId, signatureModel.Data);
+            // Pas d'attrape-tout (04/10) : une panne de la base remonte au gestionnaire (503) au lieu
+            // de partir en 400 avec le message technique — 35 fois pendant les coupures.
+            if (repository.Exists(gJobId))
+                repository.Update(gJobId, signatureModel.Data);
+            else
+                repository.Insert(gJobId, signatureModel.Data);
 
-                return Ok();
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            return Ok();
         }
 
         [HttpPatch("{gJobId}")]
         [FreezeOnTransfer]
         public ActionResult PatchSignature(Guid gJobId, ClSignatureGetModel signatureModel, [FromServices] ISignatureRepository repository)
         {
-            //Update les infos de la mission
-            try
-            {
-                repository.Update(gJobId, signatureModel.Data);
+            // Rien à modifier : le même 400 qu'avant, avec une phrase au lieu de « Sequence contains no elements ».
+            if (!repository.Exists(gJobId))
+                return BadRequest("Aucune signature à modifier pour cette mission.");
 
-                return Ok();
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            repository.Update(gJobId, signatureModel.Data);
+            return Ok();
         }
 
         [HttpDelete("{gJobId}")]
         [FreezeOnTransfer]
         public ActionResult DeleteSignature(Guid gJobId, [FromServices] ISignatureRepository Repository)
         {
-            try
-            {
-                // TODO legacy résolu en MOB-2 : suppression réellement câblée sur MOB_SIGNATURE.
-                Repository.Delete(gJobId, string.Empty);
-
-                return Ok();
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            // Suppression d'une signature absente : sans effet, 200 comme avant.
+            Repository.Delete(gJobId, string.Empty);
+            return Ok();
         }
     }
 }
