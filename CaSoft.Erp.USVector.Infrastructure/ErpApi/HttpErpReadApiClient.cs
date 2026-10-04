@@ -96,6 +96,6 @@ public sealed class HttpErpReadApiClient : IErpReadApiClient
         if (response.IsSuccessStatusCode) return;
         var body = await response.Content.ReadAsStringAsync(ct);
         _logger.LogError("Orders.Api {What} a échoué : {Status} {Body}", what, (int)response.StatusCode, body);
-        throw new HttpRequestException($"Orders.Api {what} → {(int)response.StatusCode}.");
+        throw new HttpRequestException($"Orders.Api {what} → {(int)response.StatusCode}.", null, response.StatusCode);
     }
 }

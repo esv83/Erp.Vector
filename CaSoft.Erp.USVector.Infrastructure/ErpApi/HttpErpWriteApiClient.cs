@@ -54,7 +54,7 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
 
         _logger.LogError("Orders.Api PUT missions/{MissionId}/operational a échoué : {Status} {Body}",
             missionId, (int)response.StatusCode, content);
-        throw new HttpRequestException($"Orders.Api PUT missions/{missionId}/operational → {(int)response.StatusCode}.");
+        throw new HttpRequestException($"Orders.Api PUT missions/{missionId}/operational → {(int)response.StatusCode}.", null, response.StatusCode);
     }
 
     public async Task<CrewDriverWriteResult> SetCrewDriverAsync(Guid crewId, Guid driverPersonnelId, DateTime from, CancellationToken ct = default)
@@ -85,7 +85,7 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
 
         _logger.LogError("Orders.Api PUT crews/{CrewId}/driver a échoué : {Status} {Body}",
             crewId, (int)response.StatusCode, content);
-        throw new HttpRequestException($"Orders.Api PUT crews/{crewId}/driver → {(int)response.StatusCode}.");
+        throw new HttpRequestException($"Orders.Api PUT crews/{crewId}/driver → {(int)response.StatusCode}.", null, response.StatusCode);
     }
 
     public async Task<EnContextOrderWriteOutcome> SetMissionContextOrderAsync(
@@ -115,7 +115,7 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
 
         _logger.LogError("Orders.Api PATCH missions/{MissionId}/contextOrder a échoué : {Status} {Body}",
             missionId, (int)response.StatusCode, content);
-        throw new HttpRequestException($"Orders.Api PATCH missions/{missionId}/contextOrder → {(int)response.StatusCode}.");
+        throw new HttpRequestException($"Orders.Api PATCH missions/{missionId}/contextOrder → {(int)response.StatusCode}.", null, response.StatusCode);
     }
 
     public async Task<ContextOrderValuesWriteResult> SetContextOrderValuesAsync(
@@ -150,7 +150,7 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
 
         _logger.LogError("Orders.Api PATCH missions/{MissionId}/contextOrder/values a échoué : {Status} {Body}",
             missionId, (int)response.StatusCode, content);
-        throw new HttpRequestException($"Orders.Api PATCH missions/{missionId}/contextOrder/values → {(int)response.StatusCode}.");
+        throw new HttpRequestException($"Orders.Api PATCH missions/{missionId}/contextOrder/values → {(int)response.StatusCode}.", null, response.StatusCode);
     }
 
     /// <summary>

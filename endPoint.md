@@ -22,6 +22,7 @@ appelle ces routes ; il suffit de les implémenter/ajuster côté Orders au cont
 | `crewId` | exactement l'`id` renvoyé par `GET /crews?personnelId=&date=` (Vector enchaîne les deux) |
 | `members[].id` / `personnelId` | **PER_ID** — même identifiant que renvoie `by-keycloak` |
 | Introuvable | **404** (Vector le gère proprement : `GetOrNullAsync` → `null`) |
+| Panne (base, dépendance) | **5xx, jamais 400** : Vector retente les 5xx, jamais un 4xx — un 400 est lu comme un refus métier. *539 pannes SQL rendues en 400 du 21/09 au 04/10, signalées au plan d'Order le 04/10* |
 
 > ⚠️ Les noms de champs doivent correspondre **exactement** : c'est ainsi que Vector désérialise
 > (`JsonSerializerDefaults.Web`, case-insensitive mais camelCase attendu en sortie).

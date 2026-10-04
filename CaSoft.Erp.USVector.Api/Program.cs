@@ -380,10 +380,16 @@ builder.Services.AddScoped<IEmergencyConnector>(provider =>
 builder.Logging.ClearProviders();
 builder.Host.UseNLog();
 
+// Orders indisponible → 503 ProblemDetails affichable, au lieu d'un 500 brut (voir le gestionnaire).
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<OrdersUnavailableExceptionHandler>();
+
 // CORS — TODO : restreindre (aligné sur le P0 #2 de l'ERP)
 builder.Services.AddCors();
 
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 app.UseSwagger();
 app.UseSwaggerUI(c =>

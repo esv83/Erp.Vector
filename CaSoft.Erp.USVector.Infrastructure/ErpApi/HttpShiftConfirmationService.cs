@@ -53,7 +53,7 @@ public sealed class HttpShiftConfirmationService : IShiftConfirmationService
         {
             var body = await response.Content.ReadAsStringAsync(ct);
             _logger.LogError("Orders.Api GET {Url} a échoué : {Status} {Body}", url, (int)response.StatusCode, body);
-            throw new HttpRequestException($"Orders.Api GET {url} → {(int)response.StatusCode}.");
+            throw new HttpRequestException($"Orders.Api GET {url} → {(int)response.StatusCode}.", null, response.StatusCode);
         }
 
         var list = await response.Content.ReadFromJsonAsync<List<ErpPendingShiftConfirmationDto>>(JsonOptions, ct)
@@ -111,7 +111,7 @@ public sealed class HttpShiftConfirmationService : IShiftConfirmationService
         }
 
         _logger.LogError("Orders.Api POST {Url} a échoué : {Status} {Body}", url, (int)response.StatusCode, content);
-        throw new HttpRequestException($"Orders.Api POST {url} → {(int)response.StatusCode}.");
+        throw new HttpRequestException($"Orders.Api POST {url} → {(int)response.StatusCode}.", null, response.StatusCode);
     }
 
     /// <summary>
