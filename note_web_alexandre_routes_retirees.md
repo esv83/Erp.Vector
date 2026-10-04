@@ -51,3 +51,20 @@ déclarerait sa propre fin ouvrirait une fraude que rien ne peut contredire). L'
 « en cours » ou « clôturé », avec l'heure de fin, dans le sélecteur d'équipage.
 
 - [ ] Retirer tout appel à la fin de service, et le bouton ou l'écran qui la déclarait s'il existe
+
+---
+
+## Ajout du 2026-10-04 — le kilométrage
+
+| Route | Usage prévu |
+|---|---|
+| `GET api/Kilometers/{crewId}` · `POST api/Kilometers/{crewId}` | lire ou saisir le kilométrage du véhicule de l'équipage |
+
+**Jamais fonctionnelles** : la lecture répondait **toujours 404** — 15 appels du 16/08 au 04/10, tous en
+404, **aucune saisie** ; l'écriture enregistrait en réalité le *conducteur*, et échouait quand aucun
+n'était désigné. Elles ne vérifiaient pas non plus que l'équipage était le vôtre.
+
+**Ce qui change pour l'app : rien.** Une route retirée répond 404, exactement comme avant.
+
+**Le kilométrage reviendra** sous une autre forme quand la facturation aura tranché ce qu'elle attend
+(kilométrage du véhicule, ou relevé début/fin par mission) — le contrat sera décrit à ce moment-là.

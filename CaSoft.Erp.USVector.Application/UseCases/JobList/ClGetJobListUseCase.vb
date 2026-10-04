@@ -1,6 +1,7 @@
+Imports System.Threading
 ' Liste des missions du personnel (crews actifs résolus du token Keycloak) — Result pattern.
 Public Class ClGetJobListUseCase
-    Implements IResultUseCase(Of ClJobListModel)
+    Implements IResultUseCaseAsync(Of ClJobListModel)
 
     Private ReadOnly _crewIds As IReadOnlyList(Of Guid)
     Private ReadOnly _repository As ICrewRepository
@@ -11,22 +12,17 @@ Public Class ClGetJobListUseCase
         _repository = repository
     End Sub
 
-    Public Function Handle() As ClResult(Of ClJobListModel) Implements IResultUseCase(Of ClJobListModel).Handle
+    Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of ClJobListModel)) Implements IResultUseCaseAsync(Of ClJobListModel).HandleAsync
 
-        Try
-            Dim jobList = _repository.FetchJobList(_crewIds)
+        Dim jobList = Await _repository.FetchJobListAsync(_crewIds, ct)
 
-            ' Instructions régulation : pas d'équivalent ERP (union sur les crews, vide en V1).
-            Dim instructionList As New List(Of ClInstructionListItemModel)
-            For Each crewId In _crewIds
-                instructionList.AddRange(_repository.FetchInstructionList(crewId))
-            Next
+        ' Instructions régulation : pas d'équivalent ERP (union sur les crews, vide en V1).
+        Dim instructionList As New List(Of ClInstructionListItemModel)
+        For Each crewId In _crewIds
+            instructionList.AddRange(_repository.FetchInstructionList(crewId))
+        Next
 
-            Return ClResult(Of ClJobListModel).Ok(New ClJobListModel(jobList, instructionList))
-
-        Catch ex As Exception
-            Return ClResult(Of ClJobListModel).Fail(ClError.Application(ex.Message, ex))
-        End Try
+        Return ClResult(Of ClJobListModel).Ok(New ClJobListModel(jobList, instructionList))
 
     End Function
 

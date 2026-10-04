@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore.Storage;
 using Polly.CircuitBreaker;
 using Polly.Timeout;
 
@@ -17,6 +18,10 @@ namespace CaSoft.Erp.USVector.Api.Infrastructure;
 /// d'Orders des 21/09 et 04/10 — dont 72 % sur <c>Crew/mine</c>, l'écran d'entrée de l'ambulancier.
 /// Même <c>ShiftConfirmationController</c>, qui promettait un 503, rendait 500 : il n'attrapait que
 /// <c>HttpRequestException</c>, et le disjoncteur lève <see cref="BrokenCircuitException"/>.
+/// </para>
+/// <para>
+/// <b>Base Vector comprise (04/10)</b> : quand les cas d'usage ont cessé de tout rendre en 400, une
+/// coupure SQL serait devenue un 500 — l'épuisement du réessai EF dit « passagère qui a duré ».
 /// </para>
 /// <para>
 /// <b>Une panne, pas un refus.</b> Une <c>HttpRequestException</c> n'est une panne que sans statut
@@ -55,6 +60,9 @@ public sealed class OrdersUnavailableExceptionHandler : IExceptionHandler
         HttpRequestException { StatusCode: null } => true,
         HttpRequestException { StatusCode: HttpStatusCode.RequestTimeout } => true,
         HttpRequestException { StatusCode: { } status } => (int)status >= 500,
+        // La base Vector, après épuisement du réessai EF : une erreur SQL passagère qui a duré. Une
+        // erreur SQL non passagère (colonne absente…) n'est pas réessayée, et reste un 500.
+        RetryLimitExceededException => true,
         _ => false
     };
 

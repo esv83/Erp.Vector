@@ -1,3 +1,4 @@
+Imports System.Threading
 Imports CaSoft.Erp.USVector.Application.Dto
 
 Public Class ClCrewService
@@ -9,17 +10,17 @@ Public Class ClCrewService
         _repository = repository
     End Sub
 
-    Public Function GetDriver(gCrewId As Guid) As ClResult(Of ClLogDriverModel) Implements ICrewService.GetDriver
-        Return New ClGetDriverUseCase(gCrewId, _repository).Handle()
+    Public Function GetDriverAsync(gCrewId As Guid, ct As CancellationToken) As Task(Of ClResult(Of ClLogDriverModel)) Implements ICrewService.GetDriverAsync
+        Return New ClGetDriverUseCase(gCrewId, _repository).HandleAsync(ct)
     End Function
 
-    Public Function ChangeDriver(gCrewId As Guid, gEmployeeId As Guid) As ClResult(Of Boolean) Implements ICrewService.ChangeDriver
+    Public Function ChangeDriverAsync(gCrewId As Guid, gEmployeeId As Guid, ct As CancellationToken) As Task(Of ClResult(Of Boolean)) Implements ICrewService.ChangeDriverAsync
         Dim command = New ClSetDriverCommand(gCrewId, gEmployeeId)
-        Return New ClSetDriverUseCase(command, _repository).Handle()
+        Return New ClSetDriverUseCase(command, _repository).HandleAsync(ct)
     End Function
 
-    Public Function GetMyActiveCrews(crewIds As IReadOnlyList(Of Guid), at As DateTime) As ClResult(Of ClActiveCrewSelectionDtoOut) Implements ICrewService.GetMyActiveCrews
-        Return New ClGetMyActiveCrewsUseCase(crewIds, at, _repository).Handle()
+    Public Function GetMyActiveCrewsAsync(crewIds As IReadOnlyList(Of Guid), at As DateTime, ct As CancellationToken) As Task(Of ClResult(Of ClActiveCrewSelectionDtoOut)) Implements ICrewService.GetMyActiveCrewsAsync
+        Return New ClGetMyActiveCrewsUseCase(crewIds, at, _repository).HandleAsync(ct)
     End Function
 
 End Class

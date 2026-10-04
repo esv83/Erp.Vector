@@ -49,7 +49,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             _logger.LogInformation("GET api/crew/mine — PER_ID={PerId} : {Count} équipage(s) actif(s).",
                 personnelId, crewIds.Count);
 
-            var result = _crewService.GetMyActiveCrews(crewIds, DateTime.Now);
+            var result = await _crewService.GetMyActiveCrewsAsync(crewIds, DateTime.Now, ct);
 
             // Équipage composé mais hors fenêtre (pas encore ouvert, clôturé, expiré) : le message du cas
             // d'usage dit quoi faire. ToActionResult rendrait un 404 nu — c'est le cas pour tous les

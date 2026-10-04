@@ -11,7 +11,7 @@ using Xunit;
 namespace CaSoft.Erp.USVector.Tests;
 
 /// <summary>
-/// Non-régression du filtre joblist terrain (<see cref="CrewRepository.FetchJobList(System.Collections.Generic.IReadOnlyCollection{System.Guid})"/>).
+/// Non-régression du filtre joblist terrain (<see cref="CrewRepository.FetchJobListAsync"/>).
 /// Périmètre = logique CLIENT de l'adaptateur : la joblist lit la route crew-scopée
 /// <c>GET /crews/{crewId}/missions</c> (mockée ici), masque les missions clôturées (status ≥ 4),
 /// déduplique sur plusieurs équipages, ordonne par date puis heure, et superpose les flags
@@ -89,7 +89,7 @@ public class CrewRepositoryJobListTests
     // ── Tests ─────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Masque_les_missions_cloturees_et_garde_status_1_a_3()
+    public async Task Masque_les_missions_cloturees_et_garde_status_1_a_3()
     {
         var m1 = Guid.NewGuid(); var m2 = Guid.NewGuid(); var m3 = Guid.NewGuid();
         var mClosed = Guid.NewGuid(); var mCancelled = Guid.NewGuid();
@@ -105,14 +105,14 @@ public class CrewRepositoryJobListTests
         };
 
         using var ctx = NewContext();
-        var result = NewSut(ctx, erp).FetchJobList(new[] { CrewA });
+        var result = await NewSut(ctx, erp).FetchJobListAsync(new[] { CrewA }, CancellationToken.None);
 
         result.Select(r => r.JobId).Should().BeEquivalentTo(new[] { m1, m2, m3 });
         result.Select(r => r.JobId).Should().NotContain(new[] { mClosed, mCancelled });
     }
 
     [Fact]
-    public void Deduplique_une_mission_partagee_par_deux_equipages()
+    public async Task Deduplique_une_mission_partagee_par_deux_equipages()
     {
         var shared = Guid.NewGuid(); var only = Guid.NewGuid();
 
@@ -121,7 +121,7 @@ public class CrewRepositoryJobListTests
         erp.ByCrew[CrewB] = new() { Mission(shared, status: 2), Mission(only, status: 1) };
 
         using var ctx = NewContext();
-        var result = NewSut(ctx, erp).FetchJobList(new[] { CrewA, CrewB });
+        var result = await NewSut(ctx, erp).FetchJobListAsync(new[] { CrewA, CrewB }, CancellationToken.None);
 
         result.Should().HaveCount(2);
         result.Select(r => r.JobId).Should().OnlyHaveUniqueItems();
@@ -129,7 +129,7 @@ public class CrewRepositoryJobListTests
     }
 
     [Fact]
-    public void Ordonne_par_date_de_mission_puis_heure()
+    public async Task Ordonne_par_date_de_mission_puis_heure()
     {
         var late = Guid.NewGuid();   // 08/07 08:00
         var early = Guid.NewGuid();  // 07/07 07:00
@@ -144,14 +144,14 @@ public class CrewRepositoryJobListTests
         };
 
         using var ctx = NewContext();
-        var result = NewSut(ctx, erp).FetchJobList(new[] { CrewA });
+        var result = await NewSut(ctx, erp).FetchJobListAsync(new[] { CrewA }, CancellationToken.None);
 
         result.Select(r => r.JobId).Should().ContainInOrder(early, mid, late);
         result.Select(r => r.Index).Should().ContainInOrder(1, 2, 3);
     }
 
     [Fact]
-    public void Superpose_les_flags_vue_termine_et_signature()
+    public async Task Superpose_les_flags_vue_termine_et_signature()
     {
         var seenMission = Guid.NewGuid();
         var terminatedMission = Guid.NewGuid();
@@ -168,7 +168,7 @@ public class CrewRepositoryJobListTests
         var sig = new FakeSignature();
         sig.Signed.Add(seenMission);
 
-        var result = NewSut(ctx, erp, sig).FetchJobList(new[] { CrewA });
+        var result = await NewSut(ctx, erp, sig).FetchJobListAsync(new[] { CrewA }, CancellationToken.None);
 
         var seen = result.Single(r => r.JobId == seenMission);
         seen.IsSeen.Should().BeTrue();
@@ -182,30 +182,30 @@ public class CrewRepositoryJobListTests
     }
 
     [Fact]
-    public void Interroge_la_route_crew_scopee_pour_chaque_equipage()
+    public async Task Interroge_la_route_crew_scopee_pour_chaque_equipage()
     {
         var erp = new FakeErp();
         erp.ByCrew[CrewA] = new() { Mission(Guid.NewGuid(), status: 1) };
         erp.ByCrew[CrewB] = new() { Mission(Guid.NewGuid(), status: 1) };
 
         using var ctx = NewContext();
-        NewSut(ctx, erp).FetchJobList(new[] { CrewA, CrewB });
+        await NewSut(ctx, erp).FetchJobListAsync(new[] { CrewA, CrewB }, CancellationToken.None);
 
         // Périmètre = équipage (GET /crews/{crewId}/missions), une requête par crew, jamais la route datée.
         erp.RequestedCrews.Should().BeEquivalentTo(new[] { CrewA, CrewB });
     }
 
     [Fact]
-    public void Sans_equipage_retourne_une_liste_vide()
+    public async Task Sans_equipage_retourne_une_liste_vide()
     {
         using var ctx = NewContext();
-        var result = NewSut(ctx, new FakeErp()).FetchJobList(Array.Empty<Guid>());
+        var result = await NewSut(ctx, new FakeErp()).FetchJobListAsync(Array.Empty<Guid>(), CancellationToken.None);
 
         result.Should().BeEmpty();
     }
 
     [Fact]
-    public void Mappe_le_sens_de_transport_vers_TransportSens_1_aller_2_retour()
+    public async Task Mappe_le_sens_de_transport_vers_TransportSens_1_aller_2_retour()
     {
         var aller = Guid.NewGuid();
         var retour = Guid.NewGuid();
@@ -218,7 +218,7 @@ public class CrewRepositoryJobListTests
         };
 
         using var ctx = NewContext();
-        var result = NewSut(ctx, erp).FetchJobList(new[] { CrewA });
+        var result = await NewSut(ctx, erp).FetchJobListAsync(new[] { CrewA }, CancellationToken.None);
 
         // L'UI attend 1=Aller / 2=Retour dans TransportSens (MIS_KIND remonté par Orders).
         result.Single(r => r.JobId == aller).TransportSens.Should().Be(1);

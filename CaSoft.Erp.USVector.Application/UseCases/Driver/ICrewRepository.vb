@@ -1,28 +1,33 @@
-﻿Imports CaSoft.Erp.USVector.Application.Dto
+Imports System.Threading
+Imports CaSoft.Erp.USVector.Application.Dto
 
 Namespace Port
 
+    ''' <summary>
+    ''' Équipage et missions du terrain, lus chez Orders. Asynchrone depuis le 04/10 ; les membres
+    ''' jamais implémentés (conducteur par véhicule, instructions, équipages d'une date) sont partis
+    ''' avec les cas d'usage qui ne les appelaient pas.
+    ''' </summary>
     Public Interface ICrewRepository
-        Function GetCrew(gCrewID As Guid) As ClCrew
-        Function IsEmployeeInCrew(ByVal gCrewID As Guid, ByVal gEmployeeId As Guid) As Boolean
-        Function GetCrewDriver(ByVal gVehicleID As Guid) As ClLogDriverModel
-        'Function FetchJobList(gCrewToken As Guid) As List(Of ClJobListItemModel)
-        Function FetchJobList(gCrewId As Guid) As List(Of ClJobListItemModel)
+
+        ''' <summary>L'équipage, ou <c>Nothing</c> s'il est inconnu d'Orders.</summary>
+        Function GetCrewAsync(gCrewID As Guid, ct As CancellationToken) As Task(Of ClCrew)
+
         ''' <summary>
-        ''' MOB-4a — Union des missions du jour pour plusieurs crews (un personnel
-        ''' peut être membre de plusieurs crews actifs le même jour). Dédupliquée.
+        ''' MOB-4a — Union des missions de plusieurs crews (un personnel peut être membre de
+        ''' plusieurs crews actifs le même jour). Dédupliquée.
         ''' </summary>
-        Function FetchJobList(gCrewIds As IReadOnlyCollection(Of Guid)) As List(Of ClJobListItemModel)
+        Function FetchJobListAsync(gCrewIds As IReadOnlyCollection(Of Guid), ct As CancellationToken) As Task(Of List(Of ClJobListItemModel))
+
+        ''' <summary>Instructions de la régulation : pas d'équivalent chez Orders, liste vide.</summary>
         Function FetchInstructionList(gCrewId As Guid) As List(Of ClInstructionListItemModel)
+
         ''' <summary>
         ''' Enregistre le dernier conducteur désigné de l'équipage. Un refus de l'ERP est rendu, avec
         ''' son motif, et ne lève pas ; seule une panne réelle lève.
         ''' </summary>
-        Function Update(crew As ClCrew) As ClCrewDriverWriteResult
-        Sub AckInstruction(instructionId As Integer)
-        Function GetCrewIdList(id As DateOnly) As List(Of Guid)
+        Function UpdateAsync(crew As ClCrew, ct As CancellationToken) As Task(Of ClCrewDriverWriteResult)
 
     End Interface
 
 End Namespace
-

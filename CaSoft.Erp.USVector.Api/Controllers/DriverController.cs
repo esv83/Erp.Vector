@@ -33,7 +33,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             var error = await CrewAccess.AuthorizeAsync(this, _identity, crewId, ct);
             if (error is not null) return error;
 
-            return _crewService.GetDriver(crewId).ToActionResult();
+            return (await _crewService.GetDriverAsync(crewId, ct)).ToActionResult();
         }
 
         // POST api/driver/{crewId} — change le conducteur de l'équipage. Corps = Guid du conducteur (un membre).
@@ -44,7 +44,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             if (error is not null) return error;
 
             _logger.LogInformation("POST api/driver/{CrewId} — nouveau conducteur {DriverId}.", crewId, DriverId);
-            return _crewService.ChangeDriver(crewId, DriverId).ToActionResult();
+            return (await _crewService.ChangeDriverAsync(crewId, DriverId, ct)).ToActionResult();
         }
     }
 }

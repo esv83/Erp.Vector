@@ -42,7 +42,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
 
             _logger.LogInformation("GET api/joblist/{CrewId} — début.", crewId);
             var useCase = new ClGetJobListUseCase(new[] { crewId }, _crewRepository);
-            var result = useCase.Handle().ToActionResult();
+            var result = (await useCase.HandleAsync(ct)).ToActionResult();
             _logger.LogInformation("GET api/joblist/{CrewId} — fin, réponse construite.", crewId);
             return result;
         }

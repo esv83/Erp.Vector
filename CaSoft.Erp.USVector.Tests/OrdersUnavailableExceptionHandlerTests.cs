@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Polly.CircuitBreaker;
 using Polly.Timeout;
@@ -31,7 +32,9 @@ public class OrdersUnavailableExceptionHandlerTests
         new HttpRequestException("Hôte inconnu."),
         new HttpRequestException("Orders.Api GET x → 503.", null, HttpStatusCode.ServiceUnavailable),
         new HttpRequestException("Orders.Api GET x → 500.", null, HttpStatusCode.InternalServerError),
-        new HttpRequestException("Orders.Api GET x → 408.", null, HttpStatusCode.RequestTimeout)
+        new HttpRequestException("Orders.Api GET x → 408.", null, HttpStatusCode.RequestTimeout),
+        // La base Vector, réessai EF épuisé : passagère, mais qui a duré.
+        new RetryLimitExceededException("Maximum number of retries (3) exceeded")
     };
 
     public static TheoryData<Exception> PasDesPannes => new()

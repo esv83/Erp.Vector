@@ -27,19 +27,19 @@ public class ClGetMyActiveCrewsUseCaseTests
     {
         private readonly Dictionary<Guid, ClCrew> _crews;
         public FakeCrews(params ClCrew[] crews) => _crews = crews.ToDictionary(c => c.CrewId);
-        public ClCrew GetCrew(Guid gCrewID) => _crews[gCrewID];
-        public bool IsEmployeeInCrew(Guid gCrewID, Guid gEmployeeId) => throw new NotSupportedException();
-        public ClLogDriverModel GetCrewDriver(Guid gVehicleID) => throw new NotSupportedException();
-        public List<ClJobListItemModel> FetchJobList(Guid gCrewId) => throw new NotSupportedException();
-        public List<ClJobListItemModel> FetchJobList(IReadOnlyCollection<Guid> gCrewIds) => throw new NotSupportedException();
+        public Task<ClCrew> GetCrewAsync(Guid gCrewID, CancellationToken ct)
+            => Task.FromResult(_crews.TryGetValue(gCrewID, out var crew) ? crew : null!);
+        public Task<List<ClJobListItemModel>> FetchJobListAsync(IReadOnlyCollection<Guid> gCrewIds, CancellationToken ct) => throw new NotSupportedException();
         public List<ClInstructionListItemModel> FetchInstructionList(Guid gCrewId) => throw new NotSupportedException();
-        public ClCrewDriverWriteResult Update(ClCrew crew) => throw new NotSupportedException();
-        public void AckInstruction(int instructionId) => throw new NotSupportedException();
-        public List<Guid> GetCrewIdList(DateOnly id) => throw new NotSupportedException();
+        public Task<ClCrewDriverWriteResult> UpdateAsync(ClCrew crew, CancellationToken ct) => throw new NotSupportedException();
     }
 
+    // Le double rend des tâches déjà terminées : attendre ici ne bloque rien.
     private static ClResult<ClActiveCrewSelectionDtoOut> Select(params ClCrew[] crews)
-        => new ClGetMyActiveCrewsUseCase(crews.Select(c => c.CrewId).ToList(), Now, new FakeCrews(crews)).Handle();
+        => Select(crews.Select(c => c.CrewId).ToList(), crews);
+
+    private static ClResult<ClActiveCrewSelectionDtoOut> Select(IReadOnlyList<Guid> ids, params ClCrew[] crews)
+        => new ClGetMyActiveCrewsUseCase(ids, Now, new FakeCrews(crews)).HandleAsync(CancellationToken.None).GetAwaiter().GetResult();
 
     private static string NotFoundMessage(ClResult<ClActiveCrewSelectionDtoOut> result)
     {
@@ -82,6 +82,17 @@ public class ClGetMyActiveCrewsUseCaseTests
     [Fact]
     public void Un_equipage_selectionnable_suffit()
         => Select(Crew(Now.AddHours(-4), serviceEnded: true), Crew(Now.AddHours(-1))).IsSucces.Should().BeTrue();
+
+    [Fact]
+    public void Un_equipage_inconnu_d_Orders_n_est_simplement_pas_propose()
+    {
+        var actif = Crew(Now.AddHours(-1));
+
+        var result = Select(new[] { Guid.NewGuid(), actif.CrewId }, actif);
+
+        result.IsSucces.Should().BeTrue();
+        result.Value.Crews.Should().ContainSingle().Which.CrewId.Should().Be(actif.CrewId);
+    }
 
     [Fact]
     public void Le_motif_de_cloture_prime_sur_la_fenetre_anticipee()

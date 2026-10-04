@@ -354,7 +354,6 @@ builder.Services.AddScoped<CaSoft.Erp.USVector.Infrastructure.Diagnostics.CrewCh
 builder.Services.AddHttpClient<CaSoft.Erp.USVector.Infrastructure.Diagnostics.KeycloakAdminClient>();
 
 // ── Services applicatifs (portés tels quels de MobApp.Application) ───────────
-builder.Services.AddScoped<ICrewCache, ClCrewListCache>();
 builder.Services.AddScoped<IJobCache, ClJobListCache>();
 builder.Services.AddScoped<IJobService, ClJobService>();
 builder.Services.AddScoped<ICrewService, ClCrewService>();

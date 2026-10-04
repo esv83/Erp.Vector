@@ -106,39 +106,68 @@ public class CrewDriverRefusalTests
     // ── Cas d'usage, jusqu'à la réponse mobile ─────────────────────────────
 
     [Fact]
-    public void Le_motif_d_Orders_devient_le_corps_du_400_mobile()
+    public async Task Le_motif_d_Orders_devient_le_corps_du_400_mobile()
     {
         var (crew, driver) = CrewWithOneMember();
         var repo = new FakeCrews(crew, ClCrewDriverWriteResult.Refused(VacationEnded));
 
-        var result = new ClSetDriverUseCase(new ClSetDriverCommand(crew.CrewId, driver.Id), repo).Handle();
+        var result = await new ClSetDriverUseCase(new ClSetDriverCommand(crew.CrewId, driver.Id), repo).HandleAsync(CancellationToken.None);
 
         var http = result.ToActionResult().Should().BeOfType<BadRequestObjectResult>().Subject;
         http.Value.Should().Be(VacationEnded);
     }
 
     [Fact]
-    public void Refus_sans_motif_retombe_sur_un_libelle_de_refus_pas_sur_une_panne()
+    public async Task Refus_sans_motif_retombe_sur_un_libelle_de_refus_pas_sur_une_panne()
     {
         var (crew, driver) = CrewWithOneMember();
         var repo = new FakeCrews(crew, ClCrewDriverWriteResult.Refused("   "));
 
-        var result = new ClSetDriverUseCase(new ClSetDriverCommand(crew.CrewId, driver.Id), repo).Handle();
+        var result = await new ClSetDriverUseCase(new ClSetDriverCommand(crew.CrewId, driver.Id), repo).HandleAsync(CancellationToken.None);
 
         result.IsFail.Should().BeTrue();
         result.InnerError!.ErrorText.Should().Be(ClSetDriverUseCase.RefusalFallback);
     }
 
     [Fact]
-    public void Conducteur_enregistre_renvoie_Ok()
+    public async Task Conducteur_enregistre_renvoie_Ok()
     {
         var (crew, driver) = CrewWithOneMember();
         var repo = new FakeCrews(crew, ClCrewDriverWriteResult.Applied());
 
-        var result = new ClSetDriverUseCase(new ClSetDriverCommand(crew.CrewId, driver.Id), repo).Handle();
+        var result = await new ClSetDriverUseCase(new ClSetDriverCommand(crew.CrewId, driver.Id), repo).HandleAsync(CancellationToken.None);
 
         result.IsSucces.Should().BeTrue();
         repo.Updated.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Une_panne_d_Orders_remonte_au_lieu_de_devenir_un_400()
+    {
+        // Règle du 04/10 : seul le refus métier devient un Fail. Une panne remonte jusqu'au
+        // gestionnaire de l'API, qui la rend en 503 — avant, l'ambulancier recevait un 400.
+        var (crew, driver) = CrewWithOneMember();
+        var repo = new FakeCrews(crew, ClCrewDriverWriteResult.Applied())
+        {
+            WriteThrows = new HttpRequestException("Orders.Api PUT → 503.", null, HttpStatusCode.ServiceUnavailable)
+        };
+
+        var act = () => new ClSetDriverUseCase(new ClSetDriverCommand(crew.CrewId, driver.Id), repo).HandleAsync(CancellationToken.None);
+
+        await act.Should().ThrowAsync<HttpRequestException>();
+    }
+
+    [Fact]
+    public async Task Un_equipage_inconnu_reste_un_400_avec_son_message()
+    {
+        var (crew, driver) = CrewWithOneMember();
+        var inconnu = Guid.NewGuid();
+
+        var result = await new ClGetDriverUseCase(inconnu, new FakeCrews(crew, ClCrewDriverWriteResult.Applied()))
+            .HandleAsync(CancellationToken.None);
+
+        var http = result.ToActionResult().Should().BeOfType<BadRequestObjectResult>().Subject;
+        http.Value.Should().Be($"Équipage {inconnu} introuvable côté ERP.");
     }
 
     // ── Outillage ───────────────────────────────────────────────────────────
@@ -168,20 +197,21 @@ public class CrewDriverRefusalTests
 
         public bool Updated { get; private set; }
 
-        public ClCrew GetCrew(Guid gCrewID) => _crew;
-        public ClCrewDriverWriteResult Update(ClCrew crew)
+        /// <summary>Panne d'Orders à l'écriture : levée telle quelle par <see cref="UpdateAsync"/>.</summary>
+        public Exception? WriteThrows;
+
+        public Task<ClCrew> GetCrewAsync(Guid gCrewID, CancellationToken ct)
+            => Task.FromResult(gCrewID == _crew.CrewId ? _crew : null!);
+
+        public Task<ClCrewDriverWriteResult> UpdateAsync(ClCrew crew, CancellationToken ct)
         {
+            if (WriteThrows is not null) throw WriteThrows;
             Updated = true;
-            return _write;
+            return Task.FromResult(_write);
         }
 
-        public bool IsEmployeeInCrew(Guid gCrewID, Guid gEmployeeId) => throw new NotSupportedException();
-        public ClLogDriverModel GetCrewDriver(Guid gVehicleID) => throw new NotSupportedException();
-        public List<ClJobListItemModel> FetchJobList(Guid gCrewId) => throw new NotSupportedException();
-        public List<ClJobListItemModel> FetchJobList(IReadOnlyCollection<Guid> gCrewIds) => throw new NotSupportedException();
+        public Task<List<ClJobListItemModel>> FetchJobListAsync(IReadOnlyCollection<Guid> gCrewIds, CancellationToken ct) => throw new NotSupportedException();
         public List<ClInstructionListItemModel> FetchInstructionList(Guid gCrewId) => throw new NotSupportedException();
-        public void AckInstruction(int instructionId) => throw new NotSupportedException();
-        public List<Guid> GetCrewIdList(DateOnly id) => throw new NotSupportedException();
     }
 
     private sealed class StubHandler : HttpMessageHandler
