@@ -1,7 +1,7 @@
 # Livré — Vector (module terrain ambulanciers)
 
-> **Mis à jour le** 2026-09-19 (seconde édition du jour) · **En production** : `03f9d01` (`main`),
-> rechargé le 2026-09-19 à 16:46:56, vérifié par sourcelink et journal.
+> **Mis à jour le** 2026-10-04 · **En production** : `4ff99ce` (`main`), rechargé le 2026-10-04 à
+> 11:14:40, constaté par `api/version`, sourcelink et journal.
 >
 > Ce document porte **ce qui est livré** : ce que le module fait, le journal daté des livraisons,
 > les décisions appliquées, la configuration qui a déjà cassé la production, les pistes retirées.
@@ -101,6 +101,52 @@ Principe constant : **le terrain n'écrase jamais la donnée officielle de l'ERP
 # 2. Journal des livraisons
 
 *Du plus récent au plus ancien.*
+
+## 2026-10-04 — Publication : une panne d'Orders se dit 503, la facturation lit Orders par lot
+
+*En production — `4ff99ce` (`main`), rechargé à 11:14:40. **Constaté par `GET /vector/api/version`** :
+commit `4ff99ce`, `Tree: clean`, environnement Production ; le `.pdb` du partage annonce le même
+commit ; schéma 8 scripts sur 8 au démarrage.*
+
+- **Orders à terre → 503 affichable, plus un 500 brut** (`8ff7ce7`). Du 21/09 au 04/10, **~2 600
+  requêtes** étaient tombées en 500 : coupures des 22/09 (2 112) et 02/10 (441), publications d'Orders
+  des 21/09 (14) et 04/10 (36) — **72 % sur `Crew/mine`**, l'écran d'entrée. Aucun gestionnaire
+  global ; le `catch` de `ShiftConfirmationController` ne voyait pas les exceptions de Polly
+  (`BrokenCircuitException` 1 823, `TimeoutRejectedException` 77). Désormais : panne (réseau, 5xx,
+  408, disjoncteur, délai) → `503` ProblemDetails, `detail` affichable, `Retry-After: 10`, une ligne
+  `WARN` ; un 4xx ou un bogue reste `500`. Les clients Orders portent le statut sur leur exception.
+  **Pas encore vu sur une vraie panne.** Note au dev web :
+  [`note_web_alexandre_503_regulation_indisponible.md`](note_web_alexandre_503_regulation_indisponible.md).
+- **Le paquet de la facturation lit Orders par lot** (`4ff99ce`) : `POST /missions/batch-refs` (Orders
+  1.8.5) au lieu de 200 `/full` puis une lecture par commande. **Tant qu'Orders sert la 1.8.3** — c'est
+  le cas au 04/10, la route y répond 405 — **repli** sur le chemin unitaire, inchangé. Une panne du lot
+  n'est pas un repli : la tranche sort en `Error`. **Le repli n'est pas encore vu tourner** : la
+  facturation ne passe pas le dimanche.
+- **`AGENTS.md` n'entre pas au dépôt** (`de631b2`) : non suivi, il a fait refuser `deploy.ps1` — voir
+  l'entrée suivante.
+- **Constaté après publication** : aucune erreur, 6 jetons validés, aucun rejeté, aucun 500.
+- 254 tests verts.
+
+## 2026-10-04 — Constats sur la production du 21/09 au 04/10, sous `f000ad0`
+
+*Relevés dans le journal de production, **en agrégats seulement** — rien n'en est copié sur le poste.*
+
+- **La facturation passe, propre** : 369 `field-data` et 1 020 `signatures`, **tous en 200, aucun
+  401/403**. Aucune passe les week-ends — ni le **jeudi 24/09**, non expliqué.
+- **Le disjoncteur a servi sur de vraies pannes** : ouvert 37 fois le 22/09 (14:58 → 15:38) et 15 fois
+  le 02/10 (16:38 → 16:52) — SQL `BD_ERP_MOBILE_APP` injoignable, Orders en 500, DNS de
+  `api.urgencesante.net` perdu, **tout à la fois**. Seuls les 5xx ont été retentés (787), **jamais un
+  400**.
+- **La sonde anonyme est muette parce que personne n'appelle** : **zéro appel** aux deux routes
+  d'affichage de la carte en 14 jours, vérifié dans le journal principal. Son fichier n'a jamais été
+  créé.
+- **La garde de publication a refusé pour de vrai** — première fois, 04/10 : un `AGENTS.md` non suivi.
+  Elle a tenu.
+- **Aucune adresse non structurée** en 14 jours.
+- **Un refus de conducteur n'a toujours pas été vu** : 344 changements, tous en 200.
+- **539 « 400 » d'Orders étaient des pannes SQL** (*« transient failure… EnableRetryOnFailure »*),
+  sur six lectures : signalé au plan d'Orders (`c18c250`), **corrigé chez eux le jour même**
+  (`62764b2`, `8af3d51`), à publier en 1.8.5.
 
 ## 2026-09-21 — Publication : ce qui tourne se demande, le schéma se suit, les appels ne pendent plus
 
@@ -540,7 +586,10 @@ terrain dans la foulée.*
 | Fermeture des routes de la facturation | 2026-09-19 : 559 appels en 200 avec jeton après publication, aucun 401/403 |
 | Ce qui tourne | 2026-09-21 : `api/version` rend le commit publié et `Tree: clean`, en production |
 | Schéma de la base | 2026-09-21 : 8 scripts sur 8, constaté au démarrage |
-| Suite complète | 126 verts (2026-08-25) → 112 (2026-09-13) → 172 (2026-09-15) → 191 (2026-09-19) → **235 verts (2026-09-21)** |
+| Suite complète | 126 verts (2026-08-25) → 112 (2026-09-13) → 172 (2026-09-15) → 191 (2026-09-19) → 235 (2026-09-21) → **254 verts (2026-10-04)** |
+| Disjoncteur vers Orders | 2026-10-04 : vu sur les coupures des 22/09 et 02/10 — 52 ouvertures, seuls les 5xx retentés |
+| Garde de publication | 2026-10-04 : premier refus réel (arbre sale) |
+| Facturation sous `f000ad0` | 21/09 → 04/10 : 1 389 appels de lot en 200, aucun 401/403 |
 
 ---
 
@@ -730,6 +779,9 @@ depuis un arbre modifié annonce un commit qui ne contient pas le code servi (§
 
 | Date | Incident | Ce qui l'a révélé | Suite |
 |---|---|---|---|
+| **2026-10-04** *(10:23 → 10:25)* | **Publication d'Orders `1.8.3`** : « Mise a jour Orders.Api en cours », 36 requêtes du terrain en 500 brut | relevé du journal pour l'itération de constat | gestionnaire 503 (`8ff7ce7`), publié à 11:14 |
+| **2026-10-02** *(16:38 → 16:52)* | **Coupure d'infrastructure** : SQL de la base Vector, Orders et DNS tombent ensemble — 441 requêtes en 500 brut | relevé du journal, le 04/10 | idem ; cause réseau non établie, hors de ce dépôt |
+| **2026-09-22** *(14:58 → 15:38)* | **Même coupure, plus longue** : 2 112 requêtes en 500 brut, dont `Crew/mine` — l'ambulancier ne pouvait pas entrer, sans savoir pourquoi | relevé du journal, le 04/10 — **douze jours après** | idem |
 | **2026-09-15** *(13:29 → 18:31)* | **Production republiée depuis une branche, pas depuis `main`** (`feat/decouplage-dec6-dec7`, sans les 22 commits du 13/09) : la capture mutuelle par mission disparaît — 17 tentatives en 404 sur 8 équipages, « Mission introuvable ou sans patient » — et le correctif de clôture, C2, C3 et G9 sont retirés du même coup | journaux IIS, en cherchant pourquoi les captures s'arrêtaient | fusion `dc30612`, republiée à 18:31 ; cinquième occurrence de G8 |
 | **2026-09-13** *(18:00 → 20:04)* | **Ambulanciers en service exclus de l'application** (« Votre service est clôturé ») : 9 personnels, 125 refus en une heure. Orders pose désormais une fin théorique à chaque vacation (`7984ec0`), que Vector lisait comme une clôture | appels des utilisateurs ; le refus du conducteur disait déjà « vacation terminée à 18:00 » | clôture lue sur le statut (`c5eedca`), publié à 20:04 |
 | **2026-09-13** | **Publication en production depuis un arbre non commité** : binaires à 14:40, commit `e942967` à 14:42. Le `.pdb` annonce `86b5b28`, qui ne contient pas la capture par mission. | comparaison des horodatages et des chaînes des DLL au moment de rédiger ce document | republié depuis `main` à 15:05 (`a6c2aba`), vérifié par sourcelink ; blocage des publications non commitées au plan (G8) |

@@ -1,51 +1,49 @@
 # Plan de développement — Erp.Vector
 
-> **Édition du** 2026-09-21 (soir) · **En production** `f000ad0` — **constaté par
-> `GET /vector/api/version`** : commit, `Tree: clean`, environnement Production · **235 tests verts**
-> · Dépôt `github.com/esv83/Erp.Vector` (`USVector.sln`) · Prod `\\192.168.1.112\prod_api\Vector.Api`
-> (IIS `/vector`)
+> **Édition du** 2026-10-04 · **En production** `4ff99ce` — **constaté par `GET /vector/api/version`**
+> à 11:14 : commit, `Tree: clean`, environnement Production ; `.pdb` concordant ; schéma 8 sur 8 ·
+> **254 tests verts** · Dépôt `github.com/esv83/Erp.Vector` (`USVector.sln`) · Prod
+> `\\192.168.1.112\prod_api\Vector.Api` (IIS `/vector`)
 >
-> ✅ **L'API sait désormais dire ce qu'elle est** : quel commit elle sert, depuis quel arbre, sur
-> quelle base, et quels scripts de schéma cette base porte. Trois questions qui, jusqu'au 20/09,
-> demandaient de lire un `.pdb` sur un partage — et dont deux incidents étaient nés.
+> ✅ **Une panne d'Orders se dit, au lieu de se taire en 500** — et la facturation peut lire Orders
+> par lot : la route est en production chez eux depuis le 04/10, en 1.8.5.
 >
-> ⏳ **Ce qui reste ici est modeste ou attend une décision.** Le plus lourd est la protection des
-> données du patient ; le plus bloquant n'est pas chez nous — voir « Ce qui attend ailleurs ».
+> ⏳ **Ce qui reste ici est surtout à VOIR** : la première passe de la facturation sur la route par
+> lot, le premier 503 sur une vraie panne. Le plus lourd reste la protection des données du patient ;
+> le plus bloquant n'est pas chez nous — voir « Ce qui attend ailleurs ».
 >
 > Ce document **se régénère** au prompt *« compact devplan »* et ne porte **que l'ouvert**. Le
 > **pourquoi** vit dans [`decided.md`](decided.md), à lire avant de coder ; le **fait**, horodaté et
 > constaté, dans [`delivered.md`](delivered.md).
 >
 > **Règle de travail** : neutre ou additif, jamais de rupture du contrat que consomme l'app web — elle
-> n'est pas déployée en même temps que l'API.
+> n'est pas déployée en même temps que l'API. **Et envers l'amont** : une route neuve se consomme avec
+> un repli sur son absence.
 
 **Cinq rubriques, communes à tous les dépôts de l'ERP.** Le format est partagé ; les données ne le
 sont jamais.
 
-## 📍 Point de reprise — 21/09 : ce qui tourne se demande au lieu de se déduire
+## 📍 Point de reprise — 04/10 : ce qui se taisait se dit
 
-**Publié à 09:11, et constaté autrement que d'habitude** : `api/version` a répondu `f000ad0`,
-`Tree: clean`. Le schéma s'est annoncé seul au démarrage — *8 scripts sur 8, dernier `MOB_010`* — et
-`deploy.ps1` sait désormais refuser une publication dont le **commit servi** n'est pas celui qu'on
-vient de poser.
+**Le relevé de la production du 21/09 au 04/10** a trouvé ce qu'aucun contrôle ne cherchait :
+**~2 600 requêtes du terrain en 500 brut**, dont l'écran d'entrée, pendant deux coupures
+d'infrastructure (22/09, 02/10) et les publications d'Orders. Corrigé et publié le jour même — une
+panne d'Orders rend désormais un **503 avec un message affichable**.
 
-> ⚖️ **Ce que la journée a réparé n'est pas une panne, c'est une cécité.** Les 13 et 15/09, la
-> production servait autre chose que ce que le partage portait, et aucun contrôle sur les fichiers ne
-> pouvait le voir.
+> ⚖️ **La coupure du 22/09 a duré 40 minutes et n'a été vue que douze jours plus tard**, en lisant le
+> journal pour autre chose. Ce que le journal sait, personne ne le lui demande.
 
-**Trois choses attendent d'être vues, pas d'être écrites** : un premier refus de conducteur en `WARN`,
-la première passe de la facturation sous ce binaire, et le fichier de la sonde anonyme qui se créera
-au premier appel. **Une attend une décision** : la lecture automatique des cartes, en place et inerte.
+**Le même relevé a remonté chez Orders** 539 pannes SQL rendues en « 400 » : signalées à leur plan,
+**corrigées dans la journée** (1.8.5 en production, 1.8.6 qui étend la règle à cent handlers).
 
-**Orders a accepté** *(21/09)* la lecture par lot que nous demandions — `POST /missions/batch-refs`,
-200 identifiants, trois champs — et la range derrière la restriction des types de commande, qui est le
-blocage que nous leur avions déclaré.
+**Par quoi reprendre** — lundi 05/10, après la passe de la facturation : la voir passer **par la
+route par lot**, puis retirer le repli.
 
 ---
 # 1. Fonctionnalités livrées
 
 *Ce que le module sait faire **en production**, en une page. Le récit daté vit dans
-[`delivered.md`](delivered.md), à jour au 21/09.*
+[`delivered.md`](delivered.md), à jour au 04/10.*
 
 | Domaine | Ce que le module apporte aujourd'hui |
 |---|---|
@@ -55,21 +53,22 @@ blocage que nous leur avions déclaré.
 | **Faire avancer la mission** | Cinq étapes horodatées, **annulables** · « mission vue » · signature · conducteur — **un refus dit pourquoi** · tout remonte à la régulation en quasi temps réel, un envoi en échec est rejoué |
 | **Compléter le dossier** | Type de mission et informations de facturation servis par la régulation, pré-remplis et verrouillés quand la fiche patient les connaît · un refus arrive **avec son motif** · anomalies, documents, photos |
 | **Photographier la carte mutuelle** | Depuis la mission · affichable par les écrans d'Orders et de la facturation · **lecture automatique en place, inerte** tant que la décision n'est pas prise |
-| **Passer à la facturation** | Transfert automatique à la clôture · dossier **par lots de 200**, signatures par lots de 50 · dossier **gelé** après transfert |
-| **Tenir debout** | Le terrain n'écrase jamais la donnée officielle · API fermée par défaut, jetons exigés · **délais et disjoncteur** sur les appels à Orders · publication **depuis `main` propre et poussé**, **commit servi vérifié** |
+| **Passer à la facturation** | Transfert automatique à la clôture · dossier **par lots de 200**, signatures par lots de 50 · **Orders lu par lot** quand il porte la route, mission par mission sinon · dossier **gelé** après transfert |
+| **Tenir debout** | Le terrain n'écrase jamais la donnée officielle · API fermée par défaut, jetons exigés · **délais et disjoncteur** sur les appels à Orders — **vus sur de vraies pannes** · **Orders à terre → 503 et message**, plus de 500 brut · publication **depuis `main` propre et poussé**, **commit servi vérifié** — la garde **a refusé pour de vrai** le 04/10 |
 | **Se dire** | `api/version` : commit, **état de l'arbre au build**, environnement · `api/version/runtime` : base résolue, drapeaux, **état du schéma** |
 
 ### Les réserves à ne pas perdre de vue
 
-- ⚠️ **Deux routes restent anonymes** : l'affichage de la carte mutuelle par les écrans amont, une
-  balise `<img src>` ne portant pas de jeton — *voir « Fonctionnalités envisagées en Vn »*.
+- ⚠️ **Deux routes restent anonymes** : l'affichage de la carte mutuelle par les écrans amont. **Zéro
+  appel du 21/09 au 04/10** — *voir « Protéger les données du patient »*.
+- ⚠️ **Le message du 503 n'atteint l'ambulancier que si l'app l'affiche** : demandé au dev web le
+  04/10 — *voir « Ce qui attend ailleurs »*.
 - ⚠️ **Un ambulancier rattaché depuis Employee seul n'entre pas** : 8 membres sur 244 *(13/09, non
-  remesuré)* — *voir « Ce qui attend ailleurs »*.
+  remesuré)*.
 - ⚠️ **Ouvrir l'app avant que l'équipage soit composé échoue** — 23 min d'attente médiane
   *(juillet-août)*. Le message dit quoi faire.
-- ⚠️ **Tous les types de mission sont proposés partout**, faute de règle d'applicabilité. Le
-  catalogue en porte **11** et non 7 : relevé par Orders le 21/09, les deux tables de restriction
-  étant **toujours vides**. Le défaut n'a pas seulement duré, il s'est élargi.
+- ⚠️ **Tous les types de mission sont proposés partout** : 11 au catalogue, les deux tables de
+  restriction **vides** *(relevé chez Orders le 04/10)*.
 - ⚠️ **Un n° de sécurité sociale mal tapé part en facturation** : aucun module ne le corrige, et
   l'écran ne le fait pas relire *(demandé au dev web le 26/08)*.
 
@@ -78,46 +77,61 @@ blocage que nous leur avions déclaré.
 
 *Classé par itération de session de codage, **du plus simple au plus complexe**. **L'ordre est un ordre
 de difficulté, pas de priorité.** Chaque itération porte entre crochets son **ancienne référence** :
-d'autres dépôts la citent encore. **Dans une référence croisée, on nomme la rubrique** — les numéros ne
-survivent pas à une réorganisation.*
+d'autres dépôts la citent encore. **Dans une référence croisée, on nomme la rubrique.***
 
 ## Itération 1 — Constater ce qui vient d'être publié *[ex-F1, B2, B8]*
 
 | | |
 |---|---|
 | **Nature** | Constats et mesures — aucun code |
-| **Effort** | Au fil de l'eau, puis une petite session pour les mesures |
-| **Bloqué par** | **Les événements eux-mêmes** : ils arrivent quand ils arrivent |
+| **Effort** | Un relevé lundi, puis au fil de l'eau |
+| **Bloqué par** | **Les événements eux-mêmes** |
 
-**À voir passer** — le code est en production depuis le 21/09 à 09:11 :
-- **un refus de conducteur** : `WARN` avec la phrase d'Orders, et le motif dans le corps du 400 ;
-- **une passe de la facturation** : ses lots de paquets et de signatures sous ce binaire, sans
-  401/403, avec les délais et le disjoncteur en place ;
-- **le fichier `usvector-surface-anonyme-*.log`**, qui se créera au premier appel anonyme — seules les
-  deux routes d'affichage de la carte en produisent encore ;
-- **un refus de la garde de publication** : autre branche, ou `main` non poussé — jamais éprouvé en
-  réel ;
-- **la suite [`Vector.Api.http`](CaSoft.Erp.USVector.Api/Vector.Api.http)**, à rejouer entièrement une
-  fois, identifiants en main : c'est le seul moyen de vérifier aussi **ce qui doit être refusé**.
+**À voir passer** — `4ff99ce` est en production depuis le 04/10 à 11:14 :
+- **la passe de la facturation par la route par lot** : plus aucun `/missions/{id}/full` pendant les
+  lots, **aucune ligne « Orders ne porte pas batch-refs »** — Orders sert la 1.8.5 depuis le 04/10 ;
+- **un 503 sur une vraie panne** : `WARN … Orders indisponible, 503 rendu` à la place d'exceptions non
+  gérées — la prochaine coupure, ou la publication de la 1.8.6 d'Orders ;
+- **un refus de conducteur** : `WARN` avec la phrase d'Orders — **jamais vu** (344 changements en 200
+  du 21/09 au 04/10) ;
+- **la suite [`Vector.Api.http`](CaSoft.Erp.USVector.Api/Vector.Api.http)**, à rejouer entièrement
+  une fois, identifiants en main.
 
-**À mesurer** : les **étapes de mission vides** (~3 883 annoncées avant le repli d'Orders livré le
-23/07 — constater qu'elles ont disparu) et les **adresses « non structurées »**, journalisées une par
-une, jamais comptées. 🟢 La base **est joignable depuis le poste de dev**.
+**À comprendre**, relevés le 04/10 et non examinés :
+- **988 `403` sur `JobDetail`** et 345 sur `Joblist` en 14 jours — l'accès refusé normal (hors
+  fenêtre, autre équipage) ou un écran qui insiste ?
+- **51 démarrages du pool en 14 jours**, avec des clés de protection éphémères à chacun — recyclage
+  sur inactivité, probablement.
+- **Pas de passe de la facturation le jeudi 24/09.**
 
-## Itération 2 — L'adresse publique de la recette *[relevé le 21/09]*
+**À mesurer chez Orders** : les **étapes de mission vides** (~3 883 annoncées avant leur repli du
+23/07). Vector ne les journalise pas : c'est un comptage dans leur base.
+
+## Itération 2 — Retirer le repli de la lecture par lot 🆕
+
+| | |
+|---|---|
+| **Nature** | Échafaudage à démonter |
+| **Effort** | Une courte session |
+| **Bloqué par** | **Une passe de la facturation vue sur la route par lot** — voir « Constater ce qui vient d'être publié » |
+
+Le repli mission par mission ne sert que tant qu'Orders ne porte pas `batch-refs` ; la 1.8.5 est en
+production. Retirer `ReadRefsOneByOneAsync`, le **corps par défaut** de
+`IErpReadApiClient.GetMissionBatchRefsAsync`, et le traitement 404/405 du client — une route absente
+redevient une panne. Les doubles de test implémentent alors la méthode.
+
+## Itération 3 — L'adresse publique de la recette *[relevé le 21/09]*
 
 | | |
 |---|---|
 | **Nature** | Un contrôle à moitié armé |
 | **Effort** | Une minute, dès que l'URL est connue |
-| **Bloqué par** | **L'URL de la recette**, que je n'ai pas trouvée (les chemins évidents rendent 404) |
+| **Bloqué par** | **L'URL de la recette** — les chemins évidents rendent 404 *(21/09, non revérifié)* |
 
-`deploy.ps1` lit `api/version` après la copie pour vérifier **le commit servi**. L'adresse vient du
-profil de publication : renseignée pour la production, **vide pour la recette** — le contrôle y est
-donc sauté, et le script le dit à chaque passage. Renseigner `VectorVersionUrl` dans
-`IIS-DevServer.pubxml`.
+`deploy.ps1` lit `api/version` après la copie ; l'adresse est **vide pour la recette**, le contrôle
+y est sauté. Renseigner `VectorVersionUrl` dans `IIS-DevServer.pubxml`.
 
-## Itération 3 — Dire l'heure qu'il est *[ex-E2]*
+## Itération 4 — Dire l'heure qu'il est *[ex-E2]*
 
 | | |
 |---|---|
@@ -129,7 +143,7 @@ Les étapes sont en UTC **sans le déclarer** ; l'heure de signature est écrite
 (`SignatureRepository.cs:34`, `:43`). Même motif à examiner dans `ClMarkMissionSeenUseCase` et
 `ClSetDriverUseCase`. **Fin visée** : tout en UTC, fuseau **déclaré** dans le contrat du paquet.
 
-## Itération 4 — Les dettes de forme qui restent *[ex-G2, G5]*
+## Itération 5 — Les dettes de forme qui restent *[ex-G2, G5]*
 
 | | |
 |---|---|
@@ -137,17 +151,19 @@ Les étapes sont en UTC **sans le déclarer** ; l'heure de signature est écrite
 | **Effort** | Plusieurs petites sessions, à piocher |
 | **Bloqué par** | Rien |
 
-Le code mort est parti le 21/09 ; ce qui suit demande du temps, pas du courage :
 - **Nommage des DTO** en `…DtoIn` / `…DtoOut` — aucun impact JSON, des centaines de références.
 - **Pont synchrone/asynchrone** (`.GetAwaiter().GetResult()`) sur liste, détail, identité, conducteur :
-  à défaire en remontant l'asynchrone jusqu'aux cas d'usage, pas au chausse-pied.
+  à défaire en remontant l'asynchrone jusqu'aux cas d'usage.
 - **`IResultUseCase` est synchrone** : les cas d'usage asynchrones n'implémentent aucune interface.
+- **`EnableRetryOnFailure` sur notre `UseSqlServer`** (`Program.cs`) : absorberait les micro-coupures,
+  pas les 40 min du 22/09 — à poser en regardant les écritures en transaction.
+- **Les `catch (HttpRequestException)` de `ShiftConfirmationController`** sont devenus redondants avec
+  le gestionnaire global : à retirer, en gardant leur message.
 
-⚖️ **Les alias de compatibilité restent** et ne se retirent pas ici : leur sort est en rubrique
-« Fonctionnalités envisagées en Vn », conditionné à la confirmation du front — *cf.
-[`decided.md`](decided.md), 21/09*.
+⚖️ **Les alias de compatibilité restent** : leur sort est en rubrique « Fonctionnalités envisagées
+en Vn », conditionné au front — *cf. [`decided.md`](decided.md)*.
 
-## Itération 5 — Le kilométrage dans le dossier transmis *[ex-E1, MOB-10]*
+## Itération 6 — Le kilométrage dans le dossier transmis *[ex-E1, MOB-10]*
 
 | | |
 |---|---|
@@ -158,7 +174,7 @@ Le code mort est parti le 21/09 ; ce qui suit demande du temps, pas du courage :
 Le kilométrage appartient à l'équipage et au véhicule, pas à la mission. Km du véhicule, ou relevé
 début/fin par mission (table, saisie mobile, paquet) ?
 
-## Itération 6 — Activer la lecture automatique des cartes *[ex-F2, P3]*
+## Itération 7 — Activer la lecture automatique des cartes *[ex-F2, P3]*
 
 | | |
 |---|---|
@@ -166,17 +182,12 @@ début/fin par mission (table, saisie mobile, paquet) ?
 | **Effort** | Poser une clé ; puis l'écran de validation, **côté web** |
 | **Bloqué par** | 🔴 **Une décision d'exploitation** : activer, c'est envoyer une **donnée de santé** au fournisseur du modèle |
 
-Tout est publié et dort : file, worker, appel en sortie structurée, colonnes de proposition. Sans clé,
-le worker ne démarre pas. **Ce que la décision engage** : ~12 cartes par jour, de l'ordre du centime
-par carte, et l'image qui sort du réseau. **Si elle ne doit pas sortir**, seule l'implémentation du
-port change — le reste tient.
+Tout est publié et dort. **Ce que la décision engage** : ~12 cartes par jour, de l'ordre du centime
+par carte, et l'image qui sort du réseau. **Ce que ça rapporterait** *(20/09)* : le code AMC n'est
+saisi que **41 fois sur 85**. Il faudra ensuite l'**écran de validation** côté web
+([`note_web_alexandre_carte_mutuelle_ocr.md`](note_web_alexandre_carte_mutuelle_ocr.md)).
 
-**Ce que ça rapporterait**, mesuré le 20/09 : le code AMC n'est saisi que **41 fois sur 85**. Ensuite,
-l'**écran de validation** côté web
-([`note_web_alexandre_carte_mutuelle_ocr.md`](note_web_alexandre_carte_mutuelle_ocr.md)) — sans lui,
-une proposition n'atteint jamais un opérateur.
-
-## Itération 7 — Positions et statuts des véhicules *[ex-F3, MOB-16]*
+## Itération 8 — Positions et statuts des véhicules *[ex-F3, MOB-16]*
 
 | | |
 |---|---|
@@ -186,7 +197,7 @@ une proposition n'atteint jamais un opérateur.
 
 GpsGate (positions, REST) et Sirus (statuts, UDP) sont injectés mais ne servent à rien.
 
-## Itération 8 — Protéger les données du patient *[ex-G7, P4]*
+## Itération 9 — Protéger les données du patient *[ex-G7, P4]*
 
 | | |
 |---|---|
@@ -196,18 +207,21 @@ GpsGate (positions, REST) et Sirus (statuts, UDP) sont injectés mais ne servent
 
 Documents, carte mutuelle et anomalies servis par une API exposée : **rétention et purge** (3 ans),
 chiffrement au repos, **fermeture des deux routes d'affichage de la carte**, **audit des accès**.
-⚠️ Si la lecture automatique est activée, ce lot porte aussi le sort de l'image envoyée au modèle.
+🆕 **La fermeture a maintenant sa mesure** : **zéro appel** à ces deux routes du 21/09 au 04/10 — la
+règle « fermer sur une mesure » est satisfaite pour la fenêtre relevée ; reste à confirmer auprès
+d'Orders et de la facturation que leurs écrans ne les appellent plus. ⚠️ Si la lecture automatique
+est activée, ce lot porte aussi le sort de l'image envoyée au modèle.
 
-## Itération 9 — Ce qui attend ailleurs *[ex-A3, B, C1, C3, E4, F4]*
+## Itération 10 — Ce qui attend ailleurs *[ex-A3, B, C1, C3, E4, F4]*
 
 *Rien à coder ici tant que l'autre partie n'a pas bougé. Non revérifié à cette édition sauf mention,
 et **c'est dit**.*
 
 | Entrée | Qui doit bouger | Dernier relevé | En deux mots |
 |---|---|---|---|
-| **Règle d'applicabilité des types** *[B9]* | Orders + décision métier | 21/09 | **11 types proposés partout** — quatre de plus qu'au relevé d'août, les deux tables de restriction toujours vides. **Orders la place devant tout le reste** parce que nous nous y déclarons bloqués |
-| **Lecture groupée « mission → commande → bénéficiaire »** *[B5, suite]* | Orders | 21/09 | ✅ **Acceptée et inscrite à leur plan** : `POST /missions/batch-refs`, 200 identifiants, `{ missionId, orderId, beneficiaryId }`, ligne absente si la mission est inconnue. Une session chez eux, rangée après la règle des types. C'est tout ce qui reste de notre part dans l'acquisition de la facturation (6,8 s par journée) |
-| **Exiger un jeton du terrain** | Orders | 21/09 | Plus rien ne l'en empêche : nos **quatre** clients portent le jeton, le dernier depuis le 21/09 |
+| **Règle d'applicabilité des types** *[B9]* | Orders + décision métier | **04/10** | **11 types proposés partout**, les deux tables de restriction vides. Première de leur plan, **par priorité** |
+| **Afficher le message du 503** 🆕 | dev web | **04/10** | [`note_web_alexandre_503_regulation_indisponible.md`](note_web_alexandre_503_regulation_indisponible.md) — au moins sur l'écran d'entrée. Neutre s'il ne le fait pas : rien ne casse, le message se perd |
+| **Exiger un jeton du terrain** | Orders | **04/10** | Rien ne l'en empêche de notre côté. ⚠️ **`POST /missions/batch-refs` répond 200 sans jeton** en production |
 | **Rattachement des comptes** *[C1]* | Orders, Identity, **RH** | 13/09 | Vector lit `PER_KEYCLOAK_MAP`, que l'écran d'Employee n'alimente pas. Débloqué par la bascule d'Orders sur le carnet d'Identity, elle-même bloquée par **273 personnels sans fiche Employee**. En attendant : [consigne](docs/auth/consigne-rattachement-ambulancier.md) **à transmettre à la régulation et à la RH** |
 | **Écrans : motif d'un champ grisé, relecture du NIR, bouton *Réessayer*, motif du refus de conducteur, validation des cartes lues** | dev web | 21/09 | Cinq demandes, toutes contractualisées : [`note_ui_alex.md`](note_ui_alex.md), [`docs/ui-web/UI_selection-equipage-multi-crew.md`](docs/ui-web/UI_selection-equipage-multi-crew.md), [`note_web_alexandre_carte_mutuelle_ocr.md`](note_web_alexandre_carte_mutuelle_ocr.md), [routes retirées](note_web_alexandre_routes_retirees.md) |
 | **Composer les équipages avant la prise de service** *[C3]* | 🔴 régulation — décision | 13/09 | Sans quoi l'accès anticipé de 30 min ne sert à rien. ⚠️ Le filtre d'appartenance (`MobileIdentityResolver.cs:35`) est **volontaire** |
@@ -215,6 +229,7 @@ et **c'est dit**.*
 | **`Billed` : l'écrire, ou retirer le palier** *[B4, E4]* | 🔴 décision | 13/09 | La facturation est en lecture seule par décision de son module |
 | **Tests du transfert côté Orders** *[B6]* · **Relance des missions terminées non clôturées** *[B7]* | Orders | 13/09 | Aucun filet sur la dérivation du statut ; des dossiers n'arrivent jamais en facturation |
 | **Présence : qui est connecté** *[F4]* | 🔴 décision + cadrage **RH/RGPD** | 13/09 | Spec sans code : [`feadesc_utilisateurs_connectes_vector.md`](feadesc_utilisateurs_connectes_vector.md) |
+| **La cause des coupures des 22/09 et 02/10** 🆕 | exploitation / réseau | **04/10** | SQL, Orders et DNS tombent **ensemble** : ce n'est pas un module. Hors de ce dépôt ; signalé ici pour qu'on ne le cherche pas dans le code |
 
 ---
 # 3. Fonctionnalités envisagées en Vn
@@ -223,44 +238,29 @@ et **c'est dit**.*
 
 | Sujet | En deux mots | Ce qui la rouvrirait |
 |---|---|---|
-| **Retirer les alias de compatibilité** *[G2]* | `IsAck` (alias de `IsSeen`), champs historiques du détail, `SelectedDriver` jamais nul, champs typés des lieux. **Conservés délibérément** | **La confirmation du front, champ par champ** : l'écran lit `IsSeen`, les libellés, `PickupLocation`/`DropoffLocation`, l'affichage piloté serveur. Contrat : [`note_ui_alex.md`](note_ui_alex.md) |
-| **Fermer les routes d'affichage de la carte** *[M9]* | Image courante et présence restent anonymes : une balise `<img src>` ne porte pas de jeton. **Aucun appel constaté** depuis le 15/09 | Les écrans d'Orders et de la facturation passent à un appel authentifié — sinon, le lot RGPD *(« Protéger les données du patient »)* |
-| **Lots en parallèle pour la facturation** | ~3 s de gain, 16 appels simultanés vers Orders — **refusé le 19/09** | La lecture groupée chez Orders, qui rend la question sans objet |
+| **Retirer les alias de compatibilité** *[G2]* | `IsAck` (alias de `IsSeen`), champs historiques du détail, `SelectedDriver` jamais nul, champs typés des lieux. **Conservés délibérément** | **La confirmation du front, champ par champ**. Contrat : [`note_ui_alex.md`](note_ui_alex.md) |
 | **Base Vector dédiée** *[Vd-1]* | Seul jalon DMZ non conditionné à la V2 | Pertinent dès maintenant ; personne ne l'a porté |
 | **Accès anticipé à cheval sur minuit** *[CREW-2]* | Correctif connu | Les vacations de nuit ne sont pas concernées *(02/08)* |
 | **Durcissement DMZ événementiel, push temps réel** *[Vd-2 à Vd-8]* | [`spec_architecture_vector_mission_dmz.md`](spec_architecture_vector_mission_dmz.md) | Une exigence d'exposition, ou le polling qui ne suffit plus |
 | **Photos hors SQL, masquage** *[Vd-6, Vd-5]* | NIR partiel, équipage retour | Le volume, ou le lot RGPD |
 | **Contrats partagés avec Orders** *[4b]* | Écart JSON assumé | Une rupture de contrat constatée |
 | **Repère de fraîcheur du dossier** *[E5]* | `updatedAt` est servi, personne ne s'en sert | Un besoin de resynchronisation |
+| **Alerter sur les 500 et les coupures** | La coupure du 22/09 n'a été vue que douze jours après. Le journal sait compter ; personne ne le lui demande | Une deuxième coupure découverte en retard |
 | **Éviction ciblée du cache d'identité, mode hors ligne, géolocalisation avancée, renommage `USVector` → `Vector`** | — | Une demande |
 
 ---
 # 4. Décisions tranchées
 
-**Elles ont déménagé.** Depuis le 21/09, le *pourquoi* vit dans [`decided.md`](decided.md) — décisions
-et pièges déjà payés, **qui s'ajoutent et ne se réécrivent jamais**. Ce plan-ci se régénère : y laisser
-des arbitrages revenait à les repasser sous une plume tous les deux jours.
-
-🔴 **`decided.md` se lit avant d'écrire du code dans ce dépôt.**
+**Dans [`decided.md`](decided.md)**, qui s'ajoute et ne se régénère pas. 🔴 *À lire avant d'écrire du
+code.* L'édition du 04/10 y a versé sept lignes : le 503 et le 500, Polly hors de
+`HttpRequestException`, le gestionnaire et CORS, le repli sur l'absence d'une route amont, le 4xx
+d'amont qui se lit avant d'être cru, la sonde muette, et le journal de production lu en agrégats.
 
 ---
 # 5. Journal des livraisons
 
-*Le journal daté vit dans [`delivered.md`](delivered.md), les incidents en fin de document.*
-
-## Ce qui a quitté la rubrique « Code bloqué, manquant ou en attente » à cette édition
-
-| Entrée sortie | Pourquoi |
-|---|---|
-| **Savoir ce qui tourne** *[G8]* | ✅ En production le 21/09 : `api/version` répond, et `deploy.ps1` la lit |
-| **Suivre les migrations SQL** *[G4]* | ✅ `MOB_009` joué ; 8 scripts sur 8, constaté au démarrage |
-| **Des appels sortants qui ne pendent pas** *[D, DEC-7]* | ✅ En production ; reste à le voir sur une vraie panne — *« Constater ce qui vient d'être publié »* |
-| **Un jeu de requêtes rejouables** *[G3]* | ✅ Écrit ; reste à le jouer une fois en entier — *idem* |
-| **La liste des documents charge leurs contenus** · **La fin de service** *[MOB-12]* · **Le code mort** *[G2, G5]* | ✅ En production le 21/09 |
-| **Lire la carte mutuelle automatiquement** *[F2, P3]* | 🟡 Reformulée en **« Activer la lecture automatique »** : le code est publié et inerte, il ne reste qu'une décision |
-
-**Entrées neuves** : l'adresse publique de la recette, à renseigner ; et, côté Orders, la lecture
-groupée **acceptée** — elle passe d'une demande à porter à une attente datée.
+**Dans [`delivered.md`](delivered.md)**, horodaté et constaté. Dernières entrées : la publication de
+`4ff99ce` et les constats du 21/09 au 04/10 ; trois incidents ajoutés en fin de document.
 
 ---
 
