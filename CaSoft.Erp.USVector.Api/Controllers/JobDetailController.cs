@@ -13,6 +13,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         public async Task<IActionResult> GetDetail(
             Guid gJobId,
             [FromServices] IJobRepository jobs,
+            [FromServices] IMutuelleCardRepository cards,
             [FromServices] IMobileIdentityResolver identity,
             CancellationToken ct)
         {
@@ -25,7 +26,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             if (!await identity.IsMissionAccessibleAsync(personnelId, gJobId, ct))
                 return StatusCode(403, "Mission hors de vos équipages.");
 
-            var useCase = new ClGetJobUseCase(gJobId, jobs);
+            var useCase = new ClGetJobUseCase(gJobId, jobs, cards);
             return (await useCase.HandleAsync(ct)).ToActionResult();
         }
     }

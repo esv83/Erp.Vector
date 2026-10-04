@@ -16,6 +16,13 @@ Public Class ClMutuelleCardDtoOut
     Public Property OcrStatus As String
 
     ''' <summary>
+    ''' Champs repris de la photo précédente (04/10) : date de la photo sur laquelle ils ont été
+    ''' validés — à afficher « repris de la photo du JJ/MM, à revérifier ». Nothing s'ils ont été
+    ''' validés sur cette photo-ci.
+    ''' </summary>
+    Public Property FieldsInheritedFrom As DateTime?
+
+    ''' <summary>
     ''' P3 — Ce que la lecture automatique PROPOSE, à côté des champs officiels ci-dessus. Nothing
     ''' tant qu'aucune lecture n'a abouti. L'écran de validation affiche ces valeurs à côté de la
     ''' saisie ; les valider les recopie dans les champs officiels (M5 : jamais d'écriture aveugle).

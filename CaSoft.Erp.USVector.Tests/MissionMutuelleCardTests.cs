@@ -28,6 +28,8 @@ public class MissionMutuelleCardTests
     {
         public Guid? BeneficiaryId;
         public Task<Guid?> GetBeneficiaryIdAsync(Guid missionId, CancellationToken ct) => Task.FromResult(BeneficiaryId);
+        public Task<IReadOnlyDictionary<Guid, Guid?>> GetBeneficiaryIdsAsync(IReadOnlyCollection<Guid> missionIds, CancellationToken ct)
+            => throw new NotSupportedException();
     }
 
     private sealed class FakeErp : IErpReadApiClient

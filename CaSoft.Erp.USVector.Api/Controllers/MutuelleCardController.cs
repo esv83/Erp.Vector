@@ -14,13 +14,22 @@ namespace CaSoft.Erp.USVector.Api.Controllers
     [ApiController]
     public class MutuelleCardController : Controller
     {
+        /// <summary>
+        /// Journal des lectures ouvertes aux écrans (04/10) : qui (sub, azp), quelle route, combien —
+        /// <b>jamais quel patient</b>. Une avance sur l'audit du lot RGPD, pas l'audit lui-même.
+        /// </summary>
+        public const string AccessLoggerName = "Vector.CarteMutuelle.Acces";
+
         private readonly IMutuelleCardRepository _repository;
         private readonly IMissionBeneficiaryQueryService _beneficiaries;
+        private readonly ILogger _acces;
 
-        public MutuelleCardController(IMutuelleCardRepository repository, IMissionBeneficiaryQueryService beneficiaries)
+        public MutuelleCardController(IMutuelleCardRepository repository, IMissionBeneficiaryQueryService beneficiaries,
+            ILoggerFactory loggers)
         {
             _repository = repository;
             _beneficiaries = beneficiaries;
+            _acces = loggers.CreateLogger(AccessLoggerName);
         }
 
         /// <summary>
@@ -56,11 +65,56 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         /// Carte courante du patient de la mission (sans le binaire). 404 si la mission n'a pas de
         /// patient ou si le patient n'a encore aucune carte — cas normal au premier transport.
         /// </summary>
+        /// <remarks>Ouverte aussi aux écrans de régulation et de certification (04/10), en lecture.</remarks>
+        [Authorize(Policy = ClKeycloakCallers.MutuelleCardReadPolicy)]
         [HttpGet("missions/{missionId:guid}/mutuelle-card")]
         public async Task<IActionResult> GetCurrentForMission(Guid missionId, CancellationToken ct)
         {
+            Tracer("metadonnees", 1);
             var result = await new ClGetMissionMutuelleCardUseCase(missionId, _beneficiaries, _repository).HandleAsync(ct);
             return result.ToActionResult();
+        }
+
+        /// <summary>Corps de la présence par missions.</summary>
+        public sealed class MissionsMutuelleCardPresenceQuery
+        {
+            public List<Guid>? MissionIds { get; set; }
+        }
+
+        /// <summary>
+        /// Écrans de régulation et de certification (04/10) — pour une liste de missions, une ligne par
+        /// mission : patient, carte ou non, date de la dernière photo, URL de l'image. Au plus 200.
+        /// </summary>
+        /// <remarks>
+        /// <b>POST et non GET</b> : 200 Guid dépassent la longueur d'URL admise par IIS. L'appel reste
+        /// une lecture. Un seul appel à Orders (<c>batch-refs</c>) et une seule requête en base.
+        /// </remarks>
+        [Authorize(Policy = ClKeycloakCallers.MutuelleCardReadPolicy)]
+        [HttpPost("missions/mutuelle-card/presence")]
+        public async Task<IActionResult> ListPresenceForMissions(
+            [FromBody] MissionsMutuelleCardPresenceQuery query, CancellationToken ct)
+        {
+            var ids = query?.MissionIds ?? new List<Guid>();
+            Tracer("presence", ids.Count);
+            var result = await new ClGetMissionsMutuelleCardPresenceUseCase(ids, _beneficiaries, _repository).HandleAsync(ct);
+            return result.ToActionResult();
+        }
+
+        /// <summary>
+        /// Octets de la carte <b>courante</b> du patient de la mission — l'URL que la présence annonce.
+        /// 404 si la mission n'a pas de patient ou le patient pas de carte.
+        /// </summary>
+        /// <remarks>
+        /// Avec jeton : un écran la charge par <c>fetch</c> puis l'affiche depuis un blob — une balise
+        /// <c>&lt;img src&gt;</c> ne porterait pas le jeton.
+        /// </remarks>
+        [Authorize(Policy = ClKeycloakCallers.MutuelleCardReadPolicy)]
+        [HttpGet("missions/{missionId:guid}/mutuelle-card/image")]
+        public async Task<IActionResult> GetCurrentImageForMission(Guid missionId, CancellationToken ct)
+        {
+            Tracer("image", 1);
+            var beneficiaryId = await _beneficiaries.GetBeneficiaryIdAsync(missionId, ct);
+            return beneficiaryId is null ? NotFound() : ServirImage(_repository.GetCurrentImage(beneficiaryId.Value));
         }
 
         /// <summary>
@@ -189,11 +243,23 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         /// <summary>Octets de l'image d'une carte (Content-Type d'origine).</summary>
         // Octets de la carte mutuelle, annoncés par le paquet terrain (ImageUrl) — D8. ⚠️ Donnée de
         // santé, anonyme jusqu'au 19/09 faute de DEC-6 : désormais la facturation avec son jeton de
-        // service, ou l'app avec le sien. Les deux routes d'affichage ci-dessus restent ouvertes (M9).
-        [Authorize(Policy = ClKeycloakCallers.ServiceOrMobilePolicy)]
+        // service, l'app avec le sien, ou un écran (04/10). Les deux routes d'affichage ci-dessus
+        // restent ouvertes (M9) jusqu'à ce que les écrans soient passés aux routes par mission.
+        [Authorize(Policy = ClKeycloakCallers.MutuelleCardReadPolicy)]
         [HttpGet("mutuelle-card/{cardId:guid}/image")]
         public IActionResult GetImage(Guid cardId)
-            => ServirImage(_repository.GetImage(cardId));
+        {
+            Tracer("image", 1);
+            return ServirImage(_repository.GetImage(cardId));
+        }
+
+        /// <summary>Une ligne par lecture : appelant et volume, sans identifiant de patient.</summary>
+        private void Tracer(string lecture, int nombre)
+            => _acces.LogInformation("{Lecture}|sub={Sub}|azp={Azp}|nombre={Nombre}",
+                lecture,
+                User.FindFirst("sub")?.Value ?? "-",
+                User.FindFirst(ClKeycloakCallers.AzpClaim)?.Value ?? "-",
+                nombre);
 
         /// <summary>Octets et type d'origine, ou 404. Repli MIME sur un binaire sans type déclaré.</summary>
         private IActionResult ServirImage(ClMutuelleCardImage? image)

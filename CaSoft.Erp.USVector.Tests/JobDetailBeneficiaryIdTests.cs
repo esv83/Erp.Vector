@@ -65,6 +65,77 @@ public class JobDetailBeneficiaryIdTests
         detail.Beneficiary.Phones.Should().ContainSingle().Which.Should().Be("0600000000");
     }
 
+    // ── Carte mutuelle du patient (04/10) : l'équipage la voit dans le détail ─────────
+
+    [Fact]
+    public async Task Le_detail_dit_que_la_carte_est_connue_et_de_quand_date_la_photo()
+    {
+        var photo = new DateTime(2026, 9, 20, 8, 30, 0, DateTimeKind.Utc);
+        var repris = new DateTime(2026, 6, 2, 9, 0, 0, DateTimeKind.Utc);
+        var card = new ClMutuelleCard { Id = Guid.NewGuid(), BeneficiaryId = BeneficiaryId, CapturedAt = photo, FieldsInheritedFrom = repris };
+
+        var detail = await DetailViaUseCase(withBeneficiary: true, new FakeCards { Current = card });
+
+        detail.MutuelleCardKnown.Should().BeTrue();
+        detail.MutuelleCardId.Should().Be(card.Id);
+        detail.MutuelleCardCapturedAt.Should().Be(photo);
+        detail.MutuelleCardFieldsInheritedFrom.Should().Be(repris);
+        detail.MutuelleCardImageUrl.Should().Be($"api/mutuelle-card/{card.Id}/image");
+    }
+
+    [Fact]
+    public async Task Sans_carte_le_detail_le_dit_sans_url()
+    {
+        var detail = await DetailViaUseCase(withBeneficiary: true, new FakeCards());
+
+        detail.MutuelleCardKnown.Should().BeFalse();
+        detail.MutuelleCardId.Should().BeNull();
+        detail.MutuelleCardCapturedAt.Should().BeNull();
+        detail.MutuelleCardImageUrl.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Sans_patient_la_carte_n_est_pas_cherchee()
+    {
+        var cards = new FakeCards();
+
+        var detail = await DetailViaUseCase(withBeneficiary: false, cards);
+
+        detail.MutuelleCardKnown.Should().BeFalse();
+        cards.Lectures.Should().Be(0);
+    }
+
+    private static async Task<ClJobDetailModel> DetailViaUseCase(bool withBeneficiary, FakeCards cards)
+    {
+        var repo = new JobRepository(new FakeErp { WithBeneficiary = withBeneficiary }, new FakeJobTime(),
+                                     new FakeSignature(), NullLogger<JobRepository>.Instance);
+        var result = await new ClGetJobUseCase(JobId, repo, cards).HandleAsync(CancellationToken.None);
+        result.IsSucces.Should().BeTrue();
+        return result.Value;
+    }
+
+    /// <summary>Dépôt de cartes simulé : la carte courante, et combien de fois on l'a lue.</summary>
+    private sealed class FakeCards : IMutuelleCardRepository
+    {
+        public ClMutuelleCard? Current;
+        public int Lectures;
+
+        public ClMutuelleCard GetCurrentMetadata(Guid beneficiaryId)
+        {
+            Lectures++;
+            return Current!;
+        }
+
+        public void Save(ClMutuelleCard card) => throw new NotSupportedException();
+        public ClMutuelleCardImage GetImage(Guid cardId) => throw new NotSupportedException();
+        public ClMutuelleCardImage GetCurrentImage(Guid beneficiaryId) => throw new NotSupportedException();
+        public IReadOnlyList<ClMutuelleCardPresence> ListPresence(IReadOnlyCollection<Guid> beneficiaryIds) => throw new NotSupportedException();
+        public ClMutuelleCard Update(ClMutuelleCard card) => throw new NotSupportedException();
+        public IReadOnlyList<Guid> ListPendingOcr(int take) => throw new NotSupportedException();
+        public void SaveOcrProposal(Guid cardId, ClMutuelleCardOcrProposal proposal) => throw new NotSupportedException();
+        public ClOcrFailureOutcome MarkOcrFailure(Guid cardId, string reason, int maxAttempts) => throw new NotSupportedException();
+    }
+
     // ── Harnais ──────────────────────────────────────────────────────────────────
 
     private static ClJobDetailModel Detail(bool withBeneficiary)

@@ -17,6 +17,7 @@ Public Module ModMutuelleCardMapping
             .Concentrateur = card.Concentrateur,
             .Teletransmission = card.Teletransmission,
             .OcrStatus = card.OcrStatus,
+            .FieldsInheritedFrom = card.FieldsInheritedFrom,
             .OcrProposal = ToProposalDtoOut(card)
         }
     End Function
@@ -42,6 +43,21 @@ Public Module ModMutuelleCardMapping
             .ExtractedAt = card.OcrExtractedAt
         }
     End Function
+
+    ''' <summary>
+    ''' Carte courante → détail de la mission (04/10). Sans carte, les champs restent à leur valeur
+    ''' « inconnue » : <c>MutuelleCardKnown = False</c>, le reste Nothing.
+    ''' </summary>
+    <Extension>
+    Public Sub ApplyMutuelleCard(detail As ClJobDetailModel, card As ClMutuelleCard)
+        If card Is Nothing Then Return
+
+        detail.MutuelleCardKnown = True
+        detail.MutuelleCardId = card.Id
+        detail.MutuelleCardCapturedAt = card.CapturedAt
+        detail.MutuelleCardFieldsInheritedFrom = card.FieldsInheritedFrom
+        detail.MutuelleCardImageUrl = $"api/mutuelle-card/{card.Id}/image"
+    End Sub
 
     ''' <summary>Présence → DTO, avec l'URL de l'image par bénéficiaire.</summary>
     <Extension>

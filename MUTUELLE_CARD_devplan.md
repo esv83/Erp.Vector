@@ -37,6 +37,8 @@ capture par mission, les routes des écrans amont, l'incident du 15/09 — est d
 | M7 | *(26-27/08/2026)* **La carte est un document consultable** : elle n'alimente **jamais** la colonne `C54` (ID mutuelle), qui n'accepte qu'un numéro issu de l'attribut `AMC`/`MUTUELLE`. Order et BillingGateway la **consultent**, un opérateur lit et décide — mapper un code AMC lu sur une photo contredirait `M5`. L'écran de consultation facturation est **suspendu** tant qu'aucune carte n'arrive. |
 | M8 | *(2026-09-13)* **L'app capture par mission**, le serveur résout le patient (mission → commande → bénéficiaire). Garde `M4` : la carte reste rattachée au patient. La route par bénéficiaire est conservée, non recommandée. |
 | M9 | *(2026-09-13, précisée le 19/09)* **Les routes image sont ouvertes sans jeton**, pour deux raisons distinctes. `GET api/mutuelle-card/{id}/image` l'était faute de jeton de la facturation : **fermée avec DEC-6** (code du 19/09, à publier) — elle admet la facturation ou l'app, avec leur jeton. `GET api/beneficiaries/{id}/mutuelle-card/image` et `POST api/mutuelle-card/presence` le sont pour un affichage par `<img src>` dans Order et la facturation, qui ne porte jamais de jeton : **elles se referment avec P4**, quand ces écrans passeront à un appel authentifié. |
+| M10 | *(2026-10-04)* **Les écrans de régulation et de certification lisent la carte avec le jeton de l'utilisateur, par MISSION.** Ils entrent par un azp dédié (`Keycloak:ScreenAzp`), sur quatre routes de lecture figées par un test — jamais par la politique de repli, qui leur ouvrirait le terrain. Ils ne connaissent que la mission : Vector résout le patient, en un appel `batch-refs`. L'image se charge par `fetch` puis blob, ce qui rend les deux routes anonymes de `M9` inutiles — elles se ferment après accusé de réception du front. Vector reste propriétaire de la carte (Erp.Document n'existe pas ; Orders n'a aucun champ mutuelle sur le patient). |
+| M11 | *(2026-10-04)* **Une nouvelle photo hérite des champs validés de la précédente**, marqués « repris de la photo du JJ/MM, à revérifier » (`MMC_FIELDS_INHERITED_FROM`, `MOB_011`). Une validation sur la nouvelle photo efface la mention. Les écrans montrent toujours la carte la plus récente ; l'historique reste en base jusqu'à la purge de P4. |
 
 ---
 
@@ -82,7 +84,8 @@ homogène et élevé. Rappel `M7` : même validés, ces champs n'alimentent pas 
 - Le `PATCH` **remplace** les quatre champs (un champ absent repasse à `null`) et accepte un corps
   vide, qu'il marque pourtant `validated`. Signalé au dev web ; une validation FluentValidation reste
   à décider.
-- Une nouvelle photo crée une carte aux champs vides : la saisie précédente n'est pas reportée.
+- ~~Une nouvelle photo crée une carte aux champs vides~~ — **résolu le 04/10** (`M11`) : elle hérite
+  des champs validés, marqués comme repris.
 
 ### 3.4 ⚪ P4 — Durcissement RGPD (différé)
 
@@ -118,10 +121,12 @@ on reste en blob SQL, le firewall ayant retiré le motif DMZ d'origine.
 | Route | Usage |
 |---|---|
 | `POST /api/missions/{missionId}/mutuelle-card` | ⭐ **Capture depuis l'app**, **multipart** (champ `file`), `crewId` optionnel en query. Patient résolu côté serveur, mission tracée d'office → `{ Id }`. `404` si mission introuvable ou sans patient. *(en service 2026-09-13)* |
-| `GET /api/missions/{missionId}/mutuelle-card` | ⭐ Carte courante du patient de la mission. `404` si aucune. *(en service 2026-09-13)* |
+| `GET /api/missions/{missionId}/mutuelle-card` | ⭐ Carte courante du patient de la mission. `404` si aucune. *(en service 2026-09-13)* Ouverte aux écrans le 04/10 (`M10`) ; porte `fieldsInheritedFrom` (`M11`). |
 | `POST /api/beneficiaries/{beneficiaryId}/mutuelle-card` | Capture par identifiant patient, traçabilité optionnelle `crewId` / `missionId`. Validation : MIME `image/*`, 8 Mo max. Conservée, non recommandée (`M8`). |
 | `GET /api/beneficiaries/{beneficiaryId}/mutuelle-card` | Carte courante : métadonnées + les 4 champs + `imageUrl`. **Jeton requis.** Ne charge pas le binaire (26/08). |
-| `GET /api/mutuelle-card/{id}/image` | Les octets d'une carte **désignée**, avec le `Content-Type` d'origine. **Anonyme** (`M9`). |
+| `GET /api/mutuelle-card/{id}/image` | Les octets d'une carte **désignée**, avec le `Content-Type` d'origine. **Jeton** : l'app, la facturation (19/09) ou un écran (`M10`, 04/10). |
+| `POST /api/missions/mutuelle-card/presence` | *(04/10)* **Écrans** — `{ missionIds: [...] }`, **200** au plus → **une ligne par mission** : `{ missionId, beneficiaryId, hasCard, capturedAt, imageUrl }`. **Jeton** (`M10`). |
+| `GET /api/missions/{missionId}/mutuelle-card/image` | *(04/10)* **Écrans** — octets de la carte courante du patient de la mission ; `404` sans patient ou sans carte. **Jeton** (`M10`). |
 | `GET /api/beneficiaries/{id}/mutuelle-card/image` | *(codée 26/08, en production depuis le 15/09)* Les octets de la carte **courante** — l'URL stable, qui suit les nouvelles captures. **Anonyme** : Order et la facturation l'affichent par balise `<img src>` (`M9`). |
 | `POST /api/mutuelle-card/presence` | *(codée 26/08, en production depuis le 15/09)* `{ beneficiaryIds: [...] }` → pour ceux qui portent une carte : `{ beneficiaryId, capturedAt, imageUrl }` ; les autres sont absents. **Anonyme**, **500** par appel au plus, ni nom de mutuelle ni code AMC. |
 | *Pour le dev web* | Upload : `image/*` obligatoire, **8 Mo maximum**, sinon `400` avec le motif — prévoir une compression côté client. `imageUrl` est un **chemin relatif**, à composer avec la base de l'API. |

@@ -23,6 +23,12 @@ Public Class ClMutuelleCard
     Public Property OcrStatus As String
     Public Property OcrValidatedAt As DateTime?
 
+    ''' <summary>
+    ''' Champs officiels repris de la photo précédente (04/10) : date de la photo sur laquelle ils ont
+    ''' été validés. Nothing s'ils ont été validés sur celle-ci, ou s'il n'y en a pas.
+    ''' </summary>
+    Public Property FieldsInheritedFrom As DateTime?
+
     ' ── Ce que la lecture automatique PROPOSE (P3) — jamais ce qu'elle impose (M5) ──────
     ' Ces quatre-là vivent à côté des officiels ci-dessus : c'est la validation humaine qui
     ' recopie. Les confondre reviendrait à écrire en facturation ce qu'un modèle a cru lire.

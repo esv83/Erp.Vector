@@ -62,7 +62,8 @@ public class MutuelleCardRepository : IMutuelleCardRepository
                 c.MMC_OCR_CONFIDENCE,
                 c.MMC_OCR_EXTRACTED_AT,
                 c.MMC_OCR_ATTEMPTS,
-                c.MMC_OCR_LAST_ERROR
+                c.MMC_OCR_LAST_ERROR,
+                c.MMC_FIELDS_INHERITED_FROM   // MOB_011
             })
             .FirstOrDefault();
 
@@ -91,7 +92,8 @@ public class MutuelleCardRepository : IMutuelleCardRepository
             OcrExtractedAt = row.MMC_OCR_EXTRACTED_AT,
             OcrAttempts = row.MMC_OCR_ATTEMPTS,
             OcrLastError = row.MMC_OCR_LAST_ERROR,
-            OcrValidatedAt = row.MMC_OCR_VALIDATED_AT
+            OcrValidatedAt = row.MMC_OCR_VALIDATED_AT,
+            FieldsInheritedFrom = row.MMC_FIELDS_INHERITED_FROM
         };
     }
 
@@ -149,6 +151,8 @@ public class MutuelleCardRepository : IMutuelleCardRepository
         entity.MMC_TELETRANSMISSION = card.Teletransmission;
         entity.MMC_OCR_STATUS = card.OcrStatus;
         entity.MMC_OCR_VALIDATED_AT = card.OcrValidatedAt;
+        // Validés sur CETTE photo : ils ne sont plus « repris » d'une autre (MOB_011).
+        entity.MMC_FIELDS_INHERITED_FROM = null;
 
         _ctx.SaveChanges();
         return entity.ToDomain();

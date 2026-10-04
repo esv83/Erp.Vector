@@ -35,6 +35,9 @@ if (keycloakEnabled)
     // C2 — modules de service dont le jeton est accepté (la facturation). Ils n'entrent que sur les
     // routes qui portent ClKeycloakCallers.ServiceOrMobilePolicy : la politique de repli exige l'azp mobile.
     var serviceAzp = ClKeycloakCallers.ReadServiceAzp(builder.Configuration);
+    // Écrans de régulation et de certification (04/10) : lecture de la carte mutuelle seulement.
+    var screenAzp = ClKeycloakCallers.ReadScreenAzp(builder.Configuration);
+    var otherAzp = serviceAzp.Concat(screenAzp).Distinct(StringComparer.Ordinal).ToArray();
 
     // Garde-fou AU DÉMARRAGE (KC-1) : hors mode dégradé, une Authority absente ou restée au
     // placeholder fait échouer le fetch OIDC et rejette SILENCIEUSEMENT tous les tokens (401 en
@@ -107,14 +110,15 @@ if (keycloakEnabled)
                         .GetRequiredService<ILoggerFactory>().CreateLogger("Keycloak.Jwt");
 
                     // Cloisonnement API (remplace la validation d'aud) : le token doit avoir été émis POUR
-                    // le client mobile, ou pour un module de service déclaré (Keycloak:ServiceAzp, C2). On
-                    // l'exige via « azp ». Ignoré en mode DisableValidation (dev pur). Accepter un jeton de
-                    // service ici n'ouvre AUCUNE route du terrain : la politique de repli exige l'azp mobile.
+                    // le client mobile, pour un module de service (Keycloak:ServiceAzp, C2) ou pour un écran
+                    // (Keycloak:ScreenAzp). On l'exige via « azp ». Ignoré en mode DisableValidation (dev pur).
+                    // Accepter un tel jeton ici n'ouvre AUCUNE route du terrain : la politique de repli exige
+                    // l'azp mobile.
                     var expectedAzp = audience; // = Keycloak:Audience (KC-1 : plus de valeur en dur)
                     var azp = ctx.Principal?.FindFirst(ClKeycloakCallers.AzpClaim)?.Value;
-                    if (!disableValidation && !ClKeycloakCallers.IsAccepted(azp, expectedAzp, serviceAzp))
+                    if (!disableValidation && !ClKeycloakCallers.IsAccepted(azp, expectedAzp, otherAzp))
                     {
-                        var reason = $"azp '{azp}' non autorisé (attendu '{expectedAzp}'{ClKeycloakCallers.DescribeServices(serviceAzp)}).";
+                        var reason = $"azp '{azp}' non autorisé (attendu '{expectedAzp}'{ClKeycloakCallers.DescribeServices(otherAzp)}).";
                         // Déposé pour lecture par les controllers (cf. MobileCallerExtensions.GetJwtError).
                         ctx.HttpContext.Items[MobileCallerExtensions.JwtErrorKey] = reason;
                         log.LogWarning("JWT REJETÉ sur {Path} : {Reason}.", ctx.HttpContext.Request.Path, reason);
@@ -169,14 +173,21 @@ if (keycloakEnabled)
         options.AddPolicy(ClKeycloakCallers.ServiceOrMobilePolicy, mobileAzpEnforced
             ? ClKeycloakCallers.ServiceOrMobile(audience!, serviceAzp)
             : new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+
+        options.AddPolicy(ClKeycloakCallers.MutuelleCardReadPolicy, mobileAzpEnforced
+            ? ClKeycloakCallers.MutuelleCardRead(audience!, serviceAzp, screenAzp)
+            : new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
     });
 }
 else
 {
-    // Sans Keycloak (développement local), la politique nommée existe quand même : une route qui la
-    // porte ne doit pas faire échouer l'application au démarrage, faute de politique enregistrée.
+    // Sans Keycloak (développement local), les politiques nommées existent quand même : une route qui
+    // les porte ne doit pas faire échouer l'application au démarrage, faute de politique enregistrée.
     builder.Services.AddAuthorization(options =>
-        options.AddPolicy(ClKeycloakCallers.ServiceOrMobilePolicy, policy => policy.RequireAssertion(_ => true)));
+    {
+        options.AddPolicy(ClKeycloakCallers.ServiceOrMobilePolicy, policy => policy.RequireAssertion(_ => true));
+        options.AddPolicy(ClKeycloakCallers.MutuelleCardReadPolicy, policy => policy.RequireAssertion(_ => true));
+    });
 }
 
 // G4 — Journal du schéma (`__VectorSchema`) : lu au démarrage, et servi par api/version/runtime.

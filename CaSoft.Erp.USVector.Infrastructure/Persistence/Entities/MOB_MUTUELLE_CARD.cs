@@ -39,4 +39,7 @@ public partial class MOB_MUTUELLE_CARD
 
     public string? MMC_OCR_LAST_ERROR { get; set; }
     public DateTime? MMC_OCR_VALIDATED_AT { get; set; }
+
+    // MOB_011 — champs repris de la photo précédente : date de la photo sur laquelle ils ont été validés.
+    public DateTime? MMC_FIELDS_INHERITED_FROM { get; set; }
 }

@@ -38,9 +38,34 @@ Public Class ClUploadMutuelleCardUseCase
             .MissionId = _command.MissionId,
             .OcrStatus = "pending"
         }
+        HeriterDesChampsValides(card, _repository.GetCurrentMetadata(_command.BeneficiaryId))
 
         _repository.Save(card)
         Return ClResult(Of ClMutuelleCardCreatedDtoOut).Ok(New ClMutuelleCardCreatedDtoOut With {.Id = card.Id})
     End Function
+
+    ''' <summary>
+    ''' 04/10 — Une nouvelle photo d'un patient connu reprend les champs <b>validés</b> de la précédente
+    ''' (ou repris eux-mêmes), en disant de quelle photo ils viennent. Sans cela, la mutuelle disparaissait
+    ''' de la carte courante à chaque photo, alors que la carte n'a le plus souvent pas changé.
+    ''' <para>
+    ''' Ce n'est pas une écriture aveugle (M5) : rien n'est lu par une machine, on reprend ce qu'un humain
+    ''' a validé, marqué « à revérifier ». La lecture automatique, si elle tourne, propose à côté.
+    ''' </para>
+    ''' </summary>
+    Private Shared Sub HeriterDesChampsValides(card As ClMutuelleCard, precedente As ClMutuelleCard)
+        If precedente Is Nothing Then Return
+
+        Dim valides = precedente.FieldsInheritedFrom.HasValue OrElse
+                      String.Equals(precedente.OcrStatus, "validated", StringComparison.Ordinal)
+        If Not valides Then Return
+
+        card.MutuelleName = precedente.MutuelleName
+        card.AmcCode = precedente.AmcCode
+        card.Concentrateur = precedente.Concentrateur
+        card.Teletransmission = precedente.Teletransmission
+        ' La date d'ORIGINE : reprise deux fois, c'est toujours sur la même photo qu'elle a été validée.
+        card.FieldsInheritedFrom = If(precedente.FieldsInheritedFrom, precedente.CapturedAt)
+    End Sub
 
 End Class

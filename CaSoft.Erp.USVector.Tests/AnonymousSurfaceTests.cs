@@ -28,16 +28,29 @@ namespace CaSoft.Erp.USVector.Tests;
 public class AnonymousSurfaceTests
 {
     /// <summary>
-    /// Les quatre routes que la facturation tire en serveur-à-serveur. <b>Anonymes jusqu'au
-    /// 2026-09-19</b>, faute d'authentification de service (DEC-6) ; fermées le jour où la facturation
-    /// a présenté son jeton. Elles admettent désormais le service <b>ou</b> l'app — pas l'anonyme.
+    /// Les routes que la facturation tire en serveur-à-serveur. <b>Anonymes jusqu'au 2026-09-19</b>,
+    /// faute d'authentification de service (DEC-6) ; fermées le jour où la facturation a présenté son
+    /// jeton. Elles admettent désormais le service <b>ou</b> l'app — pas l'anonyme. (L'image d'une
+    /// carte mutuelle en est sortie le 04/10 pour <see cref="LecturesDeLaCarte"/>, qui l'admet aussi.)
     /// </summary>
     private static readonly string[] FermeesAvecDec6 =
     {
         "DocumentController.GetContent",      // octets d'un document (D8)
         "FieldDataController.Get",            // paquet terrain
-        "MutuelleCardController.GetImage",    // ⚠️ donnée de santé (D8)
         "SignatureController.GetSignature"    // octets de la signature (D8)
+    };
+
+    /// <summary>
+    /// 04/10 — Les seules routes ouvertes aux <b>écrans</b> de régulation et de certification, avec leur
+    /// jeton (<see cref="ClKeycloakCallers.MutuelleCardReadPolicy"/>) : lire la carte mutuelle d'une
+    /// mission. Aucune n'écrit. Un écran qui entrerait ailleurs lirait les formulaires et le NIR.
+    /// </summary>
+    private static readonly string[] LecturesDeLaCarte =
+    {
+        "MutuelleCardController.GetCurrentForMission",       // métadonnées (nom, AMC…)
+        "MutuelleCardController.GetCurrentImageForMission",  // ⚠️ donnée de santé
+        "MutuelleCardController.GetImage",                   // ⚠️ donnée de santé — aussi la facturation (D8)
+        "MutuelleCardController.ListPresenceForMissions"     // présence, pour une liste de missions
     };
 
     /// <summary>
@@ -124,6 +137,22 @@ public class AnonymousSurfaceTests
             methode.GetCustomAttributes<AuthorizeAttribute>().Select(a => a.Policy)
                 .Should().Contain(ClKeycloakCallers.ServiceOrMobilePolicy, route);
         }
+    }
+
+    /// <summary>
+    /// La politique des écrans ne s'étend pas d'elle-même : la liste des routes qui la portent est
+    /// figée ici. Un ajout doit être un choix argumenté — et jamais une écriture.
+    /// </summary>
+    [Fact]
+    public void Les_ecrans_ne_lisent_que_la_carte_mutuelle()
+    {
+        var portees = Controleurs()
+            .SelectMany(c => c.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+                .Where(m => m.GetCustomAttributes<AuthorizeAttribute>()
+                    .Any(a => a.Policy == ClKeycloakCallers.MutuelleCardReadPolicy))
+                .Select(m => $"{c.Name}.{m.Name}"));
+
+        portees.Should().BeEquivalentTo(LecturesDeLaCarte);
     }
 
     /// <summary>

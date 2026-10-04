@@ -6,10 +6,12 @@ Public Class ClGetJobUseCase
 
     Private ReadOnly _query As Guid
     Private ReadOnly _repository As IJobRepository
+    Private ReadOnly _cards As IMutuelleCardRepository
 
-    Public Sub New(Query As Guid, repository As IJobRepository)
+    Public Sub New(Query As Guid, repository As IJobRepository, cards As IMutuelleCardRepository)
         _query = Query
         _repository = repository
+        _cards = cards
     End Sub
 
     Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of ClJobDetailModel)) Implements IResultUseCaseAsync(Of ClJobDetailModel).HandleAsync
@@ -20,7 +22,16 @@ Public Class ClGetJobUseCase
             Return ClResult(Of ClJobDetailModel).Fail(ClError.Application($"Mission {_query} introuvable côté ERP."))
         End If
 
-        Return ClResult(Of ClJobDetailModel).Ok(New ClJobDetailAdapter(job))
+        Dim detail As ClJobDetailModel = New ClJobDetailAdapter(job)
+
+        ' Carte mutuelle du patient (04/10) : le patient est déjà connu, aucun appel à Orders de plus —
+        ' une lecture indexée, sans l'image.
+        Dim patient = detail.Beneficiary.BeneficiaryId
+        If patient.HasValue Then
+            detail.ApplyMutuelleCard(_cards.GetCurrentMetadata(patient.Value))
+        End If
+
+        Return ClResult(Of ClJobDetailModel).Ok(detail)
 
     End Function
 

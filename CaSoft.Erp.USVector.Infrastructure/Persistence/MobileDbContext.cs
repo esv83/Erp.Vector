@@ -85,6 +85,7 @@ public class MobileDbContext : DbContext
             // MOB_010 — proposition de la lecture automatique : décimal borné (0 à 1), daté à la seconde.
             b.Property(c => c.MMC_OCR_CONFIDENCE).HasPrecision(4, 3);
             b.Property(c => c.MMC_OCR_EXTRACTED_AT).HasPrecision(0);
+            b.Property(c => c.MMC_FIELDS_INHERITED_FROM).HasPrecision(0);   // MOB_011
             b.HasIndex(c => new { c.MMC_BENEFICIARY_ID, c.MMC_CAPTURED_AT }, "IX_MOB_MUTUELLE_CARD_BENEFICIARY");
         });
 

@@ -30,6 +30,7 @@ internal static class MutuelleCardMappings
         MMC_OCR_EXTRACTED_AT = c.OcrExtractedAt,
         MMC_OCR_ATTEMPTS = c.OcrAttempts,
         MMC_OCR_LAST_ERROR = c.OcrLastError,
+        MMC_FIELDS_INHERITED_FROM = c.FieldsInheritedFrom,
     };
 
     public static ClMutuelleCard ToDomain(this MOB_MUTUELLE_CARD e) => new()
@@ -56,5 +57,6 @@ internal static class MutuelleCardMappings
         OcrExtractedAt = e.MMC_OCR_EXTRACTED_AT,
         OcrAttempts = e.MMC_OCR_ATTEMPTS,
         OcrLastError = e.MMC_OCR_LAST_ERROR,
+        FieldsInheritedFrom = e.MMC_FIELDS_INHERITED_FROM,
     };
 }

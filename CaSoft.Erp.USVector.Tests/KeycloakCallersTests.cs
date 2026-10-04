@@ -17,6 +17,8 @@ public class KeycloakCallersTests
     private const string Mobile = "us-ambulance";
     private const string Facturation = "erp-billinggateway-api";
     private static readonly string[] Services = { Facturation };
+    private const string Regulation = "erp-order-front";
+    private static readonly string[] Ecrans = { Regulation };
 
     private static ClaimsPrincipal Caller(string? azp)
         => azp is null
@@ -84,4 +86,39 @@ public class KeycloakCallersTests
     [Fact]
     public void Sans_section_aucun_service()
         => ClKeycloakCallers.ReadServiceAzp(new ConfigurationBuilder().Build()).Should().BeEmpty();
+
+    // ── Écrans de régulation et de certification (04/10) : la carte mutuelle, et rien d'autre ──
+
+    [Fact]
+    public async Task Le_jeton_d_un_ecran_lit_la_carte_mutuelle()
+        => (await Allowed(Caller(Regulation), ClKeycloakCallers.MutuelleCardRead(Mobile, Services, Ecrans))).Should().BeTrue();
+
+    [Fact]
+    public async Task Le_jeton_d_un_ecran_n_ouvre_ni_le_terrain_ni_le_paquet_de_la_facturation()
+    {
+        (await Allowed(Caller(Regulation), ClKeycloakCallers.MobileOnly(Mobile))).Should().BeFalse();
+        (await Allowed(Caller(Regulation), ClKeycloakCallers.ServiceOrMobile(Mobile, Services))).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(Mobile, true)]
+    [InlineData(Facturation, true)]
+    [InlineData("un-autre-client", false)]
+    public async Task La_lecture_de_la_carte_garde_le_mobile_et_la_facturation(string azp, bool allowed)
+        => (await Allowed(Caller(azp), ClKeycloakCallers.MutuelleCardRead(Mobile, Services, Ecrans))).Should().Be(allowed);
+
+    [Fact]
+    public async Task Sans_ecran_declare_un_ecran_ne_lit_rien()
+        => (await Allowed(Caller(Regulation), ClKeycloakCallers.MutuelleCardRead(Mobile, Services, Array.Empty<string>()))).Should().BeFalse();
+
+    [Fact]
+    public void La_liste_des_ecrans_se_lit_comme_celle_des_services()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Keycloak:ScreenAzp:0"] = " erp-order-front " })
+            .Build();
+
+        ClKeycloakCallers.ReadScreenAzp(configuration).Should().Equal(Regulation);
+        ClKeycloakCallers.ReadServiceAzp(configuration).Should().BeEmpty();
+    }
 }

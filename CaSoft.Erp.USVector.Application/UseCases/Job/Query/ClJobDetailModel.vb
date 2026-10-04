@@ -39,6 +39,28 @@ Public Class ClJobDetailModel
     ''' <summary>DET-2 — dépose : affichage piloté serveur (sections de lignes + coords). L'UI rend tel quel.</summary>
     Public Property DropoffDisplay As ClLocationDisplayDtoOut
 
+    ' ── Carte mutuelle du patient (04/10, additif) ─────────────────────────────────────
+    ' L'équipage voit qu'elle est déjà connue, et de quand date la dernière photo, sans le 404 de
+    ' GET missions/{id}/mutuelle-card : il ne reprend une photo que si la carte a changé.
+
+    ''' <summary>Une carte est déjà connue pour ce patient.</summary>
+    Public Property MutuelleCardKnown As Boolean
+
+    ''' <summary>Identifiant de la carte courante (pour la saisie des champs) ; Nothing sans carte.</summary>
+    Public Property MutuelleCardId As Guid?
+
+    ''' <summary>Date de la dernière photo ; Nothing sans carte.</summary>
+    Public Property MutuelleCardCapturedAt As DateTime?
+
+    ''' <summary>
+    ''' Champs repris d'une photo précédente : date de celle-ci (« repris de la photo du JJ/MM, à
+    ''' revérifier »). Nothing s'ils ont été validés sur la photo courante, ou sans carte.
+    ''' </summary>
+    Public Property MutuelleCardFieldsInheritedFrom As DateTime?
+
+    ''' <summary>Image de la carte courante, à charger avec le jeton ; Nothing sans carte.</summary>
+    Public Property MutuelleCardImageUrl As String
+
     Public Class ClPatientDtoOut
 
         ''' <summary>

@@ -162,6 +162,18 @@ Content-Type: application/json
 
 { "MissionIds": [ "{{jobId}}" ] }
 
+### 04/10 — Écrans de régulation et de certification : la carte par MISSION, avec jeton (M10).
+### Une ligne par mission demandée, 200 au plus ; 201 → 400. Un jeton d'écran sur JobDetail → 403.
+POST {{host}}/api/missions/mutuelle-card/presence
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "missionIds": [ "{{jobId}}" ] }
+
+### L'image de la carte courante du patient de la mission : 200, ou 404.
+GET {{host}}/api/missions/{{jobId}}/mutuelle-card/image
+Authorization: Bearer {{token}}
+
 ### Les cartes mutuelle présentes pour une liste de bénéficiaires (route anonyme,
 ### pour les écrans amont — aucun jeton, ni nom de mutuelle, ni code AMC en réponse).
 POST {{host}}/api/mutuelle-card/presence
