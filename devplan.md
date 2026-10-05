@@ -32,8 +32,12 @@ doit : le schéma s'est annoncé « 9 sur 9 ».
 > de documents ; le premier n'a aucun champ mutuelle sur un patient souvent tenu par AidesNSoft, le
 > second n'existe pas. Ce sont les écrans qui viennent la lire, avec leur jeton, par mission.
 
-**Par quoi reprendre — lundi 05/10** : le relevé de « Constater ce qui vient d'être publié ». Puis, s'il
-est propre, retirer le repli de la lecture par lot. Et relancer la demande des clients Keycloak.
+**Relevé du lundi 05/10 fait** (« Constater ce qui vient d'être publié ») : `29b6cc9` en service depuis
+le 04/10 à 17:35, la lecture par lot vue, un 503 vu. **L'écran de régulation lit la carte** depuis le
+05/10 à 21:01 (`ScreenAzp = us-regulation`).
+
+**Par quoi reprendre** : retirer le repli de la lecture par lot — il n'est plus bloqué. Puis le client
+Keycloak de l'écran de la certification.
 
 ---
 # 1. Fonctionnalités livrées
@@ -48,15 +52,15 @@ est propre, retirer le repli de la lecture par lot. Et relancer la demande des c
 | **Voir son travail du jour** | Missions **engagées** par la régulation · détail : patient, adresses, horaires, sens, service destinataire, **carte mutuelle connue et date de sa photo** · affichage des lieux composé par le serveur |
 | **Faire avancer la mission** | Cinq étapes horodatées, **annulables** · « mission vue » · signature · conducteur — **un refus dit pourquoi** · tout remonte à la régulation en quasi temps réel, un envoi en échec est rejoué |
 | **Compléter le dossier** | Type de mission et informations de facturation servis par la régulation, pré-remplis et verrouillés quand la fiche patient les connaît · un refus arrive **avec son motif** · anomalies, documents, photos |
-| **Photographier la carte mutuelle** | Depuis la mission · **une nouvelle photo garde les données validées**, marquées « repris de la photo du … » · **lisible par les écrans de régulation et de certification, par mission, avec jeton** (dès leurs clients déclarés) · journal des accès · lecture automatique en place, inerte |
+| **Photographier la carte mutuelle** | Depuis la mission · **une nouvelle photo garde les données validées**, marquées « repris de la photo du … » · **lue par l'écran de régulation, par mission, avec jeton** (certification : dès son client déclaré) · journal des accès · lecture automatique en place, inerte |
 | **Passer à la facturation** | Transfert automatique à la clôture · dossier **par lots de 200**, signatures par lots de 50 · Orders lu par lot (repli mission par mission tant que non vu) · dossier **gelé** après transfert |
 | **Tenir debout** | Le terrain n'écrase jamais la donnée officielle · API fermée par défaut, jetons exigés · délais et disjoncteur vers Orders, **vus sur de vraies pannes** · réessai SQL · **une panne rend 503 et un message ; un refus, son motif** · aucun appel bloquant · publication **depuis `main` propre et poussé**, commit servi et schéma vérifiés |
 | **Se dire** | `api/version` : commit, **état de l'arbre au build**, environnement · `api/version/runtime` : base résolue, drapeaux, **état du schéma** |
 
 ### Les réserves à ne pas perdre de vue
 
-- ⚠️ **Les écrans ne lisent encore rien** : `Keycloak:ScreenAzp` est vide en production, faute de
-  connaître leurs clients Keycloak.
+- ⚠️ **L'écran de la certification ne lit pas encore la carte** : son `azp` n'est jamais apparu au
+  journal. La régulation (`us-regulation`) passe depuis le 05/10 à 21:01, après 4 359 refus en 401.
 - ⚠️ **Deux routes de la carte restent anonymes** — elles ne servent à personne (zéro appel du 21/09 au
   04/10) — *voir « Fermer les routes anonymes de la carte »*.
 - ⚠️ **Le message du 503 n'atteint l'ambulancier que si l'app l'affiche** — demandé au dev web le 04/10.
@@ -83,22 +87,30 @@ de difficulté, pas de priorité.** Chaque itération porte entre crochets son *
 | **Effort** | Un relevé lundi, puis au fil de l'eau |
 | **Bloqué par** | **Le trafic de la semaine** |
 
-**À voir passer** — `9c15f94` en production depuis le 04/10 à 16:04 ; 35 s de trafic vues, sans erreur :
-- **les routes rendues asynchrones, sous une vraie charge** : sélecteur, conducteur, liste, détail,
-  timeline, signature en 200, **aucune exception non gérée** ;
-- **un détail de mission dont le patient a une carte** : `MutuelleCardKnown` vrai, date de la photo ;
-- **une deuxième photo d'un patient dont la carte est validée** : champs repris, `FieldsInheritedFrom`
-  posé — vérifiable en base ;
-- **la passe de la facturation par la route par lot** : aucun `/missions/{id}/full` pendant les lots,
-  aucune ligne « Orders ne porte pas batch-refs » ;
-- **une panne rendue en 503** : `WARN … 503 rendu` — à la prochaine coupure ou publication d'Orders ;
-- **un refus de conducteur** — jamais vu (344 changements en 200 du 21/09 au 04/10) ;
+**Constaté au relevé du 05/10** — `29b6cc9` en service depuis le 04/10 à 17:35 (sourcelink du pdb) :
+- ✅ **routes asynchrones sous charge** : sélecteur 4 728, détail 3 233, liste 2 651, conducteur 2 424,
+  timeline 3 640 en 200 ; les seules exceptions non gérées datent de la coupure de 11:26 ;
+- ✅ **une panne rendue en 503** : le 05/10 à 11:26, SQL en arrêt et Orders en 500 ensemble, **14
+  `503 rendu`** ;
+- ✅ **la passe de la facturation par lot** : 14:29 et 17:01, 20 `field-data` et 48 `signatures` en 200,
+  aucun `/full` pendant les lots, aucune ligne « Orders ne porte pas batch-refs » ;
+- ✅ **l'écran de régulation sur la présence par mission** : 200 depuis le 05/10 à 21:01.
+
+**Encore à voir passer** :
+- **une deuxième photo d'un patient dont la carte est validée** : `FieldsInheritedFrom` posé — aucune au
+  05/10 (16 photos, toutes premières) ;
+- **un détail de mission dont le patient a une carte** : `MutuelleCardKnown` vrai — le journal ne porte
+  pas les corps, à constater dans l'app ou par la suite `.http` ;
+- **un refus de conducteur** — jamais vu ;
 - **la suite [`Vector.Api.http`](CaSoft.Erp.USVector.Api/Vector.Api.http)** rejouée une fois en entier,
   identifiants en main — y compris `api/Kilometers` en 404 et la présence par mission.
 
-**À comprendre**, relevés le 04/10 et non examinés :
-- **988 `403` sur `JobDetail`** et 345 sur `Joblist` en 14 jours — refus normal ou écran qui insiste ?
-- **51 démarrages du pool en 14 jours**, clés de protection éphémères à chacun.
+**À comprendre** :
+- **Une panne de la base Vector rend 500, pas 503** : 8 au 05/10 à 11:26 (`Time` ×7, `Signature` ×1). Le
+  gestionnaire du 503 ne couvre qu'Orders.
+- **Les `403` sur `JobDetail`** : 149 en ~27 h au 05/10, au-dessus du rythme relevé le 04/10 (988 en 14
+  jours) — refus normal ou écran qui insiste ?
+- **Les démarrages du pool** : 04/10 23:37 et 05/10 04:29, clés de protection éphémères à chacun.
 - **Pas de passe de la facturation le jeudi 24/09.**
 
 **À mesurer chez Orders** : les **étapes de mission vides** (~3 883 annoncées avant leur repli du
@@ -110,7 +122,7 @@ de difficulté, pas de priorité.** Chaque itération porte entre crochets son *
 |---|---|
 | **Nature** | Échafaudage à démonter |
 | **Effort** | Une courte session |
-| **Bloqué par** | **Une passe de la facturation vue sur la route par lot** — voir « Constater ce qui vient d'être publié » |
+| **Bloqué par** | Rien — la passe par lot vue le 05/10 (« Constater ce qui vient d'être publié ») |
 
 Orders sert la 1.8.5 depuis le 04/10. Retirer `ReadRefsOneByOneAsync`, le **corps par défaut** de
 `IErpReadApiClient.GetMissionBatchRefsAsync` et le traitement 404/405 du client — une route absente
@@ -182,19 +194,7 @@ en Vn ».
 Km du véhicule, ou relevé début/fin par mission ? On repart de zéro : la route `api/Kilometers` est
 retirée depuis le 04/10.
 
-## Itération 8 — Activer la lecture automatique des cartes *[ex-F2, P3]*
-
-| | |
-|---|---|
-| **Nature** | Fonctionnalité en place, **inerte** |
-| **Effort** | Poser une clé ; puis l'écran de validation, **côté web** |
-| **Bloqué par** | 🔴 **Une décision d'exploitation** : activer, c'est envoyer une **donnée de santé** au fournisseur du modèle |
-
-~12 cartes par jour, de l'ordre du centime par carte, et l'image qui sort du réseau. Le code AMC n'est
-saisi que **41 fois sur 85** *(20/09)*. Depuis le 04/10, une nouvelle photo garde les champs validés :
-la lecture automatique servirait d'abord aux premières photos.
-
-## Itération 9 — Positions et statuts des véhicules *[ex-F3, MOB-16]*
+## Itération 8 — Positions et statuts des véhicules *[ex-F3, MOB-16]*
 
 | | |
 |---|---|
@@ -204,7 +204,7 @@ la lecture automatique servirait d'abord aux premières photos.
 
 GpsGate (positions, REST) et Sirus (statuts, UDP) sont injectés mais ne servent à rien.
 
-## Itération 10 — Protéger les données du patient *[ex-G7, P4]*
+## Itération 9 — Protéger les données du patient *[ex-G7, P4]*
 
 | | |
 |---|---|
@@ -218,14 +218,14 @@ des lectures de carte existe depuis le 04/10, sans identifiant de patient : c'es
 l'audit). La fermeture des routes anonymes a son itération propre. ⚠️ Si la lecture automatique est
 activée, ce lot porte aussi le sort de l'image envoyée.
 
-## Itération 11 — Ce qui attend ailleurs *[ex-A3, B, C1, C3, E4, F4]*
+## Itération 10 — Ce qui attend ailleurs *[ex-A3, B, C1, C3, E4, F4]*
 
 *Rien à coder ici tant que l'autre partie n'a pas bougé. Non revérifié à cette édition sauf mention,
 et **c'est dit**.*
 
 | Entrée | Qui doit bouger | Dernier relevé | En deux mots |
 |---|---|---|---|
-| **Les clients Keycloak des écrans** 🆕 | exploitation Keycloak | **04/10** | L'`azp` des jetons de l'écran de régulation et de celui de la certification → `Keycloak:ScreenAzp`. Sans eux, les écrans reçoivent 401 |
+| **Le client Keycloak de l'écran de la certification** | exploitation Keycloak | **05/10** | La régulation est servie (`us-regulation`, 05/10). Reste l'`azp` de la certification → `Keycloak:ScreenAzp`, **puis redémarrer le pool** : la liste n'est lue qu'au démarrage |
 | **Tout le front, en une note** 🆕 | **Jules** — il reprend l'app terrain d'Alexandre, indisponible | **04/10** | [`note_front_jules_vector.md`](note_front_jules_vector.md) : le nouveau du 04/10 pour l'app (503, carte connue, saisie, kilomètres), **les demandes faites à Alexandre à vérifier** (statut inconnu), la carte dans les listes de régulation et de certification. Sa bascule débloque « Fermer les routes anonymes de la carte » |
 | **Règle d'applicabilité des types** *[B9]* | Orders + décision métier | 04/10 | **11 types proposés partout**, tables de restriction vides. Première de leur plan, **par priorité** |
 | **Exiger un jeton du terrain** | Orders | 04/10 | Rien ne l'en empêche de notre côté. ⚠️ **`POST /missions/batch-refs` répond 200 sans jeton** |
@@ -245,6 +245,7 @@ et **c'est dit**.*
 | Sujet | En deux mots | Ce qui la rouvrirait |
 |---|---|---|
 | **Historique des photos de la carte** | Toutes les photos sont gardées ; les écrans ne montrent que la plus récente (choix du 04/10) | Un transport contesté où la carte d'alors compte |
+| **Activer la lecture automatique des cartes** *[F2, P3]* | En place, **inerte** : une clé à poser, puis l'écran de validation côté web. ~12 cartes/jour, ~1 centime/carte ; code AMC saisi 41 fois sur 85 *(20/09)* ; depuis le 04/10 une nouvelle photo garde les champs validés, la lecture ne servirait qu'aux premières photos | 🔴 **Une décision d'exploitation** : envoyer une **donnée de santé** au fournisseur du modèle |
 | **Retirer les alias de compatibilité** *[G2]* | `IsAck`, champs historiques du détail, `SelectedDriver` jamais nul, champs typés des lieux. **Conservés délibérément** | **La confirmation du front, champ par champ** — [`note_ui_alex.md`](note_ui_alex.md) |
 | **Alerter sur les 500 et les coupures** | La coupure du 22/09 n'a été vue que douze jours après ; le redémarrage SQL du 04/10, par hasard | Une coupure de plus découverte en retard |
 | **Sortir les images du SQL** *[Vd-6]* | ~2 Go/an : la base le porte ; gardé en SQL le 04/10 | Le volume, ou une contrainte de sauvegarde |
