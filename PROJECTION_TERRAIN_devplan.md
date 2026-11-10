@@ -83,7 +83,11 @@ C'est le point important de ce plan : **les deux plus gros blocs sont déjà fai
 
 *Format habituel : **état · préalable · contenu · fin**.*
 
-## PRJ-1 — ⏳ Généraliser l'Outbox à la projection du terrain *(préalable technique)*
+## PRJ-1 — 🟡 Généraliser l'Outbox à la projection du terrain *(préalable technique)*
+
+> **10/11 — voie (b) retenue, codée et testée, pas publiée.** `ProjectionOutbox.EnqueueAsync` arme
+> l'entrée ; la timeline, la signature et le motif « ne peut pas signer » s'en servent. **Reste** :
+> anomalies, documents, mutuelle — à brancher avec `PRJ-3` à `PRJ-5`.
 
 **Préalable** : aucun — attaquable seul, sans contrat en jeu.
 
@@ -112,7 +116,12 @@ perdu — même garantie qu'aujourd'hui pour les jalons.
 
 ---
 
-## PRJ-2 — ⏳ Projeter la signature (présence + horodatage)
+## PRJ-2 — 🟡 Projeter la signature (présence + horodatage)
+
+> **10/11 — codé et testé, pas publié** (alerte signature d'Order, lot 1). Projette la **présence**
+> et le **motif** (`MOB_012`) vers `PUT missions/{id}/field` (Orders, 094), derrière
+> `FieldProjection:Enabled` (coupé par défaut). **L'heure n'est pas projetée** : le fuseau est figé
+> (`decided.md`, 04/10 et 10/11). Le §« Contenu » ci-dessous reste vrai pour l'heure, plus tard.
 
 **Préalable** : `PRJ-1` · endpoint côté Orders (§5, `B12`).
 
@@ -235,7 +244,7 @@ traiter ici.*
 |---|---|---|
 | 1 | **Qui possède `TransferStatus` ?** Si l'aval ne lit plus que Order, sa vision de « ce qui est prêt » repose entièrement sur un statut écrit par **Certification** — seul appelant de `PUT /missions/{id}/transfer-status` dans les quatre dépôts. Le même statut ferme l'édition terrain ici (`D7`, `FreezeOnTransfer`). Trois responsabilités sur un champ, dont aucune n'appartient au module qui facture. | `E4` de [`devplan.md`](devplan.md) |
 | 2 | **Le kilométrage.** Crew/véhicule-scoped, pas mission-scoped (`D5`) : aucun transport ne dit comment un relevé d'odomètre devient une valeur de mission. Ce plan ne le résout pas et ne prétend pas le faire. | `E1` de [`devplan.md`](devplan.md) |
-| 3 | **Voie (a) ou (b) pour l'Outbox** — granularité par nature, ou paquet consolidé. | `PRJ-1` |
+| 3 | ~~**Voie (a) ou (b) pour l'Outbox**~~ — **(b), tranché le 10/11** (`decided.md`). | `PRJ-1` |
 | 4 | **Sort de `field-data`** — garder / maigrir / retirer. | `PRJ-6` |
 | 5 | **Adopter `D16`** — propriétaire unique et déclaré par champ projeté. | §3.1 |
 
@@ -253,8 +262,8 @@ traiter ici.*
 
 | Base | Script | Contenu | État |
 |---|---|---|---|
-| Vector | `MOB_008` | élargissement de l'Outbox de projection (`PRJ-1`) — forme selon la voie retenue | ⬜ à écrire |
-| Orders | *n° à déterminer* | table de projection du paquet terrain (`B12`) | ⬜ autre dépôt |
+| Vector | `MOB_012` | motif « ne peut pas signer » ; l'Outbox, elle, n'a pas changé de forme (voie b) | 🟡 écrit, à jouer |
+| Orders | `094` | `ORD_MISSION_FIELD` + `OCT_SIGNATURE_REQUIRED` (`B12`, bloc signature) | 🟡 écrit, à jouer |
 
 > Prochain numéro Vector relevé au dépôt le **2026-08-25** (dernier livré : `MOB_007`).
 > **Le recontrôler avant d'écrire** — et se rappeler qu'aucune table de suivi de schéma n'existe

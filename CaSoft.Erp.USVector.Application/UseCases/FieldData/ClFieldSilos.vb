@@ -14,6 +14,9 @@ Public Class ClFieldSilos
     ''' <summary>Horodatage de la signature, par mission — la présence d'une clé vaut « signée ».</summary>
     Public Property SignedAt As IReadOnlyDictionary(Of Guid, DateTime)
 
+    ''' <summary>Motif « le patient ne peut pas signer », par mission (MOB_012).</summary>
+    Public Property Waivers As IReadOnlyDictionary(Of Guid, ClSignatureWaiver)
+
     ''' <summary>Carte mutuelle courante (métadonnées), par <b>bénéficiaire</b>.</summary>
     Public Property CurrentMutuelles As IReadOnlyDictionary(Of Guid, ClMutuelleCard)
 

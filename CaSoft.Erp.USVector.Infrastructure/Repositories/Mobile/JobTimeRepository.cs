@@ -16,9 +16,6 @@ namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 /// </summary>
 public class JobTimeRepository : IJobTimeRepository
 {
-    // Debounce : on projette l'état consolidé après N s de calme (coalesce les manipulations rapprochées).
-    private const int DebounceSeconds = 5;
-
     private readonly MobileDbContext _ctx;
 
     public JobTimeRepository(MobileDbContext ctx) => _ctx = ctx;
@@ -39,37 +36,11 @@ public class JobTimeRepository : IJobTimeRepository
         }
 
         // Marque la mission à projeter — MÊME transaction que le changement de jalon (zéro perte).
-        // Debounce : la projection est repoussée de DebounceSeconds à chaque nouveau changement ;
+        // Debounce : la projection est repoussée de ProjectionOutbox.DebounceSeconds à chaque nouveau changement ;
         // le worker projette l'état consolidé après la rafale.
-        await EnqueueProjectionAsync(gJobId, ct);
+        await ProjectionOutbox.EnqueueAsync(_ctx, gJobId, ct);
 
         await _ctx.SaveChangesAsync(ct);
-    }
-
-    private async Task EnqueueProjectionAsync(Guid gJobId, CancellationToken ct)
-    {
-        var now = DateTime.UtcNow;
-        var dispatchAfter = now.AddSeconds(DebounceSeconds);
-        var ob = await _ctx.OperationalOutbox.SingleOrDefaultAsync(o => o.OOB_MISSION_ID == gJobId, ct);
-
-        if (ob is null)
-        {
-            _ctx.OperationalOutbox.Add(new MOB_OPERATIONAL_OUTBOX
-            {
-                OOB_MISSION_ID = gJobId,
-                OOB_DISPATCH_AFTER = dispatchAfter,
-                OOB_ATTEMPTS = 0,
-                OOB_UPDATED_AT = now
-            });
-        }
-        else
-        {
-            // Nouveau changement : on repousse (debounce) et on relance le compteur de tentatives.
-            ob.OOB_DISPATCH_AFTER = dispatchAfter;
-            ob.OOB_ATTEMPTS = 0;
-            ob.OOB_LAST_ERROR = null;
-            ob.OOB_UPDATED_AT = now;
-        }
     }
 
     public async Task<ClJobTimeData?> GetJobTimeDataAsync(Guid gJobId, CancellationToken ct)

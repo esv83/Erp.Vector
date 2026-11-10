@@ -23,6 +23,18 @@ public interface IErpWriteApiClient
         Guid? sourceCrewId, CancellationToken ct = default);
 
     /// <summary>
+    /// PRJ-2 — Projette l'état terrain de la signature d'une mission (<c>PUT /missions/{id}/field</c>) :
+    /// présence de la signature et motif « ne peut pas signer ». Instantané : un motif absent efface celui
+    /// qu'Order détenait. L'heure de signature n'est <b>pas</b> projetée — elle est en heure locale par
+    /// convention figée (decided.md), seule sa présence sert à l'alerte signature.
+    /// <para>Même contrat d'échec que <see cref="ProjectOperationalAsync"/> : 404 → <c>MissionNotFound</c>,
+    /// toute autre erreur lève.</para>
+    /// </summary>
+    Task<EnOperationalProjectionOutcome> ProjectFieldAsync(
+        Guid missionId, bool signatureExists, string? waiverCode, DateTime? waiverAtUtc,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Désigne le conducteur d'un équipage (PUT /crews/{id}/driver, MOB-11). Endpoint additif
     /// côté Orders.Api : le personnel indiqué devient le conducteur actif à la date fournie.
     /// <para>

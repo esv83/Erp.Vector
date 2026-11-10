@@ -23,6 +23,10 @@ public class MobileDbContext : DbContext
     public DbSet<MOB_MISSION_STATE> MissionStates => Set<MOB_MISSION_STATE>();
     public DbSet<MOB_SIGNATURE> Signatures => Set<MOB_SIGNATURE>();
 
+    // Motif « le patient ne peut pas signer » (MOB_012)
+    public DbSet<MOB_SIGNATURE_WAIVER> SignatureWaivers => Set<MOB_SIGNATURE_WAIVER>();
+    public DbSet<MOB_SIGNATURE_WAIVER_REASON> SignatureWaiverReasons => Set<MOB_SIGNATURE_WAIVER_REASON>();
+
     // Carte mutuelle (P1)
     public DbSet<MOB_MUTUELLE_CARD> MutuelleCards => Set<MOB_MUTUELLE_CARD>();
 
@@ -87,6 +91,27 @@ public class MobileDbContext : DbContext
             b.Property(c => c.MMC_OCR_EXTRACTED_AT).HasPrecision(0);
             b.Property(c => c.MMC_FIELDS_INHERITED_FROM).HasPrecision(0);   // MOB_011
             b.HasIndex(c => new { c.MMC_BENEFICIARY_ID, c.MMC_CAPTURED_AT }, "IX_MOB_MUTUELLE_CARD_BENEFICIARY");
+        });
+
+        // ── MOB_012 — motif « le patient ne peut pas signer », et sa liste ───────
+        modelBuilder.Entity<MOB_SIGNATURE_WAIVER_REASON>(b =>
+        {
+            b.ToTable("MOB_SIGNATURE_WAIVER_REASON");
+            b.HasKey(r => r.SWR_CODE);
+            b.Property(r => r.SWR_CODE).HasMaxLength(30).ValueGeneratedNever();
+            b.Property(r => r.SWR_LABEL).HasMaxLength(100).IsRequired();
+        });
+
+        modelBuilder.Entity<MOB_SIGNATURE_WAIVER>(b =>
+        {
+            b.ToTable("MOB_SIGNATURE_WAIVER");
+            b.HasKey(w => w.SWV_MISSION_ID);
+            b.Property(w => w.SWV_MISSION_ID).ValueGeneratedNever();
+            b.Property(w => w.SWV_REASON_CODE).HasMaxLength(30).IsRequired();
+            b.Property(w => w.SWV_COMMENT).HasMaxLength(500);
+            b.Property(w => w.SWV_DECLARED_AT).HasPrecision(0);
+            b.HasOne<MOB_SIGNATURE_WAIVER_REASON>().WithMany().HasForeignKey(w => w.SWV_REASON_CODE)
+             .HasConstraintName("FK_MOB_SIGNATURE_WAIVER_REASON").OnDelete(DeleteBehavior.NoAction);
         });
 
         // ── Outbox projection opérationnelle (synchro régulation garantie) ───────

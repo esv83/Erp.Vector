@@ -57,6 +57,30 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
         throw new HttpRequestException($"Orders.Api PUT missions/{missionId}/operational → {(int)response.StatusCode}.", null, response.StatusCode);
     }
 
+    public async Task<EnOperationalProjectionOutcome> ProjectFieldAsync(
+        Guid missionId, bool signatureExists, string? waiverCode, DateTime? waiverAtUtc, CancellationToken ct = default)
+    {
+        var body = new
+        {
+            signatureExists,
+            waiver = waiverCode is null ? null : new { code = waiverCode, at = waiverAtUtc }
+        };
+        var response = await _http.PutAsJsonAsync($"missions/{missionId}/field", body, JsonOptions, ct);
+        if (response.IsSuccessStatusCode) return EnOperationalProjectionOutcome.Applied;
+
+        var content = await response.Content.ReadAsStringAsync(ct);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            _logger.LogWarning("Orders.Api PUT missions/{MissionId}/field : mission introuvable (404) {Body}",
+                missionId, content);
+            return EnOperationalProjectionOutcome.MissionNotFound;
+        }
+
+        _logger.LogError("Orders.Api PUT missions/{MissionId}/field a échoué : {Status} {Body}",
+            missionId, (int)response.StatusCode, content);
+        throw new HttpRequestException($"Orders.Api PUT missions/{missionId}/field → {(int)response.StatusCode}.", null, response.StatusCode);
+    }
+
     public async Task<CrewDriverWriteResult> SetCrewDriverAsync(Guid crewId, Guid driverPersonnelId, DateTime from, CancellationToken ct = default)
     {
         var body = new { driverPersonnelId, from };

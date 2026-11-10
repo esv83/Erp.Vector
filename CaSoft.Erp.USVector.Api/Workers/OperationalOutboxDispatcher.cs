@@ -15,6 +15,12 @@ namespace CaSoft.Erp.USVector.Api.Workers;
 /// d'Orders (404) → l'entrée est abandonnée : c'est définitif, relancer ne sert à rien.
 /// Le debounce (repousser <c>OOB_DISPATCH_AFTER</c> à chaque changement) est fait côté écriture
 /// (<see cref="Repositories.Mobile.JobTimeRepository"/>) : ici on ne traite que les entrées dues.
+/// <para>
+/// PRJ-2 — Quand <see cref="FieldProjectionOptions.Enabled"/> est vrai, la même entrée projette aussi
+/// l'état terrain de la signature (<c>PUT missions/{id}/field</c>) : présence et motif « ne peut pas
+/// signer ». Coupé par défaut : la route n'existe chez Orders qu'à partir de sa version qui la livre,
+/// et un 404 de route serait pris pour une mission inconnue — l'entrée abandonnée, la donnée perdue.
+/// </para>
 /// </summary>
 public sealed class OperationalOutboxDispatcher : BackgroundService
 {
@@ -23,16 +29,20 @@ public sealed class OperationalOutboxDispatcher : BackgroundService
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<OperationalOutboxDispatcher> _logger;
+    private readonly bool _isFieldProjectionEnabled;
 
-    public OperationalOutboxDispatcher(IServiceScopeFactory scopeFactory, ILogger<OperationalOutboxDispatcher> logger)
+    public OperationalOutboxDispatcher(IServiceScopeFactory scopeFactory, ILogger<OperationalOutboxDispatcher> logger,
+        FieldProjectionOptions? fieldProjection = null)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
+        _isFieldProjectionEnabled = fieldProjection?.Enabled ?? false;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("OperationalOutboxDispatcher démarré (poll {Interval}s).", PollInterval.TotalSeconds);
+        _logger.LogInformation("OperationalOutboxDispatcher démarré (poll {Interval}s, projection signature {Field}).",
+            PollInterval.TotalSeconds, _isFieldProjectionEnabled ? "active" : "coupée");
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -68,7 +78,8 @@ public sealed class OperationalOutboxDispatcher : BackgroundService
         foreach (var ob in due)
         {
             var mst = await ctx.MissionStates.SingleOrDefaultAsync(s => s.MST_MISSION_ID == ob.OOB_MISSION_ID, ct);
-            if (mst is null)
+            // Une signature ou un motif peut exister sans aucun jalon : la projection terrain ne dépend pas de la timeline.
+            if (mst is null && !_isFieldProjectionEnabled)
             {
                 ctx.OperationalOutbox.Remove(ob);   // plus de mission → rien à projeter
                 continue;
@@ -76,12 +87,26 @@ public sealed class OperationalOutboxDispatcher : BackgroundService
 
             try
             {
+                var outcome = EnOperationalProjectionOutcome.Applied;
+
                 // État consolidé courant (jalons null inclus → l'effacement/annulation est propagé).
-                var outcome = await erpWrite.ProjectOperationalAsync(
-                    ob.OOB_MISSION_ID,
-                    mst.MST_ACK_AT, mst.MST_READ_AT, mst.MST_GO_AT,
-                    mst.MST_ONSITE_AT, mst.MST_TERMINATED_AT,
-                    sourceCrewId: null, ct);
+                if (mst is not null)
+                    outcome = await erpWrite.ProjectOperationalAsync(
+                        ob.OOB_MISSION_ID,
+                        mst.MST_ACK_AT, mst.MST_READ_AT, mst.MST_GO_AT,
+                        mst.MST_ONSITE_AT, mst.MST_TERMINATED_AT,
+                        sourceCrewId: null, ct);
+
+                // PRJ-2 — instantané : signature présente ou non, motif ou rien (un motif retiré s'efface chez Order).
+                if (_isFieldProjectionEnabled && outcome != EnOperationalProjectionOutcome.MissionNotFound)
+                {
+                    var isSigned = await ctx.Signatures.AnyAsync(s => s.SIG_MISSION_ID == ob.OOB_MISSION_ID, ct);
+                    var waiver = await ctx.SignatureWaivers.AsNoTracking()
+                        .SingleOrDefaultAsync(w => w.SWV_MISSION_ID == ob.OOB_MISSION_ID, ct);
+                    outcome = await erpWrite.ProjectFieldAsync(
+                        ob.OOB_MISSION_ID, isSigned, waiver?.SWV_REASON_CODE,
+                        waiver is null ? null : DateTime.SpecifyKind(waiver.SWV_DECLARED_AT, DateTimeKind.Utc), ct);
+                }
 
                 if (outcome == EnOperationalProjectionOutcome.MissionNotFound)
                 {
@@ -89,7 +114,7 @@ public sealed class OperationalOutboxDispatcher : BackgroundService
                     // réapparaître — une seule entrée a tourné 55 414 fois avant ce correctif (2026-09-13).
                     _logger.LogWarning(
                         "Projection outbox mission {MissionId} abandonnée : mission introuvable chez Orders.Api (404) " +
-                        "après {Attempts} tentative(s). Les jalons terrain de cette mission ne seront pas projetés.",
+                        "après {Attempts} tentative(s). Les jalons et la signature de cette mission ne seront pas projetés.",
                         ob.OOB_MISSION_ID, ob.OOB_ATTEMPTS + 1);
                 }
 

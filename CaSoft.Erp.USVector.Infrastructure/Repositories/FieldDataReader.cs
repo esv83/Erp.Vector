@@ -197,7 +197,15 @@ public sealed class FieldDataReader : IFieldDataReader
         {
             Exists = signedAt.HasValue,
             SignedAt = signedAt,
-            ImageUrl = signedAt.HasValue ? $"api/Signature/{missionId}" : null
+            ImageUrl = signedAt.HasValue ? $"api/Signature/{missionId}" : null,
+            Waiver = silos.Waivers is not null && silos.Waivers.TryGetValue(missionId, out var waiver)
+                ? new ClFieldSignatureWaiverDtoOut
+                {
+                    ReasonCode = waiver.ReasonCode,
+                    Comment = waiver.Comment,
+                    DeclaredAt = waiver.DeclaredAt
+                }
+                : null
         };
 
         // Carte mutuelle courante du bénéficiaire (métadonnées : l'image est annoncée par son URL).

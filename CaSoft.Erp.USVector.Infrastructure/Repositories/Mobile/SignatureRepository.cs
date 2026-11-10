@@ -13,6 +13,8 @@ namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 /// Delete, non implémenté côté legacy, est ici réellement supporté (le contrat expose DELETE api/signature).
 /// <para>⚖️ L'horodatage est en heure LOCALE, par convention partagée avec la facturation (C62) — voir
 /// <see cref="ClHorloge"/>.</para>
+/// <para>PRJ-1 — Toute écriture arme la projection de la mission vers Order dans la même transaction :
+/// la présence de la signature y alimente l'alerte signature.</para>
 /// </summary>
 public class SignatureRepository : ISignatureRepository
 {
@@ -37,6 +39,7 @@ public class SignatureRepository : ISignatureRepository
             SIG_DATA = strSignData,
             SIG_DATETIME = ClHorloge.MaintenantLocal()
         });
+        await ProjectionOutbox.EnqueueAsync(_ctx, gJobId, ct);
         await _ctx.SaveChangesAsync(ct);
     }
 
@@ -45,6 +48,7 @@ public class SignatureRepository : ISignatureRepository
         var entity = await _ctx.Signatures.SingleAsync(s => s.SIG_MISSION_ID == gJobId, ct);
         entity.SIG_DATA = strSignData;
         entity.SIG_DATETIME = ClHorloge.MaintenantLocal();
+        await ProjectionOutbox.EnqueueAsync(_ctx, gJobId, ct);
         await _ctx.SaveChangesAsync(ct);
     }
 
@@ -54,6 +58,7 @@ public class SignatureRepository : ISignatureRepository
         if (entity is null) return;
 
         _ctx.Signatures.Remove(entity);
+        await ProjectionOutbox.EnqueueAsync(_ctx, gJobId, ct);
         await _ctx.SaveChangesAsync(ct);
     }
 

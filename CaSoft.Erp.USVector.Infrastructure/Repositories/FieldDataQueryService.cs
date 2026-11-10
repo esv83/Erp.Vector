@@ -47,6 +47,13 @@ public sealed class FieldDataQueryService : IFieldDataQueryService
                     .ToList()
                     .ToDictionary(s => s.SIG_MISSION_ID, s => s.SIG_DATETIME),
 
+            Waivers = missions.Count == 0
+                ? new Dictionary<Guid, ClSignatureWaiver>()
+                : _ctx.SignatureWaivers.AsNoTracking()
+                    .Where(w => missions.Contains(w.SWV_MISSION_ID))
+                    .ToList()
+                    .ToDictionary(w => w.SWV_MISSION_ID, w => w.ToDomain()),
+
             CurrentMutuelles = ReadCurrentMutuelles(beneficiaries),
 
             // DOC_CONTENT n'est pas lu : le paquet annonce le document par son URL (D8).

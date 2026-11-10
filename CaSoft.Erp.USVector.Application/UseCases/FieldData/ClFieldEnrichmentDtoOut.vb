@@ -41,6 +41,19 @@ Public Class ClFieldSignatureDtoOut
     Public Property Exists As Boolean
     Public Property SignedAt As DateTime?
     Public Property ImageUrl As String
+    ''' <summary>
+    ''' Motif « le patient ne peut pas signer » déclaré par l'équipage (MOB_012) ; <c>Nothing</c> sinon.
+    ''' Ajout du 10/11 (alerte signature) : un lecteur qui l'ignore n'est pas affecté.
+    ''' </summary>
+    Public Property Waiver As ClFieldSignatureWaiverDtoOut
+End Class
+
+''' <summary>Motif « le patient ne peut pas signer ».</summary>
+Public Class ClFieldSignatureWaiverDtoOut
+    Public Property ReasonCode As String
+    Public Property Comment As String
+    ''' <summary>UTC — à la différence de <c>SignedAt</c>, en heure locale par convention figée.</summary>
+    Public Property DeclaredAt As DateTime
 End Class
 
 ''' <summary>Attributs de facturation dynamiques saisis (overlay MOB-13).</summary>

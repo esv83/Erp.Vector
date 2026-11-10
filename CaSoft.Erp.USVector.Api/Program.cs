@@ -297,7 +297,12 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddScoped<ISignatureRepository, SignatureRepository>();
 builder.Services.AddScoped<IJobTimeRepository, JobTimeRepository>();
 // Synchro régulation garantie : worker qui vide l'Outbox de projection opérationnelle (debounce + retry).
+// PRJ-2 — la même entrée projette aussi la signature (présence, motif) vers Orders : coupé par défaut.
+builder.Services.AddSingleton(builder.Configuration.GetSection(FieldProjectionOptions.SectionName).Get<FieldProjectionOptions>()
+    ?? new FieldProjectionOptions());
 builder.Services.AddHostedService<OperationalOutboxDispatcher>();
+// Motif « le patient ne peut pas signer » (MOB_012) : stockage BD Mobile, arme la projection.
+builder.Services.AddScoped<ISignatureWaiverRepository, SignatureWaiverRepository>();
 
 // Carte mutuelle (P1) : stockage BD Mobile.
 builder.Services.AddScoped<IMutuelleCardRepository, MutuelleCardRepository>();
