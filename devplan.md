@@ -245,6 +245,27 @@ et **c'est dit**.*
 - **Passer les références `CaSoft.Framework.*` à `2.11.0`** (aujourd'hui : 2.3.5 — le saut le plus long de l'ERP : la 2.4.0 fusionne `Data` dans `Infrastructure`, la 2.5.0 change le texte des erreurs). La série 2.x est additive ; lire les notes de version entre les deux, notamment les dépendances nouvelles (JwtBearer ≥ 8.0.10 pour `Security`, Hosting.Abstractions ≥ 8.0.1 pour `Application`).
 - **Validation du jeton Keycloak** : remplacer la configuration JwtBearer de `CaSoft.Erp.USVector.Api/Program.cs` par `AddAuthentication(…).AddCaSoftKeycloakJwtBearer(builder.Configuration)`, et retirer le contrôle local de l'`azp`. Clés : `Keycloak:Authority`, `Keycloak:ClientId` (le front), `Keycloak:FrontClientIds` (les autres fronts), `Keycloak:AllowedAzp` (les **modules** seulement). Les interrupteurs du module (`Keycloak:Enabled`…) restent au module. `Keycloak:Audience` y tient lieu d'`azp` : sa valeur passe dans `Keycloak:ClientId`.
 
+## Dette
+
+Prochains identifiants : CQ-008 · DR-005 · AR-002
+
+*Rubrique créée le 11/11, sur la revue code-quality de `8af6ff7` (alerte signature, lot 1). Les points DR et AR viennent de la section « hors périmètre » de cette revue : non revus par un agent design-review ou architecture.*
+
+| ID | P | Fichier | Constat |
+|---|---|---|---|
+| CQ-001 | P2 | `CaSoft.Erp.USVector.Api/Workers/OperationalOutboxDispatcher.cs:63-137` | `DispatchDueAsync` 75 lignes (refactoring 50 ; 59 avant le lot 1), projection terrain inline l. 100-109 → extraire `ProjectFieldStateAsync` |
+| CQ-002 | P2 | `CaSoft.Erp.USVector.Infrastructure/ErpApi/HttpErpWriteApiClient.cs:60-82` | `ProjectFieldAsync` recopie `ProjectOperationalAsync` (règle 404) ; fin d'échec log + `HttpRequestException` ×5 (l. 57, 81, 112, 142, 177) → helpers privés |
+| CQ-003 | P3 | `CaSoft.Erp.USVector.Infrastructure/Repositories/FieldDataReader.cs:201-208` | `ClFieldSignatureWaiverDtoOut` construit inline, seul bloc hors méthode d'extension (règle MAPPING) |
+| CQ-004 | P3 | `CaSoft.Erp.USVector.Api/Workers/OperationalOutboxDispatcher.cs:104-108` | `SpecifyKind(Utc)` du motif en double de `SignatureWaiverMappings.ToDomain` |
+| CQ-005 | P3 | `CaSoft.Erp.USVector.Application/UseCases/SignatureWaiver/ClDeclareSignatureWaiverUseCase.vb:13,33-35,61` | vocabulaire technique en français (`Validateur`, `verdict`, `Refus`) dans du code nouveau |
+| CQ-006 | P3 | `…/UseCases/SignatureWaiver/ClSignatureWaiverDtos.vb`, `Domain/Entities/ClSignatureWaiver.vb` | plusieurs types par fichier, mapping hors `ModXxxMapping.vb`, contre la convention du module |
+| CQ-007 | P3 | `ErpApi/IErpWriteApiClient.cs:33,137`, `Repositories/Mobile/ProjectionOutbox.cs`, `Api/Workers/OperationalOutboxDispatcher.cs` | « Operational » vs « Projection » pour le même mécanisme (`EnOperationalProjectionOutcome` rendu par `ProjectFieldAsync`) ; table `MOB_OPERATIONAL_OUTBOX` inchangée |
+| DR-001 | P2 | `HttpErpWriteApiClient.cs:79-81`, `OperationalOutboxDispatcher.cs:123-133` | un 400/409 d'Order sur `PUT missions/{id}/field` lève et se relance sans fin (60 s), contre « refus métier jamais retentés » (`decided.md`, 21/09) ; risque faible (Vector ne produit pas les données refusées) ; à arbitrer avec le 04/10 |
+| DR-002 | P2 | `SignatureWaiverRepository.cs:53,63`, `SignatureRepository.cs`, repositories du module | `SaveChangesAsync` dans les repositories, pas d'`IUnitOfWork` (absent du socle) ; schéma du module, migrer au fil des modifications |
+| DR-003 | P3 | `CaSoft.Erp.USVector.Api/Controllers/SignatureWaiverController.cs:23-34` | lectures par `ISignatureWaiverRepository` au lieu d'un `IXxxQueryService` ; le contrôleur compose le libellé (deux appels) |
+| DR-004 | P3 | `SignatureWaiverController.cs:44-49` | `Withdraw` appelle le repository sans cas d'usage (ni garde, ni `ClResult`) |
+| AR-001 | P3 | `OperationalOutboxDispatcher.cs:103-105` | le worker (couche Api) interroge `MobileDbContext` directement (`Signatures`, `SignatureWaivers`) au lieu d'un service d'Infrastructure |
+
 # 3. Fonctionnalités envisagées en Vn
 
 *Non engagé, non planifié — avec la condition qui les remettrait sur la table.*
