@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using CaSoft.Erp.USVector.Api.Infrastructure;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
@@ -34,17 +34,41 @@ public class KeycloakCallersTests
         return result.Succeeded;
     }
 
+    /// <summary>
+    /// Itération 11 — l'admission est jugée par le socle (AddCaSoftKeycloakJwtBearer), sur les clés de
+    /// Vector : le mobile (ClientId), les écrans (FrontClientIds), les modules (AllowedAzp).
+    /// </summary>
+    private static CaSoft.Framework.Security.ClKeycloakCallers Admission(bool withServices = true)
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["Keycloak:ClientId"] = Mobile,
+            ["Keycloak:FrontClientIds:0"] = Regulation
+        };
+        if (withServices) values["Keycloak:AllowedAzp:0"] = Facturation;
+        return CaSoft.Framework.Security.ClKeycloakCallers.FromConfiguration(
+            new ConfigurationBuilder().AddInMemoryCollection(values).Build());
+    }
+
     [Theory]
     [InlineData(Mobile, true)]
     [InlineData(Facturation, true)]
+    [InlineData(Regulation, true)]
     [InlineData("un-autre-client", false)]
     [InlineData(null, false)]
-    public void L_authentification_accepte_le_mobile_et_les_services_declares(string? azp, bool accepted)
-        => ClKeycloakCallers.IsAccepted(azp, Mobile, Services).Should().Be(accepted);
+    public void L_authentification_accepte_le_mobile_les_ecrans_et_les_services_declares(string? azp, bool accepted)
+        => Admission().IsAdmitted(azp!).Should().Be(accepted);
 
     [Fact]
-    public void Sans_service_declare_seul_le_mobile_est_accepte()
-        => ClKeycloakCallers.IsAccepted(Facturation, Mobile, Array.Empty<string>()).Should().BeFalse();
+    public void Sans_service_declare_la_facturation_est_refusee()
+        => Admission(withServices: false).IsAdmitted(Facturation).Should().BeFalse();
+
+    [Fact]
+    public void La_facturation_est_un_module_et_l_ecran_un_front()
+    {
+        Admission().IsModule(Facturation).Should().BeTrue();
+        Admission().IsFront(Regulation).Should().BeTrue();
+    }
 
     [Fact]
     public async Task Le_jeton_de_la_facturation_n_ouvre_pas_les_routes_du_terrain()
@@ -74,9 +98,9 @@ public class KeycloakCallersTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Keycloak:ServiceAzp:0"] = " erp-billinggateway-api ",
-                ["Keycloak:ServiceAzp:1"] = "",
-                ["Keycloak:ServiceAzp:2"] = "erp-billinggateway-api"
+                ["Keycloak:AllowedAzp:0"] = " erp-billinggateway-api ",
+                ["Keycloak:AllowedAzp:1"] = "",
+                ["Keycloak:AllowedAzp:2"] = "erp-billinggateway-api"
             })
             .Build();
 
@@ -115,7 +139,7 @@ public class KeycloakCallersTests
     public void La_liste_des_ecrans_se_lit_comme_celle_des_services()
     {
         var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["Keycloak:ScreenAzp:0"] = " erp-order-front " })
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Keycloak:FrontClientIds:0"] = " erp-order-front " })
             .Build();
 
         ClKeycloakCallers.ReadScreenAzp(configuration).Should().Equal(Regulation);

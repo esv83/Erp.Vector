@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 
 namespace CaSoft.Erp.USVector.Api.Infrastructure;
 
@@ -6,12 +6,17 @@ namespace CaSoft.Erp.USVector.Api.Infrastructure;
 /// C2 — Qui peut appeler Vector avec un jeton Keycloak, et où. Trois familles d'appelants, distinguées
 /// par l'<c>azp</c> (le client qui a obtenu le jeton) :
 /// <list type="bullet">
-///   <item><b>le client mobile</b> (<c>Keycloak:Audience</c>) — toutes les routes protégées ;</item>
-///   <item><b>les modules de service</b> (<c>Keycloak:ServiceAzp</c>, la facturation) — seulement les
+///   <item><b>le client mobile</b> (<c>Keycloak:ClientId</c>) — toutes les routes protégées ;</item>
+///   <item><b>les modules de service</b> (<c>Keycloak:AllowedAzp</c>, la facturation) — seulement les
 ///   routes qui portent <see cref="ServiceOrMobilePolicy"/> ou <see cref="MutuelleCardReadPolicy"/> ;</item>
-///   <item><b>les écrans</b> (<c>Keycloak:ScreenAzp</c>, régulation et certification, 04/10) — seulement
+///   <item><b>les écrans</b> (<c>Keycloak:FrontClientIds</c>, régulation et certification, 04/10) — seulement
 ///   la lecture de la carte mutuelle, <see cref="MutuelleCardReadPolicy"/>.</item>
 /// </list>
+/// <para>
+/// <b>L'admission</b> (jeton émis pour l'un de ces clients) est jugée par le socle,
+/// <c>AddCaSoftKeycloakJwtBearer</c>, sur les mêmes clés (Itération 11). Cette classe ne porte plus que
+/// <b>l'autorisation</b> propre à Vector : qui entre sur quelles routes.
+/// </para>
 /// <para>
 /// ⚠️ Accepter un jeton à l'authentification ne suffit pas pour entrer : la politique de repli exige
 /// l'azp <b>mobile</b>. Sans cette séparation, le jeton de la facturation ou d'un écran ouvrirait
@@ -37,16 +42,20 @@ public static class ClKeycloakCallers
     /// </summary>
     public const string MutuelleCardReadPolicy = "LecteurCarteMutuelle";
 
-    /// <summary>Clients de service autorisés (<c>Keycloak:ServiceAzp</c>), sans vide ni doublon.</summary>
+    /// <summary>Le client mobile (<c>Keycloak:ClientId</c>, le « front » du socle).</summary>
+    public static string? ReadMobileAzp(IConfiguration configuration)
+        => configuration["Keycloak:ClientId"]?.Trim();
+
+    /// <summary>Modules de service autorisés (<c>Keycloak:AllowedAzp</c>), sans vide ni doublon.</summary>
     public static IReadOnlyCollection<string> ReadServiceAzp(IConfiguration configuration)
-        => ReadAzpList(configuration, "Keycloak:ServiceAzp");
+        => ReadAzpList(configuration, "Keycloak:AllowedAzp");
 
     /// <summary>
-    /// Écrans autorisés à lire la carte (<c>Keycloak:ScreenAzp</c>). Vide par défaut : la politique de
-    /// lecture se réduit alors au mobile et aux services, comme avant.
+    /// Écrans autorisés à lire la carte (<c>Keycloak:FrontClientIds</c>, les « autres fronts » du socle).
+    /// Vide : la politique de lecture se réduit au mobile et aux services.
     /// </summary>
     public static IReadOnlyCollection<string> ReadScreenAzp(IConfiguration configuration)
-        => ReadAzpList(configuration, "Keycloak:ScreenAzp");
+        => ReadAzpList(configuration, "Keycloak:FrontClientIds");
 
     private static IReadOnlyCollection<string> ReadAzpList(IConfiguration configuration, string section)
         => configuration.GetSection(section).Get<string[]>()?
@@ -55,15 +64,6 @@ public static class ClKeycloakCallers
                .Distinct(StringComparer.Ordinal)
                .ToArray()
            ?? Array.Empty<string>();
-
-    /// <summary>Le jeton a-t-il été émis pour un appelant connu ?</summary>
-    public static bool IsAccepted(string? azp, string? mobileAzp, IReadOnlyCollection<string> serviceAzp)
-        => !string.IsNullOrEmpty(azp)
-           && (string.Equals(azp, mobileAzp, StringComparison.Ordinal) || serviceAzp.Contains(azp, StringComparer.Ordinal));
-
-    /// <summary>Complément du message de refus : les clients de service acceptés, s'il y en a.</summary>
-    public static string DescribeServices(IReadOnlyCollection<string> serviceAzp)
-        => serviceAzp.Count == 0 ? string.Empty : $" ou l'un de : {string.Join(", ", serviceAzp)}";
 
     /// <summary>Politique de repli : authentifié <b>et</b> émis pour le client mobile.</summary>
     public static AuthorizationPolicy MobileOnly(string mobileAzp)

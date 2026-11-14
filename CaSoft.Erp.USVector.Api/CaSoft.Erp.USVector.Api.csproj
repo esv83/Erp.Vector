@@ -52,6 +52,8 @@
     <!-- Jeton du compte de service sur les appels à Orders (C2). Ne dépend que de
          CaSoft.Framework.Security 2.8.0, pas du socle : coexiste avec le socle CaSoft.Framework 2.12.0. -->
     <PackageReference Include="CaSoft.Identity.Client" Version="1.4.0" />
+    <!-- Itération 11 : validation du jeton Keycloak commune aux API (AddCaSoftKeycloakJwtBearer). -->
+    <PackageReference Include="CaSoft.Framework.Security" Version="2.12.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.10.0" />
     <PackageReference Include="NLog.Web.AspNetCore" Version="5.4.0" />

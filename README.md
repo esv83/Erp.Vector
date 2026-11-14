@@ -1,4 +1,4 @@
-# CaSoft.Erp.USVector — Vector
+﻿# CaSoft.Erp.USVector — Vector
 
 API du **module terrain des ambulanciers** : l'application mobile y lit ses missions et y écrit ce que
 l'équipage fait sur le terrain. Reconstruite sur l'ERP après la perte de la base historique, **sans
@@ -33,9 +33,10 @@ changer le contrat consommé par l'application** — mêmes routes, mêmes forma
 
 ## Authentification
 
-- **Ambulancier** : jeton Keycloak du client mobile (`azp` = `Keycloak:Audience`). L'équipage est
+- **Ambulancier** : jeton Keycloak du client mobile (`azp` = `Keycloak:ClientId`). L'équipage est
   résolu côté serveur, jamais fourni par l'app.
-- **Service à service** : Vector accepte les modules déclarés dans `Keycloak:ServiceAzp` et présente
+- **Service à service** : Vector accepte les modules déclarés dans `Keycloak:AllowedAzp`, les écrans dans `Keycloak:FrontClientIds`
+  (lecture de la carte mutuelle seulement), et présente
   son propre jeton à Orders (`erp-vector-api`).
 - **Fermée par défaut** : les seules routes anonymes sont nommées et justifiées dans
   `AnonymousSurfaceTests`.

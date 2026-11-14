@@ -12,8 +12,6 @@ using CaSoft.Erp.USVector.Api.Workers;
 using EmergencyPlatformConnector;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using NLog.Web;
@@ -21,133 +19,42 @@ using NLog.Web;
 var builder = WebApplication.CreateBuilder(args);
 
 // ── Auth Keycloak (JWT) — gated par config, comme Crew.Api (MOB-4a) ──────────
+// Itération 11 : anciennes clés (Audience, ServiceAzp, ScreenAzp) recopiées sous les noms du socle.
+var keycloakLegacyKeys = KeycloakLegacyKeys.Apply(builder.Configuration);
 var keycloakEnabled = builder.Configuration.GetValue("Keycloak:Enabled", false);
 if (keycloakEnabled)
 {
     // KC-1 — realm et client mobile viennent de la config (plus aucune valeur en dur ci-dessous).
-    // Les figer dans le code imposait une recompilation pour changer d'environnement, et laissait
-    // un « keycloak.placeholder » trompeur dans appsettings — qui donnait le change en débogage.
     var authority = builder.Configuration["Keycloak:Authority"];
-    // Le client mobile est à la fois l'audience visée et l'« azp » attendu (cf. OnTokenValidated).
-    var audience = builder.Configuration["Keycloak:Audience"];
+    // Le client mobile : le « front » du socle, et l'azp qu'exige la politique de repli.
+    var audience = ClKeycloakCallers.ReadMobileAzp(builder.Configuration);
     // ⚠️ DEV/TEST UNIQUEMENT : décode le token SANS vérifier signature / issuer / audience /
-    // expiration, et SANS contacter Keycloak (Authority inutile). NE JAMAIS activer en production.
+    // expiration / azp, et SANS contacter Keycloak. NE JAMAIS activer en production.
     var disableValidation = builder.Configuration.GetValue("Keycloak:DisableValidation", false);
-    // C2 — modules de service dont le jeton est accepté (la facturation). Ils n'entrent que sur les
-    // routes qui portent ClKeycloakCallers.ServiceOrMobilePolicy : la politique de repli exige l'azp mobile.
+    // C2 — modules de service (la facturation) : n'entrent que sur ServiceOrMobilePolicy.
     var serviceAzp = ClKeycloakCallers.ReadServiceAzp(builder.Configuration);
     // Écrans de régulation et de certification (04/10) : lecture de la carte mutuelle seulement.
     var screenAzp = ClKeycloakCallers.ReadScreenAzp(builder.Configuration);
-    var otherAzp = serviceAzp.Concat(screenAzp).Distinct(StringComparer.Ordinal).ToArray();
 
-    // Garde-fou AU DÉMARRAGE (KC-1) : hors mode dégradé, une Authority absente ou restée au
-    // placeholder fait échouer le fetch OIDC et rejette SILENCIEUSEMENT tous les tokens (401 en
-    // série, sans cause lisible). Mieux vaut refuser de démarrer en le disant. Volontairement
-    // ICI et non dans le callback AddJwtBearer : celui-ci n'est exécuté qu'à la première requête
-    // authentifiée, l'erreur sortirait en 500 tardif au lieu d'un échec de démarrage.
-    if (!disableValidation)
-    {
-        if (string.IsNullOrWhiteSpace(authority) || authority.Contains("placeholder", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException(
-                $"Keycloak:Authority invalide ('{authority}'). Renseigner le realm dans "
-                + "appsettings.{Environnement}.json ou via la variable d'environnement Keycloak__Authority.");
+    // Garde-fou AU DÉMARRAGE (KC-1) : une Authority restée au placeholder fait échouer le fetch OIDC
+    // et rejette SILENCIEUSEMENT tous les tokens. Le socle refuse déjà une Authority ou un ClientId
+    // absents ; le placeholder, lui, est propre à l'historique de Vector.
+    if (!disableValidation && authority?.Contains("placeholder", StringComparison.OrdinalIgnoreCase) == true)
+        throw new InvalidOperationException(
+            $"Keycloak:Authority invalide ('{authority}'). Renseigner le realm dans "
+            + "appsettings.{Environnement}.json ou via la variable d'environnement Keycloak__Authority.");
 
-        if (string.IsNullOrWhiteSpace(audience))
-            throw new InvalidOperationException(
-                "Keycloak:Audience manquant : c'est aussi l'« azp » attendu du client mobile.");
-    }
+    // Itération 11 — la validation est celle du socle : émetteur = Authority, MapInboundClaims = false,
+    // pas de contrôle d'audience (Keycloak émet « aud: account »), azp admis = ClientId +
+    // FrontClientIds + AllowedAzp, refus motivé sinon.
+    // Nom complet : le socle a aussi un ClKeycloakCallers (l'admission), homonyme du nôtre (les routes).
+    CaSoft.Framework.Security.ClKeycloakAuthenticationExtensions.AddCaSoftKeycloakJwtBearer(
+        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme), builder.Configuration);
 
-    builder.Services
-        .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-        .AddJwtBearer(options =>
-        {
-            options.Authority = authority;
-            options.Audience = audience;
-            options.RequireHttpsMetadata = builder.Configuration.GetValue("Keycloak:RequireHttpsMetadata", true);
-
-            // Conserver les claims JWT bruts (sub, iss, exp…) : sinon .NET remappe par défaut « sub »
-            // vers ClaimTypes.NameIdentifier (URI XML long), et toute lecture de « sub » (log ci-dessous,
-            // GetKeycloakSubject) tombe à vide → « impossible d'extraire le user id du sub ». On lit le
-            // sub tel que Keycloak l'émet. (Correctif canonique Keycloak + ASP.NET Core.)
-            options.MapInboundClaims = false;
-
-            if (disableValidation)
-            {
-                options.Authority = null; // évite le fetch OIDC metadata
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
-                    ValidateLifetime = false,
-                    ValidateIssuerSigningKey = false,
-                    SignatureValidator = (token, _) => new JsonWebToken(token)
-                };
-            }
-
-            // Audience : Keycloak émet par défaut « aud: account » (aucun audience mapper configuré sur
-            // le realm). Plutôt que d'imposer un mapper côté Keycloak, on désactive la validation d'aud
-            // et on valide l'« azp » (authorized party = client émetteur du token) dans OnTokenValidated.
-            // Signature / issuer / expiration restent validés. (Si un audience mapper est ajouté plus
-            // tard, on pourra revenir à une validation d'audience stricte.)
-            options.TokenValidationParameters.ValidateAudience = false;
-
-            // ── Interception JWT observable/testable (MOB-4a) ────────────────────
-            // On trace chaque étape du pipeline et on dépose la raison d'un rejet
-            // dans HttpContext.Items pour que les controllers renvoient une erreur explicite.
-            options.Events = new JwtBearerEvents
-            {
-                OnMessageReceived = ctx =>
-                {
-                    var log = ctx.HttpContext.RequestServices
-                        .GetRequiredService<ILoggerFactory>().CreateLogger("Keycloak.Jwt");
-                    log.LogDebug("JWT — requête {Method} {Path} : header Authorization {Present}.",
-                        ctx.HttpContext.Request.Method, ctx.HttpContext.Request.Path,
-                        ctx.HttpContext.HasAuthorizationHeader() ? "présent" : "ABSENT");
-                    return Task.CompletedTask;
-                },
-                OnTokenValidated = ctx =>
-                {
-                    var log = ctx.HttpContext.RequestServices
-                        .GetRequiredService<ILoggerFactory>().CreateLogger("Keycloak.Jwt");
-
-                    // Cloisonnement API (remplace la validation d'aud) : le token doit avoir été émis POUR
-                    // le client mobile, pour un module de service (Keycloak:ServiceAzp, C2) ou pour un écran
-                    // (Keycloak:ScreenAzp). On l'exige via « azp ». Ignoré en mode DisableValidation (dev pur).
-                    // Accepter un tel jeton ici n'ouvre AUCUNE route du terrain : la politique de repli exige
-                    // l'azp mobile.
-                    var expectedAzp = audience; // = Keycloak:Audience (KC-1 : plus de valeur en dur)
-                    var azp = ctx.Principal?.FindFirst(ClKeycloakCallers.AzpClaim)?.Value;
-                    if (!disableValidation && !ClKeycloakCallers.IsAccepted(azp, expectedAzp, otherAzp))
-                    {
-                        var reason = $"azp '{azp}' non autorisé (attendu '{expectedAzp}'{ClKeycloakCallers.DescribeServices(otherAzp)}).";
-                        // Déposé pour lecture par les controllers (cf. MobileCallerExtensions.GetJwtError).
-                        ctx.HttpContext.Items[MobileCallerExtensions.JwtErrorKey] = reason;
-                        log.LogWarning("JWT REJETÉ sur {Path} : {Reason}.", ctx.HttpContext.Request.Path, reason);
-                        ctx.Fail(reason);
-                        return Task.CompletedTask;
-                    }
-
-                    log.LogInformation("JWT validé : sub={Sub} azp={Azp} iss={Iss} aud={Aud} exp={Exp}.",
-                        ctx.Principal?.FindFirst("sub")?.Value,
-                        azp,
-                        ctx.Principal?.FindFirst("iss")?.Value,
-                        ctx.Principal?.FindFirst("aud")?.Value,
-                        ctx.Principal?.FindFirst("exp")?.Value);
-                    return Task.CompletedTask;
-                },
-                OnAuthenticationFailed = ctx =>
-                {
-                    var reason = $"{ctx.Exception.GetType().Name}: {ctx.Exception.Message}";
-                    // Déposé pour lecture par les controllers (cf. MobileCallerExtensions.GetJwtError).
-                    ctx.HttpContext.Items[MobileCallerExtensions.JwtErrorKey] = reason;
-                    var log = ctx.HttpContext.RequestServices
-                        .GetRequiredService<ILoggerFactory>().CreateLogger("Keycloak.Jwt");
-                    log.LogWarning(ctx.Exception, "JWT REJETÉ sur {Path} : {Reason}.",
-                        ctx.HttpContext.Request.Path, reason);
-                    return Task.CompletedTask;
-                }
-            };
-        });
+    // Ce que Vector ajoute autour, sans rien retirer au socle : le motif d'un rejet déposé pour les
+    // contrôleurs (MobileCallerExtensions.GetJwtError), le journal « Keycloak.Jwt », et le mode dégradé.
+    builder.Services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme,
+        options => VectorJwtBearerEvents.Apply(options, disableValidation));
     // ⚠️ FERMÉ PAR DÉFAUT. Jusqu'ici aucun contrôleur ne portait d'attribut d'autorisation et il
     // n'existait aucune politique globale : seuls les cinq endpoints passant par CrewAccess étaient
     // protégés, par leur code. Tout le reste répondait 200 à qui connaissait un identifiant de
@@ -439,6 +346,10 @@ app.UseCors(options => options
     .AllowAnyMethod()
     .AllowAnyOrigin()
 );
+
+if (keycloakLegacyKeys.Count > 0)
+    app.Logger.LogWarning("Clés Keycloak à renommer (Itération 11), reprises sous leur nouveau nom : {Cles}.",
+        string.Join(" ; ", keycloakLegacyKeys));
 
 if (keycloakEnabled)
 {

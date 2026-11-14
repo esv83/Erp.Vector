@@ -1,4 +1,4 @@
-using System.Data.Common;
+﻿using System.Data.Common;
 using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Infrastructure.Persistence.Schema;
 using Microsoft.AspNetCore.Authorization;
@@ -98,8 +98,9 @@ public class VersionController : ControllerBase
             {
                 KeycloakEnabled = _cfg.GetValue("Keycloak:Enabled", false),
                 KeycloakAuthority = _cfg["Keycloak:Authority"],
-                MobileAzp = _cfg["Keycloak:Audience"],
+                MobileAzp = ClKeycloakCallers.ReadMobileAzp(_cfg),
                 ServiceAzp = ClKeycloakCallers.ReadServiceAzp(_cfg),
+                ScreenAzp = ClKeycloakCallers.ReadScreenAzp(_cfg),
                 DisableValidation = _cfg.GetValue("Keycloak:DisableValidation", false),
                 DiagnosticsEnabled = _cfg.GetValue("Diagnostics:Enabled", false),
                 OrdersApi = _cfg["OrdersApi:BaseUrl"],

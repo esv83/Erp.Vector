@@ -1,4 +1,4 @@
-# Configuration USVector.Api — Keycloak & IIS
+﻿# Configuration USVector.Api — Keycloak & IIS
 
 Guide de configuration de l'API mobile **CaSoft.Erp.USVector.Api** : authentification
 **Keycloak** (chapitre 1) et déploiement **IIS** sur le serveur de dev (chapitre 2).
@@ -28,8 +28,9 @@ La configuration se lit dans cet ordre (le dernier gagne) :
 | `Keycloak:RequireHttpsMetadata` | appsettings | `true` | Exige HTTPS pour les métadonnées OIDC |
 | `Keycloak:DisableValidation` | **dev only** | `false` | ⚠ décode sans vérifier signature — **jamais en prod** |
 | `Keycloak:Authority` | appsettings | `https://auth.ade-dev.fr/realms/delesse` | Realm — validation JWT **et** recherche par username (§1.3). Vide ou placeholder hors mode dégradé → l'API **refuse de démarrer** (KC-1) |
-| `Keycloak:Audience` | appsettings | `us-ambulance` | `azp` attendu du client mobile (§1.2) |
-| `Keycloak:ServiceAzp` | appsettings | `[ "erp-billinggateway-api" ]` | `azp` des modules admis en service à service |
+| `Keycloak:ClientId` | appsettings | `us-ambulance` | `azp` attendu du client mobile (§1.2). Ancien nom : `Keycloak:Audience` |
+| `Keycloak:AllowedAzp` | appsettings | `[ "erp-billinggateway-api" ]` | `azp` des modules admis en service à service. Ancien nom : `Keycloak:ServiceAzp` |
+| `Keycloak:FrontClientIds` | appsettings | `[ "us-regulation" ]` | `azp` des écrans (lecture de la carte mutuelle). Ancien nom : `Keycloak:ScreenAzp` |
 | `Keycloak:AdminClientId` | env / appsettings | `usvector-diag` | Service account (recherche username) |
 | `Keycloak:AdminClientSecret` | **env** (secret) | `***` | Secret du service account |
 | `MobileIdentityCache:PersonnelMinutes` | appsettings | `30` | TTL cache `sub→PER_ID` |
@@ -61,7 +62,7 @@ USVector.Api valide chaque token porté par `Authorization: Bearer …` :
 | Paramètre attendu | Valeur | Où c'est vérifié |
 |---|---|---|
 | **Authority (issuer)** | `https://auth.ade-dev.fr/realms/delesse` | `Keycloak:Authority`, lu par `Program.cs` |
-| **`azp` attendu** | `us-ambulance` | `Keycloak:Audience`, lu par `Program.cs` |
+| **`azp` attendu** | `us-ambulance` | `Keycloak:ClientId`, lu par le socle (`AddCaSoftKeycloakJwtBearer`) |
 | **Signature** | JWKS du realm (récupéré via l'Authority) | middleware JwtBearer |
 | **Claim `sub`** | l'ID utilisateur Keycloak (= le sub) | lu par l'app (résolution PER_ID) |
 
@@ -69,7 +70,13 @@ USVector.Api valide chaque token porté par `Authorization: Bearer …` :
 (aucun *audience mapper*). Plutôt que d'imposer un mapper côté realm, l'API **désactive la validation
 d'audience** et valide l'**`azp`** (*authorized party* = client émetteur) : il doit valoir
 `us-ambulance`. Signature / issuer / expiration restent validés. Un token émis pour un autre client
-est donc rejeté (`azp '…' non autorisé`). Cf. `Program.cs`, `OnTokenValidated`.
+est donc rejeté (`azp '…' non autorisé`).
+
+> **Depuis l'Itération 11 (14/11/2026)**, cette validation est celle du socle, `AddCaSoftKeycloakJwtBearer`
+> (CaSoft.Framework.Security 2.12.0) : émetteur = `Keycloak:Authority` **à l'identique**, `azp` admis =
+> `ClientId` + `FrontClientIds` + `AllowedAzp`. Vector y ajoute le motif du rejet pour les contrôleurs et
+> le journal `Keycloak.Jwt` (`VectorJwtBearerEvents`). Une ancienne clé encore posée (web.config) est
+> reprise sous son nouveau nom et signalée au démarrage (`KeycloakLegacyKeys`).
 
 > 🔒 *Durcissement optionnel* : si tu ajoutes un *Audience mapper* Keycloak (Client scopes →
 > « Audience » → *Included Client Audience* = `us-ambulance`, *Add to access token* = ON) pour que le
@@ -82,9 +89,9 @@ est donc rejeté (`azp '…' non autorisé`). Cf. `Program.cs`, `OnTokenValidate
    serveur (le middleware récupère la config OIDC + les clés JWKS au démarrage / à la volée).
 
 > ✅ **Piloté par la configuration depuis le 2026-08-02 (KC-1)** : `options.Authority` et
-> `options.Audience` sont lus dans `Keycloak:Authority` / `Keycloak:Audience`. Changer de realm ne
-> demande plus de code. Garde-fou au démarrage : une `Authority` vide ou placeholder, ou une
-> `Audience` absente, **empêche l'API de démarrer** (hors `DisableValidation`).
+> le client mobile sont lus dans `Keycloak:Authority` / `Keycloak:ClientId`. Changer de realm ne
+> demande plus de code. Garde-fou au démarrage : une `Authority` vide ou placeholder, ou un
+> `ClientId` absent, **empêche l'API de démarrer** — y compris en `DisableValidation` (le socle les exige).
 
 #### Mode dev sans Keycloak joignable
 
