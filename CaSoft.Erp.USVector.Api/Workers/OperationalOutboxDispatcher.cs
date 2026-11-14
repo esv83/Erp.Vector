@@ -1,5 +1,6 @@
-using CaSoft.Erp.USVector.Infrastructure.ErpApi;
+﻿using CaSoft.Erp.USVector.Infrastructure.ErpApi;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
+using CaSoft.Erp.USVector.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -87,27 +88,7 @@ public sealed class OperationalOutboxDispatcher : BackgroundService
 
             try
             {
-                var outcome = EnOperationalProjectionOutcome.Applied;
-
-                // État consolidé courant (jalons null inclus → l'effacement/annulation est propagé).
-                if (mst is not null)
-                    outcome = await erpWrite.ProjectOperationalAsync(
-                        ob.OOB_MISSION_ID,
-                        mst.MST_ACK_AT, mst.MST_READ_AT, mst.MST_GO_AT,
-                        mst.MST_ONSITE_AT, mst.MST_TERMINATED_AT,
-                        sourceCrewId: null, ct);
-
-                // PRJ-2 — instantané : signature présente ou non, motif ou rien (un motif retiré s'efface chez Order).
-                if (_isFieldProjectionEnabled && outcome != EnOperationalProjectionOutcome.MissionNotFound)
-                {
-                    var isSigned = await ctx.Signatures.AnyAsync(s => s.SIG_MISSION_ID == ob.OOB_MISSION_ID, ct);
-                    var waiver = await ctx.SignatureWaivers.AsNoTracking()
-                        .SingleOrDefaultAsync(w => w.SWV_MISSION_ID == ob.OOB_MISSION_ID, ct);
-                    outcome = await erpWrite.ProjectFieldAsync(
-                        ob.OOB_MISSION_ID, isSigned, waiver?.SWV_REASON_CODE,
-                        waiver is null ? null : DateTime.SpecifyKind(waiver.SWV_DECLARED_AT, DateTimeKind.Utc), ct);
-                }
-
+                var outcome = await ProjectEntryAsync(ctx, erpWrite, ob.OOB_MISSION_ID, mst, ct);
                 if (outcome == EnOperationalProjectionOutcome.MissionNotFound)
                 {
                     // Définitif : la mission n'existe pas (ou plus) chez Orders. La relancer ne la fera pas
@@ -117,22 +98,62 @@ public sealed class OperationalOutboxDispatcher : BackgroundService
                         "après {Attempts} tentative(s). Les jalons et la signature de cette mission ne seront pas projetés.",
                         ob.OOB_MISSION_ID, ob.OOB_ATTEMPTS + 1);
                 }
-
                 ctx.OperationalOutbox.Remove(ob);   // livré, ou abandonné → retiré de l'outbox
             }
             catch (Exception ex)
             {
-                ob.OOB_ATTEMPTS += 1;
-                ob.OOB_LAST_ERROR = ex.Message.Length > 500 ? ex.Message[..500] : ex.Message;
-                var backoff = Math.Min(60, Math.Pow(2, Math.Min(ob.OOB_ATTEMPTS, 6)));   // 2,4,…,60 s
-                ob.OOB_DISPATCH_AFTER = now.AddSeconds(backoff);
-                ob.OOB_UPDATED_AT = now;
-                _logger.LogWarning(ex,
-                    "Projection outbox mission {MissionId} échouée (tentative {Attempts}) — relance dans {Backoff}s.",
-                    ob.OOB_MISSION_ID, ob.OOB_ATTEMPTS, backoff);
+                ScheduleRetry(ob, now, ex);
             }
         }
 
         await ctx.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Projette une entrée : jalons (si la mission en a), puis état terrain (PRJ-2) tant qu'Orders
+    /// connaît la mission. Rend <c>MissionNotFound</c> dès qu'une des deux projections l'a constaté.
+    /// </summary>
+    private async Task<EnOperationalProjectionOutcome> ProjectEntryAsync(
+        MobileDbContext ctx, IErpWriteApiClient erpWrite, Guid missionId, MOB_MISSION_STATE? mst, CancellationToken ct)
+    {
+        var outcome = EnOperationalProjectionOutcome.Applied;
+
+        // État consolidé courant (jalons null inclus → l'effacement/annulation est propagé).
+        if (mst is not null)
+            outcome = await erpWrite.ProjectOperationalAsync(
+                missionId,
+                mst.MST_ACK_AT, mst.MST_READ_AT, mst.MST_GO_AT,
+                mst.MST_ONSITE_AT, mst.MST_TERMINATED_AT,
+                sourceCrewId: null, ct);
+
+        if (_isFieldProjectionEnabled && outcome != EnOperationalProjectionOutcome.MissionNotFound)
+            outcome = await ProjectFieldStateAsync(ctx, erpWrite, missionId, ct);
+
+        return outcome;
+    }
+
+    /// <summary>PRJ-2 — instantané : signature présente ou non, motif ou rien (un motif retiré s'efface chez Order).</summary>
+    private static async Task<EnOperationalProjectionOutcome> ProjectFieldStateAsync(
+        MobileDbContext ctx, IErpWriteApiClient erpWrite, Guid missionId, CancellationToken ct)
+    {
+        var isSigned = await ctx.Signatures.AnyAsync(s => s.SIG_MISSION_ID == missionId, ct);
+        var waiver = await ctx.SignatureWaivers.AsNoTracking()
+            .SingleOrDefaultAsync(w => w.SWV_MISSION_ID == missionId, ct);
+        return await erpWrite.ProjectFieldAsync(
+            missionId, isSigned, waiver?.SWV_REASON_CODE,
+            waiver is null ? null : DateTime.SpecifyKind(waiver.SWV_DECLARED_AT, DateTimeKind.Utc), ct);
+    }
+
+    /// <summary>Panne (5xx, réseau) : l'entrée reste dans l'outbox, relancée avec un délai croissant (2, 4, … 60 s).</summary>
+    private void ScheduleRetry(MOB_OPERATIONAL_OUTBOX ob, DateTime now, Exception ex)
+    {
+        ob.OOB_ATTEMPTS += 1;
+        ob.OOB_LAST_ERROR = ex.Message.Length > 500 ? ex.Message[..500] : ex.Message;
+        var backoff = Math.Min(60, Math.Pow(2, Math.Min(ob.OOB_ATTEMPTS, 6)));
+        ob.OOB_DISPATCH_AFTER = now.AddSeconds(backoff);
+        ob.OOB_UPDATED_AT = now;
+        _logger.LogWarning(ex,
+            "Projection outbox mission {MissionId} échouée (tentative {Attempts}) — relance dans {Backoff}s.",
+            ob.OOB_MISSION_ID, ob.OOB_ATTEMPTS, backoff);
     }
 }
