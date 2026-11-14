@@ -32,6 +32,15 @@ Public Class ClJobDetailAdapter
             .Arrival = Getparagraphe(job.Arrival)
             .IsLastDay = job.IsLastDay
             .IsSign = job.IsSign
+            ' Même calcul qu'Order : jour local, refus dès que aujourd'hui > date de la mission + délai.
+            .CanEditBeneficiary = Date.Today <= job.Schedule.Date.AddDays(BeneficiaryEntryDelayDays)
+            If job.BeneficiaryIdentification IsNot Nothing Then
+                .BeneficiaryIdentification = New ClBeneficiaryIdentificationDtoOut With {
+                    .State = job.BeneficiaryIdentification.State,
+                    .Description = job.BeneficiaryIdentification.Description,
+                    .IdentityEditableByField = job.BeneficiaryIdentification.IdentityEditableByField
+                }
+            End If
 
             ' Nouveaux champs (règles serveur) :
             ' Prise en charge formatée sur le Schedule.

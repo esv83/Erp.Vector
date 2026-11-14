@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Application;
+﻿using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Dto;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
@@ -119,7 +119,15 @@ public class JobRepository : IJobRepository
             Arrival = ToAddressLines(mission.Dropoff),
             PickupLocation = ToJobLocation(mission.Pickup, jobId, "pickup"),
             DropoffLocation = ToJobLocation(mission.Dropoff, jobId, "dropoff"),
-            Comments = mission.Comment ?? string.Empty
+            Comments = mission.Comment ?? string.Empty,
+            BeneficiaryIdentification = mission.BeneficiaryIdentification is { } identification
+                ? new ClBeneficiaryIdentification
+                {
+                    State = identification.State,
+                    Description = identification.Description,
+                    IdentityEditableByField = identification.IdentityEditableByField
+                }
+                : null
         };
     }
 

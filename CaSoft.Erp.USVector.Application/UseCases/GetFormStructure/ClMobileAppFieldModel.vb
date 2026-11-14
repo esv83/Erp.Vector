@@ -24,4 +24,22 @@
     ''' <summary>Motif affichable du verrou. Nothing quand le champ est ouvert.</summary>
     Public Property ReadOnlyReason As String
 
+    ''' <summary>
+    ''' J-154 — Les mêmes options qu'<see cref="Options"/>, en tableau ordonné, avec le drapeau
+    ''' <c>TextRequired</c> (« Autre » à texte libre). Additif (D14) : <see cref="Options"/> garde sa
+    ''' forme objet pour les clients qui la lisent. Nothing hors liste.
+    ''' </summary>
+    Public Property OptionItems As List(Of ClMobileAppFieldOptionDtoOut)
+
+    ''' <summary>J-154 — Texte libre de l'option « Autre » en place ; Nothing sinon. À renvoyer au PATCH.</summary>
+    Public Property OtherText As String
+
+End Class
+
+''' <summary>Une option d'un champ liste.</summary>
+Public Class ClMobileAppFieldOptionDtoOut
+    Public Property Key As Integer
+    Public Property Label As String
+    ''' <summary>Vrai pour « Autre » : un texte libre accompagne la clé (<c>OtherText</c>).</summary>
+    Public Property TextRequired As Boolean
 End Class

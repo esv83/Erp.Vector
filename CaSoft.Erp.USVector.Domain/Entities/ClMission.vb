@@ -26,6 +26,8 @@ Public Class ClMission
     ' « paragraphe » (compat) tirée des mêmes données.
     Public Property PickupLocation As ClJobLocation
     Public Property DropoffLocation As ClJobLocation
+    ''' <summary>J-127 — Nothing pour une commande ordinaire.</summary>
+    Public Property BeneficiaryIdentification As ClBeneficiaryIdentification
 
     Private _contractTypeIdProperty = RegisterProperty(Of Integer)(Function(f) f.ContractTypeId, RelationshipTypes.None, 2)
     Public Property ContractTypeId As Integer?

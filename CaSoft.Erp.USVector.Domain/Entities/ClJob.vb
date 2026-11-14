@@ -28,6 +28,7 @@ Public Class ClJob
         _IsAsap = Mission.IsAsap
         _MaxDelay = Mission.MaxDelay
         _CallTime = Mission.CallTime
+        _BeneficiaryIdentification = Mission.BeneficiaryIdentification
         Me.Comments = Mission.Comments
 
     End Sub
@@ -107,6 +108,8 @@ Public Class ClJob
     Public ReadOnly Property IsAsap As Boolean
     Public ReadOnly Property MaxDelay As Integer?
     Public ReadOnly Property CallTime As Date?
+    ''' <summary>J-127 — Nothing pour une commande ordinaire.</summary>
+    Public ReadOnly Property BeneficiaryIdentification As ClBeneficiaryIdentification
 
     Public Shared Function GetBuilder() As ClJobBuilder
         Return ClJobBuilder.GetBuilder

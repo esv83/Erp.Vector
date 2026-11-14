@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -144,11 +144,11 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
 
     public async Task<ContextOrderValuesWriteResult> SetContextOrderValuesAsync(
         Guid missionId,
-        IReadOnlyCollection<(string Name, string? Value)> values,
+        IReadOnlyCollection<(string Name, string? Value, string? OtherText)> values,
         string? setBy = null,
         CancellationToken ct = default)
     {
-        var body = new { values = values.Select(v => new { name = v.Name, value = v.Value }).ToList(), setBy };
+        var body = new { values = values.Select(v => new { name = v.Name, value = v.Value, otherText = v.OtherText }).ToList(), setBy };
         var response = await _http.PatchAsJsonAsync($"missions/{missionId}/contextOrder/values", body, JsonOptions, ct);
         if (response.IsSuccessStatusCode)
             return new ContextOrderValuesWriteResult(EnContextOrderValuesWriteOutcome.Applied);
@@ -193,7 +193,7 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
     /// moins que la saisie a été <b>refusée</b> — c'est déjà ce qui manquait à l'ambulancier.
     /// </para>
     /// </remarks>
-    private static string? ReadProblemDetail(string? content)
+    internal static string? ReadProblemDetail(string? content)
     {
         if (string.IsNullOrWhiteSpace(content)) return null;
 

@@ -61,6 +61,33 @@ Public Class ClJobDetailModel
     ''' <summary>Image de la carte courante, à charger avec le jeton ; Nothing sans carte.</summary>
     Public Property MutuelleCardImageUrl As String
 
+    ''' <summary>
+    ''' J-144 / contact — la saisie sur le patient (identité, téléphone, e-mail) est encore permise :
+    ''' jusqu'à <see cref="BeneficiaryEntryDelayDays"/> jours après la date de la mission. <b>Indicatif</b>,
+    ''' pour masquer le formulaire : la règle est celle d'Order (<c>ClFieldMissionWriteGuard</c>), et
+    ''' c'est son 403 qui fait foi.
+    ''' </summary>
+    Public Property CanEditBeneficiary As Boolean
+
+    ''' <summary>
+    ''' J-127 / J-129 — patient né anonyme : état, signalement, et si l'équipage peut encore saisir
+    ''' l'identité. <b>Nothing</b> pour une commande ordinaire. Relu chez Order à chaque appel (J-143) :
+    ''' la régulation peut corriger l'identité à tout moment.
+    ''' </summary>
+    Public Property BeneficiaryIdentification As ClBeneficiaryIdentificationDtoOut
+
+    ''' <summary>Délai de saisie terrain d'Order (<c>DelaiSaisieTerrainEnJours</c>), en jours après la date de la mission.</summary>
+    Public Const BeneficiaryEntryDelayDays As Integer = 2
+
+    Public Class ClBeneficiaryIdentificationDtoOut
+        ''' <summary>1 anonyme · 2 à vérifier · 3 identifié.</summary>
+        Public Property State As Integer
+        ''' <summary>Signalement de la régulation ; peut être Nothing (afficher alors « Patient anonyme »).</summary>
+        Public Property Description As String
+        ''' <summary>Faux dès que la régulation a tranché : masquer le formulaire d'identité.</summary>
+        Public Property IdentityEditableByField As Boolean
+    End Class
+
     Public Class ClPatientDtoOut
 
         ''' <summary>

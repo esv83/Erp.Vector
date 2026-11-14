@@ -1,4 +1,4 @@
-namespace CaSoft.Erp.USVector.Infrastructure.ErpApi;
+﻿namespace CaSoft.Erp.USVector.Infrastructure.ErpApi;
 
 /// <summary>
 /// Accès en écriture vers <c>Orders.Api</c> (HTTP) — TRF-5. Pendant écriture de
@@ -81,11 +81,11 @@ public interface IErpWriteApiClient
     /// permette à l'ambulancier de corriger sa saisie plutôt que de la croire perdue.
     /// </para>
     /// </summary>
-    /// <param name="values">Couples nom/valeur, tels que le mobile les a saisis.</param>
+    /// <param name="values">Valeurs telles que le mobile les a saisies ; <c>OtherText</c> accompagne une option « Autre ».</param>
     /// <param name="setBy">Identifiant ambulancier/équipage, tracé côté Order. Optionnel.</param>
     Task<ContextOrderValuesWriteResult> SetContextOrderValuesAsync(
         Guid missionId,
-        IReadOnlyCollection<(string Name, string? Value)> values,
+        IReadOnlyCollection<(string Name, string? Value, string? OtherText)> values,
         string? setBy = null,
         CancellationToken ct = default);
 }

@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Application;
+﻿using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.ErpApi;
@@ -138,9 +138,53 @@ public class JobDetailBeneficiaryIdTests
 
     // ── Harnais ──────────────────────────────────────────────────────────────────
 
-    private static ClJobDetailModel Detail(bool withBeneficiary)
+    // ── Saisie sur le patient encore permise (J-144 / contact) : même délai qu'Order ─────
+
+    /// <summary>
+    /// Order refuse dès que aujourd'hui dépasse la date de la mission de plus de deux jours : le
+    /// drapeau suit le même calcul, pour que le front masque le formulaire au lieu de buter sur le 403.
+    /// </summary>
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(-2, true)]
+    [InlineData(-3, false)]
+    [InlineData(1, true)]
+    public void La_saisie_sur_le_patient_ferme_deux_jours_apres_la_mission(int offsetDays, bool expected)
     {
-        var erp = new FakeErp { WithBeneficiary = withBeneficiary };
+        var detail = Detail(withBeneficiary: true, DateOnly.FromDateTime(DateTime.Today).AddDays(offsetDays));
+
+        detail.CanEditBeneficiary.Should().Be(expected);
+    }
+
+    // ── Patient né anonyme (J-127 / J-129) ───────────────────────────────────────
+
+    [Fact]
+    public void Le_patient_anonyme_et_son_verrou_sont_servis_au_detail()
+    {
+        var detail = Detail(withBeneficiary: true, identification: new ErpBeneficiaryIdentificationDto
+        {
+            State = 1, Description = "Homme, 70 ans environ", IdentityEditableByField = true
+        });
+
+        detail.BeneficiaryIdentification.Should().NotBeNull();
+        detail.BeneficiaryIdentification!.State.Should().Be(1);
+        detail.BeneficiaryIdentification.Description.Should().Be("Homme, 70 ans environ");
+        detail.BeneficiaryIdentification.IdentityEditableByField.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Une_commande_ordinaire_n_a_pas_de_bloc_d_identification()
+        => Detail(withBeneficiary: true).BeneficiaryIdentification.Should().BeNull();
+
+    private static ClJobDetailModel Detail(bool withBeneficiary, DateOnly? missionDate = null,
+                                           ErpBeneficiaryIdentificationDto? identification = null)
+    {
+        var erp = new FakeErp
+        {
+            WithBeneficiary = withBeneficiary,
+            MissionDate = missionDate ?? new DateOnly(2026, 8, 26),
+            Identification = identification
+        };
         var repo = new JobRepository(erp, new FakeJobTime(), new FakeSignature(),
                                      NullLogger<JobRepository>.Instance);
         return new ClJobDetailAdapter(repo.GetJobAsync(JobId, CancellationToken.None).GetAwaiter().GetResult()!);
@@ -149,14 +193,17 @@ public class JobDetailBeneficiaryIdTests
     private sealed class FakeErp : IErpReadApiClient
     {
         public bool WithBeneficiary;
+        public DateOnly MissionDate = new(2026, 8, 26);
+        public ErpBeneficiaryIdentificationDto? Identification;
 
         public Task<ErpMissionFullDto?> GetMissionFullAsync(Guid id, CancellationToken ct = default)
             => Task.FromResult<ErpMissionFullDto?>(new ErpMissionFullDto
             {
                 Id = id,
                 OrderId = OrderId,
-                MissionDate = new DateOnly(2026, 8, 26),
-                SchedulingTime = new TimeOnly(9, 30)
+                MissionDate = MissionDate,
+                SchedulingTime = new TimeOnly(9, 30),
+                BeneficiaryIdentification = Identification
             });
 
         public Task<ErpOrderEditDto?> GetOrderAsync(Guid id, CancellationToken ct = default)

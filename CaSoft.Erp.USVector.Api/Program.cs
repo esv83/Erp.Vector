@@ -253,6 +253,19 @@ builder.Services.AddHttpClient<IShiftConfirmationService, HttpShiftConfirmationS
     // Idempotent côté Orders : un second appel rend « déjà confirmé », pas une erreur.
     .AddOrdersResilience(builder.Configuration);
 
+// J-144 / contact — saisies de l'équipage sur le patient, par la BORDURE d'Order (pas Orders.Api) :
+// Order y exige le jeton de service de Vector et juge l'auteur. Base lue à la création du client :
+// une clé absente ne casse que ces deux routes, jamais le démarrage (decided.md, 20/09).
+builder.Services.AddHttpClient<IBeneficiaryFieldEntryService, HttpBeneficiaryFieldEntryService>(c =>
+    {
+        var raw = builder.Configuration["OrdersEdge:BaseUrl"]
+            ?? throw new InvalidOperationException("OrdersEdge:BaseUrl manquant.");
+        c.BaseAddress = new Uri(raw.EndsWith('/') ? raw : raw + "/");
+    })
+    .AddVectorServiceAccountToken(serviceAccount)
+    // Rejouable : l'identité se remplace, le contact n'ajoute que l'inconnu.
+    .AddOrdersResilience(builder.Configuration);
+
 // Contrat mobile inchangé : PascalCase comme l'ancienne WebApi (pas de camelCase).
 builder.Services.AddControllers()
     .AddJsonOptions(options =>

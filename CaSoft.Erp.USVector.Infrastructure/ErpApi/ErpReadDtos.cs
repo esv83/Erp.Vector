@@ -1,4 +1,4 @@
-namespace CaSoft.Erp.USVector.Infrastructure.ErpApi;
+﻿namespace CaSoft.Erp.USVector.Infrastructure.ErpApi;
 
 // DTO miroir des réponses JSON d'Orders.Api (camelCase, enums en entiers).
 // On ne mappe QUE les champs réellement consommés par les adaptateurs mobiles —
@@ -37,6 +37,20 @@ public sealed class ErpMissionFullDto
     public ErpStageDto? Dropoff { get; set; }
     /// <summary>Commentaire opérationnel de la mission (ex. « C15 CHUTE MECA DLR LOMBAIRE »).</summary>
     public string? Comment { get; set; }
+
+    /// <summary>J-127 — patient né anonyme ; <c>null</c> pour une commande ordinaire.</summary>
+    public ErpBeneficiaryIdentificationDto? BeneficiaryIdentification { get; set; }
+}
+
+/// <summary>Bloc <c>beneficiaryIdentification</c> de <c>GET /missions/{id}/full</c> — seuls les champs utiles au terrain.</summary>
+public sealed class ErpBeneficiaryIdentificationDto
+{
+    /// <summary>1 anonyme · 2 à vérifier · 3 identifié.</summary>
+    public int State { get; set; }
+    /// <summary>Signalement donné par la régulation ; souvent <c>null</c>.</summary>
+    public string? Description { get; set; }
+    /// <summary>Faux dès que la régulation a tranché : l'équipage ne peut plus saisir l'identité.</summary>
+    public bool IdentityEditableByField { get; set; }
 }
 
 /// <summary>GET /missions (liste légère)</summary>
@@ -256,6 +270,9 @@ public sealed class ErpContextOrderFieldDto
 
     /// <summary>Motif affichable du verrou. <c>null</c> quand le champ est ouvert.</summary>
     public string? ReadOnlyReason { get; set; }
+
+    /// <summary>Texte libre de l'option <c>textRequired</c> (« Autre ») en place ; <c>null</c> sinon (Order 1.17.0, script 097).</summary>
+    public string? OtherText { get; set; }
 }
 
 /// <summary>Une valeur proposée d'un attribut de type liste, telle qu'Order la sert.</summary>
@@ -263,4 +280,7 @@ public sealed class ErpContextOrderOptionDto
 {
     public int Key { get; set; }
     public string? Label { get; set; }
+
+    /// <summary>« Autre » : la clé s'accompagne d'un texte libre (Order 1.17.0). Absent avant : faux.</summary>
+    public bool TextRequired { get; set; }
 }

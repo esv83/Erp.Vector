@@ -55,7 +55,7 @@ public class CrewRepositoryJobListTests
         public Task<EnOperationalProjectionOutcome> ProjectFieldAsync(Guid missionId, bool signatureExists, string? waiverCode, DateTime? waiverAtUtc, CancellationToken ct = default) => Task.FromResult(EnOperationalProjectionOutcome.Applied);
         public Task<CrewDriverWriteResult> SetCrewDriverAsync(Guid crewId, Guid driverPersonnelId, DateTime from, CancellationToken ct = default) => Task.FromResult(new CrewDriverWriteResult(EnCrewDriverWriteOutcome.Applied));
         public Task<EnContextOrderWriteOutcome> SetMissionContextOrderAsync(Guid missionId, int contextOrderId, string? setBy = null, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<ContextOrderValuesWriteResult> SetContextOrderValuesAsync(Guid missionId, IReadOnlyCollection<(string Name, string? Value)> values, string? setBy = null, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<ContextOrderValuesWriteResult> SetContextOrderValuesAsync(Guid missionId, IReadOnlyCollection<(string Name, string? Value, string? OtherText)> values, string? setBy = null, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     private sealed class FakeSignature : ISignatureRepository

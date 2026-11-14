@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text;
 using System.Text.Json;
 using CaSoft.Erp.USVector.Application;
@@ -49,6 +49,14 @@ public class ContextOrderAttributeTests
         "options": [ { "key": 0, "label": "Non" }, { "key": 1, "label": "Oui" } ],
         "value": "1",
         "isReadOnly": true, "readOnlyReason": "Document déjà récupéré à l'aller"
+      },
+      {
+        "name": "ASSISTANCE", "label": "Assistance", "index": 40, "type": "list",
+        "required": false, "instantUpdate": false, "placeHolder": null,
+        "isMulti": false,
+        "options": [ { "key": 3, "label": "Europ", "textRequired": false }, { "key": 9, "label": "Autre", "textRequired": true } ],
+        "value": "9", "otherText": "Mondial Secours",
+        "isReadOnly": false, "readOnlyReason": null
       }
     ]
     """;
@@ -65,7 +73,7 @@ public class ContextOrderAttributeTests
         var fields = await Build(new StubHandler(FormPayload)).GetFormStructureAsync(Mission, default);
 
         fields.Should().NotBeNull();
-        fields!.Select(f => f.Name).Should().Equal(new[] { "DDN", "NIR", "PMT" }, "l'ordre vient de l'index");
+        fields!.Select(f => f.Name).Should().Equal(new[] { "DDN", "NIR", "PMT", "ASSISTANCE" }, "l'ordre vient de l'index");
 
         var nir = fields!.Single(f => f.Name == "NIR");
         nir.Label.Should().Be("N° sécurité sociale");
@@ -136,6 +144,45 @@ public class ContextOrderAttributeTests
         options![0].Should().Be("Non");
         options![1].Should().Be("Oui");
         options!.Keys.Should().Equal(new[] { 0, 1 }, "l'ordre voulu par Order est conservé");
+    }
+
+    /// <summary>
+    /// J-154 — « Autre » : le drapeau par option et le texte du champ arrivent au front, à côté de
+    /// l'objet d'options historique, qui ne change pas (D14).
+    /// </summary>
+    [Fact]
+    public async Task L_option_Autre_et_son_texte_arrivent_au_front()
+    {
+        var fields = await Build(new StubHandler(FormPayload)).GetFormStructureAsync(Mission, default);
+
+        var assistance = fields!.Single(f => f.Name == "ASSISTANCE");
+        assistance.OtherText.Should().Be("Mondial Secours");
+        assistance.OptionItems!.Select(o => (o.Key, o.Label, o.TextRequired))
+            .Should().Equal((3, "Europ", false), (9, "Autre", true));
+        (assistance.Options as Dictionary<int, string>)!.Keys.Should().Equal(3, 9);
+
+        var pmt = fields!.Single(f => f.Name == "PMT");
+        pmt.OptionItems!.Should().OnlyContain(o => !o.TextRequired, "un Order d'avant 097 ne sert pas le drapeau");
+        pmt.OtherText.Should().BeNull();
+        fields!.Single(f => f.Name == "NIR").OptionItems.Should().BeNull();
+    }
+
+    /// <summary>J-154 — le texte de « Autre » part vers Order avec la clé.</summary>
+    [Fact]
+    public async Task Le_texte_de_l_option_Autre_est_relaye_a_Order()
+    {
+        var handler = new StubHandler(FormPayload);
+
+        await Build(handler).SaveValuesAsync(Mission, new List<ClAttributValueModel>
+        {
+            new() { AttributName = "ASSISTANCE", AttributValue = "9", OtherText = "Mondial Secours" },
+            new() { AttributName = "NIR", AttributValue = "1540375116001" }
+        }, "amb-42", default);
+
+        using var sent = JsonDocument.Parse(handler.PatchBody!);
+        var values = sent.RootElement.GetProperty("values");
+        values[0].GetProperty("otherText").GetString().Should().Be("Mondial Secours");
+        values[1].GetProperty("otherText").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     [Fact]

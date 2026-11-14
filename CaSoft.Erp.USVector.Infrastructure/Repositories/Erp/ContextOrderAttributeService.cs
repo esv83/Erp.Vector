@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Application;
+﻿using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Infrastructure.ErpApi;
 
@@ -49,7 +49,10 @@ public sealed class ContextOrderAttributeService : IContextOrderAttributeService
                 // on garde cette convention pour ne pas faire apparaître un « options: {} » là où le
                 // front n'en attendait jamais.
                 Options = IsList(f.Type) ? ToMobileOptions(f.Options) : null,
+                // J-154 — à côté, pas à la place : l'objet ci-dessus ne peut pas porter le drapeau.
+                OptionItems = IsList(f.Type) ? ToOptionItems(f.Options) : null,
                 Value = f.Value,
+                OtherText = f.OtherText,
                 IsReadOnly = f.IsReadOnly,
                 // Le verrou est servi tel quel ; son motif, non. Order s'adresse à la régulation et
                 // nomme le référentiel où la fiche se corrige — un système auquel l'ambulancier n'a
@@ -64,7 +67,7 @@ public sealed class ContextOrderAttributeService : IContextOrderAttributeService
     {
         var payload = (values ?? new List<ClAttributValueModel>())
             .Where(v => !string.IsNullOrWhiteSpace(v.AttributName))
-            .Select(v => (Name: v.AttributName, Value: v.AttributValue?.ToString()))
+            .Select(v => (Name: v.AttributName, Value: v.AttributValue?.ToString(), OtherText: v.OtherText))
             .ToList();
 
         // Lot vide : rien à écrire, et surtout pas un aller-retour réseau pour le dire.
@@ -101,6 +104,17 @@ public sealed class ContextOrderAttributeService : IContextOrderAttributeService
     /// plutôt que de faire échouer le formulaire entier pour un doublon de catalogue.
     /// </para>
     /// </summary>
+    /// <summary>J-154 — Les options dans l'ordre d'Order, avec le drapeau « Autre ».</summary>
+    private static List<ClMobileAppFieldOptionDtoOut>? ToOptionItems(List<ErpContextOrderOptionDto>? options)
+        => options is null || options.Count == 0
+            ? null
+            : options.Select(o => new ClMobileAppFieldOptionDtoOut
+                {
+                    Key = o.Key,
+                    Label = o.Label ?? string.Empty,
+                    TextRequired = o.TextRequired
+                }).ToList();
+
     private static Dictionary<int, string>? ToMobileOptions(List<ErpContextOrderOptionDto>? options)
     {
         if (options is null || options.Count == 0) return null;
