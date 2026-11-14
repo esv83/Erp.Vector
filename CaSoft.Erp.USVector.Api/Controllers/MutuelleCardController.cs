@@ -1,3 +1,4 @@
+﻿using CaSoft.Framework.Application;
 using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
@@ -23,11 +24,13 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         private readonly IMutuelleCardRepository _repository;
         private readonly IMissionBeneficiaryQueryService _beneficiaries;
         private readonly ILogger _acces;
+        private readonly IUnitOfWork _unitOfWork;
 
         public MutuelleCardController(IMutuelleCardRepository repository, IMissionBeneficiaryQueryService beneficiaries,
-            ILoggerFactory loggers)
+            ILoggerFactory loggers, IUnitOfWork unitOfWork)
         {
             _repository = repository;
+            _unitOfWork = unitOfWork;
             _beneficiaries = beneficiaries;
             _acces = loggers.CreateLogger(AccessLoggerName);
         }
@@ -57,7 +60,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             await file.CopyToAsync(ms, ct);
 
             var command = new ClUploadMissionMutuelleCardCommand(missionId, ms.ToArray(), file.ContentType, crewId);
-            var result = await new ClUploadMissionMutuelleCardUseCase(command, _beneficiaries, _repository).HandleAsync(ct);
+            var result = await new ClUploadMissionMutuelleCardUseCase(command, _beneficiaries, _repository, _unitOfWork).HandleAsync(ct);
             return result.ToActionResult();
         }
 
@@ -147,7 +150,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             var command = new ClUploadMutuelleCardCommand(
                 beneficiaryId, ms.ToArray(), file.ContentType, crewId, missionId);
 
-            return (await new ClUploadMutuelleCardUseCase(command, _repository).HandleAsync(ct)).ToActionResult();
+            return (await new ClUploadMutuelleCardUseCase(command, _repository, _unitOfWork).HandleAsync(ct)).ToActionResult();
         }
 
         /// <summary>Métadonnées de la carte courante du bénéficiaire (sans le binaire).</summary>
@@ -238,7 +241,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         public async Task<IActionResult> SetFields(Guid cardId, [FromBody] ClMutuelleFieldsDtoIn fields, CancellationToken ct)
         {
             var command = new ClSetMutuelleFieldsCommand(cardId, fields);
-            return (await new ClSetMutuelleFieldsUseCase(command, _repository).HandleAsync(ct)).ToActionResult();
+            return (await new ClSetMutuelleFieldsUseCase(command, _repository, _unitOfWork).HandleAsync(ct)).ToActionResult();
         }
 
         /// <summary>Octets de l'image d'une carte (Content-Type d'origine).</summary>

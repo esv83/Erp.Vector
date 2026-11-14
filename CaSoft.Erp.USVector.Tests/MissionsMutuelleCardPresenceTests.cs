@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Application;
+﻿using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.ErpApi;
@@ -59,6 +59,7 @@ public class MissionsMutuelleCardPresenceTests
             Id = Guid.NewGuid(), BeneficiaryId = PatientA, Image = new byte[] { 1 }, ContentType = "image/jpeg",
             ByteSize = 1, CapturedAt = Photo, OcrStatus = "pending"
         }, CancellationToken.None);
+        await UnitOfWorkDoubles.Of(repository).CommitAsync();
         return repository;
     }
 

@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Application.Port;
+﻿using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.Mapping;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
@@ -40,7 +40,6 @@ public class JobTimeRepository : IJobTimeRepository
         // le worker projette l'état consolidé après la rafale.
         await ProjectionOutbox.EnqueueAsync(_ctx, gJobId, ct);
 
-        await _ctx.SaveChangesAsync(ct);
     }
 
     public async Task<ClJobTimeData?> GetJobTimeDataAsync(Guid gJobId, CancellationToken ct)

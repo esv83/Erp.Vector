@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Application;
+﻿using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
@@ -25,7 +25,7 @@ public class MutuelleCardInheritanceTests
     private static async Task<Guid> Photographier(MutuelleCardRepository repository)
     {
         var result = await new ClUploadMutuelleCardUseCase(
-                new ClUploadMutuelleCardCommand(Patient, new byte[] { 1, 2, 3 }, "image/jpeg", null, null), repository)
+                new ClUploadMutuelleCardCommand(Patient, new byte[] { 1, 2, 3 }, "image/jpeg", null, null), repository, UnitOfWorkDoubles.Of(repository))
             .HandleAsync(Ct);
         result.IsSucces.Should().BeTrue();
         // Deux photos dans la même milliseconde se départageraient mal : la plus récente fait foi.
@@ -39,7 +39,7 @@ public class MutuelleCardInheritanceTests
                 {
                     MutuelleName = "MGEN", AmcCode = amc, Concentrateur = "SP Santé", Teletransmission = "Oui"
                 }),
-                repository)
+                repository, UnitOfWorkDoubles.Of(repository))
             .HandleAsync(Ct)).IsSucces.Should().BeTrue();
 
     private static async Task<ClMutuelleCard> Courante(MutuelleCardRepository repository)

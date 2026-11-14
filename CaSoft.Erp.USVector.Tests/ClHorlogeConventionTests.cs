@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Application;
+﻿using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Dto;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
@@ -36,7 +36,7 @@ public class ClHorlogeConventionTests
     {
         var repo = new FakeJobTime();
 
-        await new ClMarkMissionSeenUseCase(Guid.NewGuid(), repo).HandleAsync(Ct);
+        await new ClMarkMissionSeenUseCase(Guid.NewGuid(), repo, new UnitOfWorkDoubles.Counting()).HandleAsync(Ct);
 
         repo.Stored!.ReadTime!.Value.Kind.Should().Be(DateTimeKind.Local);
         repo.Stored.ReadTime.Value.Should().BeCloseTo(DateTime.Now, Tolerance);
@@ -79,6 +79,7 @@ public class ClHorlogeConventionTests
         var mission = Guid.NewGuid();
 
         await new SignatureRepository(ctx).InsertAsync(mission, "image", Ct);
+        await UnitOfWorkDoubles.For(ctx).CommitAsync();
 
         var ecrite = ctx.Signatures.Single(s => s.SIG_MISSION_ID == mission).SIG_DATETIME;
         ecrite.Kind.Should().Be(DateTimeKind.Local);
@@ -101,7 +102,7 @@ public class ClHorlogeConventionTests
         var jobs = new FakeJobs();
         var saisie = new ClJobTimeModel { GoTime = "2026-10-04T10:00:00+02:00" };
 
-        await new ClUpdateTimeUseCase(new ClJobTimeCommand(Guid.NewGuid(), saisie), jobs).HandleAsync(Ct);
+        await new ClUpdateTimeUseCase(new ClJobTimeCommand(Guid.NewGuid(), saisie), jobs, new UnitOfWorkDoubles.Counting()).HandleAsync(Ct);
 
         // Orders et la facturation convertissent ces étapes : elles DOIVENT être en UTC.
         jobs.Stored.GoTime.Should().Be(new DateTime(2026, 10, 4, 8, 0, 0));
@@ -118,7 +119,7 @@ public class ClHorlogeConventionTests
 
         (await new ClReportAnomalyUseCase(
                 new ClReportAnomalyCommand(mission, new ClReportAnomalyDtoIn { Type = (int)EnAnomalyType.Phone, Text = "tel" }),
-                new AnomalyRepository(ctx))
+                new AnomalyRepository(ctx), UnitOfWorkDoubles.For(ctx))
             .HandleAsync(Ct)).IsSucces.Should().BeTrue();
 
         ctx.Anomalies.Single().ANO_REPORTED_AT.Should().BeCloseTo(DateTime.UtcNow, Tolerance);

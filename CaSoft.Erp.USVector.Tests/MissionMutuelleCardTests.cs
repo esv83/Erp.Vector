@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Application;
+﻿using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.ErpApi;
@@ -72,7 +72,7 @@ public class MissionMutuelleCardTests
         => new ClUploadMissionMutuelleCardUseCase(
                 new ClUploadMissionMutuelleCardCommand(Mission, new byte[] { 1, 2, 3 }, contentType, Crew),
                 new FakeBeneficiaries { BeneficiaryId = beneficiaryId },
-                repository)
+                repository, UnitOfWorkDoubles.Of(repository))
             .HandleAsync(CancellationToken.None);
 
     // ── Capture ───────────────────────────────────────────────────────────────
@@ -129,7 +129,9 @@ public class MissionMutuelleCardTests
         var older = NewCard(new DateTime(2026, 9, 1, 8, 0, 0, DateTimeKind.Utc));
         var newer = NewCard(new DateTime(2026, 9, 10, 8, 0, 0, DateTimeKind.Utc));
         await repository.SaveAsync(older, CancellationToken.None);
+        await UnitOfWorkDoubles.Of(repository).CommitAsync();
         await repository.SaveAsync(newer, CancellationToken.None);
+        await UnitOfWorkDoubles.Of(repository).CommitAsync();
 
         var result = await new ClGetMissionMutuelleCardUseCase(Mission, new FakeBeneficiaries { BeneficiaryId = Ben }, repository)
             .HandleAsync(CancellationToken.None);

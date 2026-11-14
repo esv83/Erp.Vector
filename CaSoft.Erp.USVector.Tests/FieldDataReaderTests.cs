@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Application;
+﻿using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.ErpApi;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
@@ -112,6 +112,7 @@ public class FieldDataReaderTests
             Id = Guid.NewGuid(), BeneficiaryId = Ben, Image = new byte[] { 9 }, ContentType = "image/jpeg",
             ByteSize = 1, CapturedAt = go, AmcCode = "AMC1"
         }, CancellationToken.None);
+        await UnitOfWorkDoubles.For(ctx).CommitAsync();
 
         var result = await Reader(ctx).GetAsync(Mission, CancellationToken.None);
 
@@ -257,6 +258,7 @@ public class FieldDataReaderTests
             Id = Guid.NewGuid(), BeneficiaryId = Ben, Image = new byte[] { 9 }, ContentType = "image/jpeg",
             ByteSize = 1, CapturedAt = DateTime.UtcNow, AmcCode = "AMC1"
         }, CancellationToken.None);
+        await UnitOfWorkDoubles.For(ctx).CommitAsync();
         var inconnue = Guid.NewGuid();
         var erp = new FakeErp { Batch = Connues(new Dictionary<Guid, Guid?> { [Mission] = Ben, [Retour] = null }) };
 

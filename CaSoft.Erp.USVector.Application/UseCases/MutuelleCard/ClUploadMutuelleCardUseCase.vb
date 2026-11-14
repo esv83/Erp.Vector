@@ -1,3 +1,4 @@
+﻿Imports CaSoft.Framework.Application
 Imports System.Threading
 
 ''' <summary>
@@ -10,10 +11,12 @@ Public Class ClUploadMutuelleCardUseCase
 
     Private ReadOnly _command As ClUploadMutuelleCardCommand
     Private ReadOnly _repository As IMutuelleCardRepository
+    Private ReadOnly _unitOfWork As IUnitOfWork
 
-    Public Sub New(command As ClUploadMutuelleCardCommand, repository As IMutuelleCardRepository)
+    Public Sub New(command As ClUploadMutuelleCardCommand, repository As IMutuelleCardRepository, unitOfWork As IUnitOfWork)
         _command = command
         _repository = repository
+        _unitOfWork = unitOfWork
     End Sub
 
     Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of ClMutuelleCardCreatedDtoOut)) Implements IResultUseCaseAsync(Of ClMutuelleCardCreatedDtoOut).HandleAsync
@@ -43,6 +46,7 @@ Public Class ClUploadMutuelleCardUseCase
         HeriterDesChampsValides(card, Await _repository.GetCurrentMetadataAsync(_command.BeneficiaryId, ct))
 
         Await _repository.SaveAsync(card, ct)
+        Await _unitOfWork.CommitAsync(ct)
         Return ClResult(Of ClMutuelleCardCreatedDtoOut).Ok(New ClMutuelleCardCreatedDtoOut With {.Id = card.Id})
     End Function
 

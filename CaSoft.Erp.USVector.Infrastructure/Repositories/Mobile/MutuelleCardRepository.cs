@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Application;
+﻿using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.Mapping;
@@ -25,10 +25,11 @@ public class MutuelleCardRepository : IMutuelleCardRepository
 
     public MutuelleCardRepository(MobileDbContext ctx) => _ctx = ctx;
 
-    public async Task SaveAsync(ClMutuelleCard card, CancellationToken ct)
+    /// <summary>Prépare l'ajout ; l'enregistrement est celui du cas d'usage (<c>IUnitOfWork.CommitAsync</c>).</summary>
+    public Task SaveAsync(ClMutuelleCard card, CancellationToken ct)
     {
         _ctx.MutuelleCards.Add(card.ToEntity());
-        await _ctx.SaveChangesAsync(ct);
+        return Task.CompletedTask;
     }
 
     public async Task<ClMutuelleCard?> GetCurrentMetadataAsync(Guid beneficiaryId, CancellationToken ct)
@@ -154,7 +155,6 @@ public class MutuelleCardRepository : IMutuelleCardRepository
         // Validés sur CETTE photo : ils ne sont plus « repris » d'une autre (MOB_011).
         entity.MMC_FIELDS_INHERITED_FROM = null;
 
-        await _ctx.SaveChangesAsync(ct);
         return entity.ToDomain();
     }
 
@@ -185,7 +185,6 @@ public class MutuelleCardRepository : IMutuelleCardRepository
         entity.MMC_OCR_LAST_ERROR = null;
         entity.MMC_OCR_STATUS = ExtractedStatus;
 
-        await _ctx.SaveChangesAsync(ct);
     }
 
     public async Task<ClOcrFailureOutcome> MarkOcrFailureAsync(Guid cardId, string reason, int maxAttempts, CancellationToken ct)
@@ -200,7 +199,6 @@ public class MutuelleCardRepository : IMutuelleCardRepository
         entity.MMC_OCR_LAST_ERROR = reason.Length > 400 ? reason[..400] : reason;
         if (giveUp) entity.MMC_OCR_STATUS = ErrorStatus;
 
-        await _ctx.SaveChangesAsync(ct);
         return new ClOcrFailureOutcome { Attempts = entity.MMC_OCR_ATTEMPTS, GaveUp = giveUp };
     }
 

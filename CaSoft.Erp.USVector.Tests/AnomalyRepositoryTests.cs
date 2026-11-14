@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Domain;
+﻿using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 using FluentAssertions;
@@ -26,6 +26,7 @@ public class AnomalyRepositoryTests
         var sut = new AnomalyRepository(ctx);
 
         await sut.SaveAsync(Anomaly(EnAnomalyType.Address, new DateTime(2026, 6, 20, 8, 0, 0, DateTimeKind.Utc), "mauvaise adresse"), CancellationToken.None);
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
 
         var list = (await sut.ListByMissionAsync(Mission, CancellationToken.None));
         list.Should().HaveCount(1);
@@ -39,7 +40,9 @@ public class AnomalyRepositoryTests
         using var ctx = NewContext();
         var sut = new AnomalyRepository(ctx);
         await sut.SaveAsync(Anomaly(EnAnomalyType.Phone, new DateTime(2026, 6, 20, 8, 0, 0, DateTimeKind.Utc)), CancellationToken.None);
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
         await sut.SaveAsync(Anomaly(EnAnomalyType.Patient, new DateTime(2026, 6, 20, 9, 0, 0, DateTimeKind.Utc)), CancellationToken.None);
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
 
         var list = (await sut.ListByMissionAsync(Mission, CancellationToken.None));
         list.Should().HaveCount(2);

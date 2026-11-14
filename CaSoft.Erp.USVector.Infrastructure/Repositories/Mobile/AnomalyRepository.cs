@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Application.Port;
+﻿using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.Mapping;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
@@ -13,10 +13,11 @@ public class AnomalyRepository : IAnomalyRepository
 
     public AnomalyRepository(MobileDbContext ctx) => _ctx = ctx;
 
-    public async Task SaveAsync(ClAnomaly anomaly, CancellationToken ct)
+    /// <summary>Prépare l'ajout ; l'enregistrement est celui du cas d'usage (<c>IUnitOfWork.CommitAsync</c>).</summary>
+    public Task SaveAsync(ClAnomaly anomaly, CancellationToken ct)
     {
         _ctx.Anomalies.Add(anomaly.ToEntity());
-        await _ctx.SaveChangesAsync(ct);
+        return Task.CompletedTask;
     }
 
     public async Task<IReadOnlyList<ClAnomaly>> ListByMissionAsync(Guid missionId, CancellationToken ct)

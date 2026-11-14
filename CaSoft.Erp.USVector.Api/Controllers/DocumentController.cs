@@ -1,3 +1,4 @@
+﻿using CaSoft.Framework.Application;
 using System.Linq;
 using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Application;
@@ -16,8 +17,13 @@ namespace CaSoft.Erp.USVector.Api.Controllers
     public class DocumentController : Controller
     {
         private readonly IDocumentRepository _repository;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public DocumentController(IDocumentRepository repository) => _repository = repository;
+        public DocumentController(IDocumentRepository repository, IUnitOfWork unitOfWork)
+        {
+            _repository = repository;
+            _unitOfWork = unitOfWork;
+        }
 
         /// <summary>
         /// Corps multipart du dépôt de document. Regroupe les champs de formulaire dans un seul
@@ -51,7 +57,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             var command = new ClUploadDocumentCommand(
                 gJobId, ms.ToArray(), file.ContentType, file.FileName, form.Category, crewId);
 
-            return (await new ClUploadDocumentUseCase(command, _repository).HandleAsync(ct)).ToActionResult();
+            return (await new ClUploadDocumentUseCase(command, _repository, _unitOfWork).HandleAsync(ct)).ToActionResult();
         }
 
         /// <summary>Métadonnées des documents de la mission (du plus récent au plus ancien).</summary>

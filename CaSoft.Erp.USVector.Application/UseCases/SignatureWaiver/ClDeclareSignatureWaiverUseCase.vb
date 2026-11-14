@@ -1,3 +1,4 @@
+﻿Imports CaSoft.Framework.Application
 Imports System.Threading
 Imports CaSoft.Erp.USVector.Application.Port
 
@@ -15,11 +16,13 @@ Public Class ClDeclareSignatureWaiverUseCase
     Private ReadOnly _missionId As Guid
     Private ReadOnly _input As ClDeclareSignatureWaiverDtoIn
     Private ReadOnly _repository As ISignatureWaiverRepository
+    Private ReadOnly _unitOfWork As IUnitOfWork
 
-    Public Sub New(missionId As Guid, input As ClDeclareSignatureWaiverDtoIn, repository As ISignatureWaiverRepository)
+    Public Sub New(missionId As Guid, input As ClDeclareSignatureWaiverDtoIn, repository As ISignatureWaiverRepository, unitOfWork As IUnitOfWork)
         _missionId = missionId
         _input = input
         _repository = repository
+        _unitOfWork = unitOfWork
     End Sub
 
     Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of ClSignatureWaiverDtoOut)) Implements IResultUseCaseAsync(Of ClSignatureWaiverDtoOut).HandleAsync
@@ -55,6 +58,7 @@ Public Class ClDeclareSignatureWaiverUseCase
         }
 
         Await _repository.SaveAsync(waiver, ct)
+        Await _unitOfWork.CommitAsync(ct)
         Return ClResult(Of ClSignatureWaiverDtoOut).Ok(waiver.ToDtoOut(reason.Label))
     End Function
 

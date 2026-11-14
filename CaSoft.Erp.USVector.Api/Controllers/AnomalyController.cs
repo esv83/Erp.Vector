@@ -1,3 +1,4 @@
+﻿using CaSoft.Framework.Application;
 using System.Linq;
 using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Application;
@@ -15,14 +16,19 @@ namespace CaSoft.Erp.USVector.Api.Controllers
     public class AnomalyController : Controller
     {
         private readonly IAnomalyRepository _repository;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public AnomalyController(IAnomalyRepository repository) => _repository = repository;
+        public AnomalyController(IAnomalyRepository repository, IUnitOfWork unitOfWork)
+        {
+            _repository = repository;
+            _unitOfWork = unitOfWork;
+        }
 
         /// <summary>Signale une anomalie sur la mission. Bloqué (409) si la mission est déjà transférée.</summary>
         [HttpPost("missions/{gJobId:guid}/anomalies")]
         [FreezeOnTransfer("gJobId")]
         public async Task<IActionResult> Report(Guid gJobId, [FromBody] ClReportAnomalyDtoIn input, CancellationToken ct)
-            => (await new ClReportAnomalyUseCase(new ClReportAnomalyCommand(gJobId, input), _repository).HandleAsync(ct)).ToActionResult();
+            => (await new ClReportAnomalyUseCase(new ClReportAnomalyCommand(gJobId, input), _repository, _unitOfWork).HandleAsync(ct)).ToActionResult();
 
         /// <summary>Anomalies de la mission (de la plus récente à la plus ancienne).</summary>
         [HttpGet("missions/{gJobId:guid}/anomalies")]

@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Application;
+﻿using CaSoft.Erp.USVector.Application;
 using CaSoft.Framework;
 using CaSoft.Erp.USVector.Infrastructure.Mapping;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
@@ -40,7 +40,6 @@ public class SignatureRepository : ISignatureRepository
             SIG_DATETIME = ClHorloge.MaintenantLocal()
         });
         await ProjectionOutbox.EnqueueAsync(_ctx, gJobId, ct);
-        await _ctx.SaveChangesAsync(ct);
     }
 
     public async Task UpdateAsync(Guid gJobId, string strSignData, CancellationToken ct)
@@ -49,7 +48,6 @@ public class SignatureRepository : ISignatureRepository
         entity.SIG_DATA = strSignData;
         entity.SIG_DATETIME = ClHorloge.MaintenantLocal();
         await ProjectionOutbox.EnqueueAsync(_ctx, gJobId, ct);
-        await _ctx.SaveChangesAsync(ct);
     }
 
     public async Task DeleteAsync(Guid gJobId, string strSignData, CancellationToken ct)
@@ -59,7 +57,6 @@ public class SignatureRepository : ISignatureRepository
 
         _ctx.Signatures.Remove(entity);
         await ProjectionOutbox.EnqueueAsync(_ctx, gJobId, ct);
-        await _ctx.SaveChangesAsync(ct);
     }
 
     // MOB-8 — Existence légère (clé seule) : alimente le flag MI_SIGNATURE_EXISTS du détail/liste.

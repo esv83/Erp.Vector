@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Domain;
+﻿using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 using FluentAssertions;
@@ -37,6 +37,7 @@ public class DocumentRepositoryTests
         var doc = Doc(EnDocumentCategory.TransportOrder, new DateTime(2026, 6, 20, 8, 0, 0, DateTimeKind.Utc), 1, 2, 3);
 
         await sut.SaveAsync(doc, CancellationToken.None);
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
 
         var loaded = (await sut.GetByIdAsync(doc.Id, CancellationToken.None));
         loaded.Should().NotBeNull();
@@ -51,8 +52,10 @@ public class DocumentRepositoryTests
         using var ctx = NewContext();
         var sut = new DocumentRepository(ctx);
         await sut.SaveAsync(Doc(EnDocumentCategory.Prescription, new DateTime(2026, 6, 20, 8, 0, 0, DateTimeKind.Utc), 1), CancellationToken.None);
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
         var recent = Doc(EnDocumentCategory.Administrative, new DateTime(2026, 6, 20, 9, 0, 0, DateTimeKind.Utc), 2);
         await sut.SaveAsync(recent, CancellationToken.None);
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
 
         var list = (await sut.ListByMissionAsync(Mission, CancellationToken.None));
         list.Should().HaveCount(2);
@@ -70,6 +73,7 @@ public class DocumentRepositoryTests
         var sut = new DocumentRepository(ctx);
         var doc = Doc(EnDocumentCategory.TransportOrder, new DateTime(2026, 9, 19, 8, 0, 0, DateTimeKind.Utc), 1, 2, 3);
         await sut.SaveAsync(doc, CancellationToken.None);
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
 
         var listed = (await sut.ListByMissionAsync(Mission, CancellationToken.None)).Single();
 

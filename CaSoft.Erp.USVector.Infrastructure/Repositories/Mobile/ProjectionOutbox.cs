@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Infrastructure.Persistence;
+﻿using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,7 +10,7 @@ namespace CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 /// relit l'état consolidé de tous les silos au moment de l'envoi.
 /// </summary>
 /// <remarks>
-/// <b>À appeler AVANT le <c>SaveChangesAsync</c> du changement</b> : l'entrée part dans la même
+/// <b>À appeler AVANT le <c>IUnitOfWork.CommitAsync</c> du changement</b> : l'entrée part dans la même
 /// transaction, c'est ce qui garantit qu'aucun changement n'est perdu. Debounce : chaque changement
 /// repousse l'envoi, le dispatcher projette après la rafale.
 /// </remarks>

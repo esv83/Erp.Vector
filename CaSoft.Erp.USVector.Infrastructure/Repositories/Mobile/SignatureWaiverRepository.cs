@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Application.Port;
+﻿using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.Mapping;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
@@ -50,7 +50,6 @@ public sealed class SignatureWaiverRepository : ISignatureWaiverRepository
         entity.Apply(waiver);
 
         await ProjectionOutbox.EnqueueAsync(_ctx, waiver.MissionId, ct);
-        await _ctx.SaveChangesAsync(ct);
     }
 
     public async Task DeleteAsync(Guid missionId, CancellationToken ct)
@@ -60,6 +59,5 @@ public sealed class SignatureWaiverRepository : ISignatureWaiverRepository
 
         _ctx.SignatureWaivers.Remove(entity);
         await ProjectionOutbox.EnqueueAsync(_ctx, missionId, ct);
-        await _ctx.SaveChangesAsync(ct);
     }
 }

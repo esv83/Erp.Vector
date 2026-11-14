@@ -1,3 +1,4 @@
+﻿Imports CaSoft.Framework.Application
 Imports System.Threading
 
 ' Mise à jour des jalons opérationnels (En route / Sur place / Terminé) — Result pattern.
@@ -6,11 +7,13 @@ Public Class ClUpdateTimeUseCase
     Implements IResultUseCaseAsync(Of Boolean)
 
     Private ReadOnly _repository As IJobRepository
+    Private ReadOnly _unitOfWork As IUnitOfWork
     Private ReadOnly _command As ClJobTimeCommand
 
-    Public Sub New(command As ClJobTimeCommand, repository As IJobRepository)
+    Public Sub New(command As ClJobTimeCommand, repository As IJobRepository, unitOfWork As IUnitOfWork)
         _command = command
         _repository = repository
+        _unitOfWork = unitOfWork
     End Sub
 
     Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of Boolean)) Implements IResultUseCaseAsync(Of Boolean).HandleAsync
@@ -30,6 +33,7 @@ Public Class ClUpdateTimeUseCase
         If terminateTime.HasValue Then jobTime.TerminateTime = terminateTime
 
         Await _repository.SaveJobTimeAsync(jobTime, ct)
+        Await _unitOfWork.CommitAsync(ct)
         Return ClResult(Of Boolean).Ok(True)
 
     End Function

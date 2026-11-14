@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Domain;
+﻿using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
 using FluentAssertions;
@@ -36,6 +36,7 @@ public class MutuelleCardRepositoryTests
         var card = Card(new DateTime(2026, 6, 15, 10, 0, 0, DateTimeKind.Utc), 1, 2, 3);
 
         await sut.SaveAsync(card, CancellationToken.None);
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
 
         var loaded = (await sut.GetImageAsync(card.Id, CancellationToken.None));
         loaded.Should().NotBeNull();
@@ -54,6 +55,7 @@ public class MutuelleCardRepositoryTests
         using var ctx = NewContext();
         var sut = new MutuelleCardRepository(ctx);
         await sut.SaveAsync(Card(new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc), 1, 2, 3), CancellationToken.None);
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
 
         var meta = (await sut.GetCurrentMetadataAsync(Ben, CancellationToken.None));
 
@@ -77,10 +79,13 @@ public class MutuelleCardRepositoryTests
         var sansCarte = Guid.Parse("dddddddd-0000-0000-0000-000000000003");
 
         await sut.SaveAsync(Card(new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc), 1), CancellationToken.None);
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
         await sut.SaveAsync(Card(new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc), 9), CancellationToken.None);
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
         var carteAutre = Card(new DateTime(2026, 6, 12, 0, 0, 0, DateTimeKind.Utc), 7);
         carteAutre.BeneficiaryId = autre;
         await sut.SaveAsync(carteAutre, CancellationToken.None);
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
 
         var presences = (await sut.ListPresenceAsync(new[] { Ben, autre, sansCarte }, CancellationToken.None));
 
@@ -105,8 +110,10 @@ public class MutuelleCardRepositoryTests
         using var ctx = NewContext();
         var sut = new MutuelleCardRepository(ctx);
         await sut.SaveAsync(Card(new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc), 1), CancellationToken.None);
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
         var recent = Card(new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc), 9);
         await sut.SaveAsync(recent, CancellationToken.None);
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
 
         (await sut.GetCurrentMetadataAsync(Ben, CancellationToken.None))!.Id.Should().Be(recent.Id);
     }
@@ -127,6 +134,7 @@ public class MutuelleCardRepositoryTests
         var sut = new MutuelleCardRepository(ctx);
         var card = Card(new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc), 1, 2);
         await sut.SaveAsync(card, CancellationToken.None);
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
 
         var patch = new ClMutuelleCard
         {
@@ -140,6 +148,7 @@ public class MutuelleCardRepositoryTests
         };
 
         var updated = (await sut.UpdateAsync(patch, CancellationToken.None));
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
 
         updated.Should().NotBeNull();
         updated!.AmcCode.Should().Be("AMC123");
@@ -154,5 +163,6 @@ public class MutuelleCardRepositoryTests
         var sut = new MutuelleCardRepository(ctx);
 
         (await sut.UpdateAsync(new ClMutuelleCard { Id = Guid.NewGuid(), AmcCode = "X" }, CancellationToken.None)).Should().BeNull();
+        await UnitOfWorkDoubles.Of(sut).CommitAsync();
     }
 }

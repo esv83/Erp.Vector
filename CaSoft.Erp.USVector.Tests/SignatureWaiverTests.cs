@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Application;
+﻿using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
@@ -33,7 +33,7 @@ public class SignatureWaiverTests
     }
 
     private static Task<ClResult<ClSignatureWaiverDtoOut>> Declare(MobileDbContext ctx, ClDeclareSignatureWaiverDtoIn input)
-        => new ClDeclareSignatureWaiverUseCase(Mission, input, new SignatureWaiverRepository(ctx)).HandleAsync(CancellationToken.None);
+        => new ClDeclareSignatureWaiverUseCase(Mission, input, new SignatureWaiverRepository(ctx), UnitOfWorkDoubles.For(ctx)).HandleAsync(CancellationToken.None);
 
     // ── La déclaration ───────────────────────────────────────────────────────
 
@@ -92,6 +92,7 @@ public class SignatureWaiverTests
         await ctx.SaveChangesAsync();
 
         await repository.DeleteAsync(Mission, CancellationToken.None);
+        await UnitOfWorkDoubles.Of(repository).CommitAsync();
 
         ctx.SignatureWaivers.Should().BeEmpty();
         ctx.OperationalOutbox.Should().ContainSingle(o => o.OOB_MISSION_ID == Mission);
@@ -116,12 +117,14 @@ public class SignatureWaiverTests
         var signatures = new SignatureRepository(ctx);
 
         await signatures.InsertAsync(Mission, "data:image/png;base64,AAAA", CancellationToken.None);
+        await UnitOfWorkDoubles.Of(signatures).CommitAsync();
         ctx.OperationalOutbox.Should().ContainSingle(o => o.OOB_MISSION_ID == Mission);
 
         ctx.OperationalOutbox.RemoveRange(ctx.OperationalOutbox);
         await ctx.SaveChangesAsync();
 
         await signatures.DeleteAsync(Mission, "", CancellationToken.None);
+        await UnitOfWorkDoubles.Of(signatures).CommitAsync();
         ctx.OperationalOutbox.Should().ContainSingle(o => o.OOB_MISSION_ID == Mission, "un retrait doit aussi être su d'Order");
     }
 

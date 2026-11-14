@@ -1,3 +1,4 @@
+﻿Imports CaSoft.Framework.Application
 Imports System.Threading
 
 ''' <summary>
@@ -9,10 +10,12 @@ Public Class ClUploadDocumentUseCase
 
     Private ReadOnly _command As ClUploadDocumentCommand
     Private ReadOnly _repository As IDocumentRepository
+    Private ReadOnly _unitOfWork As IUnitOfWork
 
-    Public Sub New(command As ClUploadDocumentCommand, repository As IDocumentRepository)
+    Public Sub New(command As ClUploadDocumentCommand, repository As IDocumentRepository, unitOfWork As IUnitOfWork)
         _command = command
         _repository = repository
+        _unitOfWork = unitOfWork
     End Sub
 
     Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of ClDocumentDtoOut)) Implements IResultUseCaseAsync(Of ClDocumentDtoOut).HandleAsync
@@ -39,6 +42,7 @@ Public Class ClUploadDocumentUseCase
         }
 
         Await _repository.SaveAsync(document, ct)
+        Await _unitOfWork.CommitAsync(ct)
         Return ClResult(Of ClDocumentDtoOut).Ok(document.ToDtoOut())
     End Function
 

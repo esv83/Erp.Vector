@@ -1,3 +1,4 @@
+﻿Imports CaSoft.Framework.Application
 Imports System.Threading
 
 ' MOB — « Mission vue » (spec_architecture_vector_mission_dmz §10 : le marqueur terrain retenu est
@@ -9,11 +10,13 @@ Public Class ClMarkMissionSeenUseCase
     Implements IResultUseCaseAsync(Of Boolean)
 
     Private ReadOnly _repository As IJobTimeRepository
+    Private ReadOnly _unitOfWork As IUnitOfWork
     Private ReadOnly _jobId As Guid
 
-    Public Sub New(jobId As Guid, repository As IJobTimeRepository)
+    Public Sub New(jobId As Guid, repository As IJobTimeRepository, unitOfWork As IUnitOfWork)
         _jobId = jobId
         _repository = repository
+        _unitOfWork = unitOfWork
     End Sub
 
     Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of Boolean)) Implements IResultUseCaseAsync(Of Boolean).HandleAsync
@@ -33,6 +36,7 @@ Public Class ClMarkMissionSeenUseCase
 
         ' Upsert BD Mobile (MST_READ_AT) + projection (Outbox) vers Orders.Api (readAt).
         Await _repository.SaveAsync(_jobId, jobTime, ct)
+        Await _unitOfWork.CommitAsync(ct)
         Return ClResult(Of Boolean).Ok(True)
 
     End Function

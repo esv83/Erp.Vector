@@ -1,3 +1,4 @@
+﻿Imports CaSoft.Framework.Application
 Imports System.Threading
 
 ''' <summary>
@@ -15,13 +16,16 @@ Public Class ClUploadMissionMutuelleCardUseCase
     Private ReadOnly _command As ClUploadMissionMutuelleCardCommand
     Private ReadOnly _beneficiaries As IMissionBeneficiaryQueryService
     Private ReadOnly _repository As IMutuelleCardRepository
+    Private ReadOnly _unitOfWork As IUnitOfWork
 
     Public Sub New(command As ClUploadMissionMutuelleCardCommand,
                    beneficiaries As IMissionBeneficiaryQueryService,
-                   repository As IMutuelleCardRepository)
+                   repository As IMutuelleCardRepository,
+                   unitOfWork As IUnitOfWork)
         _command = command
         _beneficiaries = beneficiaries
         _repository = repository
+        _unitOfWork = unitOfWork
     End Sub
 
     Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of ClMutuelleCardCreatedDtoOut))
@@ -33,7 +37,7 @@ Public Class ClUploadMissionMutuelleCardUseCase
 
         Dim command As New ClUploadMutuelleCardCommand(
             beneficiaryId.Value, _command.Image, _command.ContentType, _command.CrewId, _command.MissionId)
-        Return Await New ClUploadMutuelleCardUseCase(command, _repository).HandleAsync(ct)
+        Return Await New ClUploadMutuelleCardUseCase(command, _repository, _unitOfWork).HandleAsync(ct)
     End Function
 
 End Class

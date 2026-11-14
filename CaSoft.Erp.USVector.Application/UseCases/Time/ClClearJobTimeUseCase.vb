@@ -1,3 +1,4 @@
+﻿Imports CaSoft.Framework.Application
 Imports System.Threading
 
 ' Retour arrière : efface un jalon opérationnel (Mission vue / En route / Sur place / Terminé) — Result pattern.
@@ -8,13 +9,15 @@ Public Class ClClearJobTimeUseCase
     Implements IResultUseCaseAsync(Of Boolean)
 
     Private ReadOnly _repository As IJobRepository
+    Private ReadOnly _unitOfWork As IUnitOfWork
     Private ReadOnly _jobId As Guid
     Private ReadOnly _jalon As String
 
-    Public Sub New(jobId As Guid, jalon As String, repository As IJobRepository)
+    Public Sub New(jobId As Guid, jalon As String, repository As IJobRepository, unitOfWork As IUnitOfWork)
         _jobId = jobId
         _jalon = jalon
         _repository = repository
+        _unitOfWork = unitOfWork
     End Sub
 
     Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of Boolean)) Implements IResultUseCaseAsync(Of Boolean).HandleAsync
@@ -38,6 +41,7 @@ Public Class ClClearJobTimeUseCase
 
         ' Upsert BD Mobile (jalon effacé) + enqueue Outbox → projection consolidée (retour arrière).
         Await _repository.SaveJobTimeAsync(jobTime, ct)
+        Await _unitOfWork.CommitAsync(ct)
         Return ClResult(Of Boolean).Ok(True)
 
     End Function

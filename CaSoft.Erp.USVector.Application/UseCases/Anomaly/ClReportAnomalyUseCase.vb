@@ -1,3 +1,4 @@
+﻿Imports CaSoft.Framework.Application
 Imports System.Threading
 
 ''' <summary>
@@ -9,10 +10,12 @@ Public Class ClReportAnomalyUseCase
 
     Private ReadOnly _command As ClReportAnomalyCommand
     Private ReadOnly _repository As IAnomalyRepository
+    Private ReadOnly _unitOfWork As IUnitOfWork
 
-    Public Sub New(command As ClReportAnomalyCommand, repository As IAnomalyRepository)
+    Public Sub New(command As ClReportAnomalyCommand, repository As IAnomalyRepository, unitOfWork As IUnitOfWork)
         _command = command
         _repository = repository
+        _unitOfWork = unitOfWork
     End Sub
 
     Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of ClAnomalyDtoOut)) Implements IResultUseCaseAsync(Of ClAnomalyDtoOut).HandleAsync
@@ -33,6 +36,7 @@ Public Class ClReportAnomalyUseCase
         }
 
         Await _repository.SaveAsync(anomaly, ct)
+        Await _unitOfWork.CommitAsync(ct)
         Return ClResult(Of ClAnomalyDtoOut).Ok(anomaly.ToDtoOut())
     End Function
 

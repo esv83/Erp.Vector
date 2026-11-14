@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Api.Infrastructure;
+﻿using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
@@ -25,7 +25,7 @@ public class MutuelleFieldsValidationTests
         var repository = new MutuelleCardRepository(new MobileDbContext(new DbContextOptionsBuilder<MobileDbContext>()
             .UseInMemoryDatabase($"saisie-{Guid.NewGuid()}").Options));
         var cardId = (await new ClUploadMutuelleCardUseCase(
-                new ClUploadMutuelleCardCommand(Patient, new byte[] { 1 }, "image/jpeg", null, null), repository)
+                new ClUploadMutuelleCardCommand(Patient, new byte[] { 1 }, "image/jpeg", null, null), repository, UnitOfWorkDoubles.Of(repository))
             .HandleAsync(Ct)).Value.Id;
         (await Saisir(repository, cardId, new ClMutuelleFieldsDtoIn
         {
@@ -36,7 +36,7 @@ public class MutuelleFieldsValidationTests
 
     private static Task<CaSoft.Framework.ClResult<ClMutuelleCardDtoOut>> Saisir(
         MutuelleCardRepository repository, Guid cardId, ClMutuelleFieldsDtoIn? fields)
-        => new ClSetMutuelleFieldsUseCase(new ClSetMutuelleFieldsCommand(cardId, fields!), repository).HandleAsync(Ct);
+        => new ClSetMutuelleFieldsUseCase(new ClSetMutuelleFieldsCommand(cardId, fields!), repository, UnitOfWorkDoubles.Of(repository)).HandleAsync(Ct);
 
     private static async Task<ClMutuelleCard> Courante(MutuelleCardRepository repository)
         => (await repository.GetCurrentMetadataAsync(Patient, Ct))!;

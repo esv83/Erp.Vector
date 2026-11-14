@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Application;
+﻿using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
 using FluentAssertions;
@@ -27,12 +27,14 @@ public class ClMarkMissionSeenUseCaseTests
     public async Task Premiere_vue_pose_ReadTime_et_sauvegarde()
     {
         var repo = new FakeJobTime(null);
+        var unitOfWork = new UnitOfWorkDoubles.Counting();
 
-        var result = await new ClMarkMissionSeenUseCase(Guid.NewGuid(), repo).HandleAsync(CancellationToken.None);
+        var result = await new ClMarkMissionSeenUseCase(Guid.NewGuid(), repo, unitOfWork).HandleAsync(CancellationToken.None);
 
         result.IsSucces.Should().BeTrue();
         result.Value.Should().BeTrue();
         repo.SaveCount.Should().Be(1);
+        unitOfWork.Commits.Should().Be(1, "DR-002 : le cas d'usage enregistre, une fois");
         repo.Stored!.ReadTime.Should().NotBeNull();
     }
 
@@ -44,12 +46,14 @@ public class ClMarkMissionSeenUseCaseTests
             .WithReadTime(new DateTime(2026, 1, 1))
             .Build();
         var repo = new FakeJobTime(existing);
+        var unitOfWork = new UnitOfWorkDoubles.Counting();
 
-        var result = await new ClMarkMissionSeenUseCase(Guid.NewGuid(), repo).HandleAsync(CancellationToken.None);
+        var result = await new ClMarkMissionSeenUseCase(Guid.NewGuid(), repo, unitOfWork).HandleAsync(CancellationToken.None);
 
         result.IsSucces.Should().BeTrue();
         result.Value.Should().BeTrue();
         repo.SaveCount.Should().Be(0); // no-op : l'horodatage d'origine est conservé
+        unitOfWork.Commits.Should().Be(0, "rien à enregistrer");
     }
 
     [Fact]
@@ -59,7 +63,7 @@ public class ClMarkMissionSeenUseCaseTests
         // un 400 portant le message technique de SQL Server.
         var repo = new FakeJobTime(null) { Throws = new InvalidOperationException("transient failure") };
 
-        var act = () => new ClMarkMissionSeenUseCase(Guid.NewGuid(), repo).HandleAsync(CancellationToken.None);
+        var act = () => new ClMarkMissionSeenUseCase(Guid.NewGuid(), repo, new UnitOfWorkDoubles.Counting()).HandleAsync(CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }

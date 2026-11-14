@@ -1,3 +1,4 @@
+﻿using CaSoft.Framework.Application;
 using CaSoft.Erp.USVector.Api.Infrastructure;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
@@ -15,8 +16,13 @@ namespace CaSoft.Erp.USVector.Api.Controllers
     public class SignatureWaiverController : Controller
     {
         private readonly ISignatureWaiverRepository _repository;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public SignatureWaiverController(ISignatureWaiverRepository repository) => _repository = repository;
+        public SignatureWaiverController(ISignatureWaiverRepository repository, IUnitOfWork unitOfWork)
+        {
+            _repository = repository;
+            _unitOfWork = unitOfWork;
+        }
 
         /// <summary>Motifs proposés à l'équipage, dans l'ordre d'affichage.</summary>
         [HttpGet("signature-waiver-reasons")]
@@ -37,7 +43,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         [HttpPut("missions/{gJobId:guid}/signature-waiver")]
         [FreezeOnTransfer("gJobId")]
         public async Task<IActionResult> Declare(Guid gJobId, [FromBody] ClDeclareSignatureWaiverDtoIn input, CancellationToken ct)
-            => (await new ClDeclareSignatureWaiverUseCase(gJobId, input, _repository).HandleAsync(ct)).ToActionResult();
+            => (await new ClDeclareSignatureWaiverUseCase(gJobId, input, _repository, _unitOfWork).HandleAsync(ct)).ToActionResult();
 
         /// <summary>Retire le motif (le patient a finalement signé, ou erreur de saisie).</summary>
         [HttpDelete("missions/{gJobId:guid}/signature-waiver")]
@@ -45,6 +51,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         public async Task<IActionResult> Withdraw(Guid gJobId, CancellationToken ct)
         {
             await _repository.DeleteAsync(gJobId, ct);
+            await _unitOfWork.CommitAsync(ct);   // pas de cas d'usage ici : DR-004
             return NoContent();
         }
     }

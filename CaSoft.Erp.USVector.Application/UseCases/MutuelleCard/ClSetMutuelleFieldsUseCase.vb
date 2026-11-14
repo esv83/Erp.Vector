@@ -1,3 +1,4 @@
+﻿Imports CaSoft.Framework.Application
 Imports System.Threading
 
 ''' <summary>
@@ -13,10 +14,12 @@ Public Class ClSetMutuelleFieldsUseCase
 
     Private ReadOnly _command As ClSetMutuelleFieldsCommand
     Private ReadOnly _repository As IMutuelleCardRepository
+    Private ReadOnly _unitOfWork As IUnitOfWork
 
-    Public Sub New(command As ClSetMutuelleFieldsCommand, repository As IMutuelleCardRepository)
+    Public Sub New(command As ClSetMutuelleFieldsCommand, repository As IMutuelleCardRepository, unitOfWork As IUnitOfWork)
         _command = command
         _repository = repository
+        _unitOfWork = unitOfWork
     End Sub
 
     Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of ClMutuelleCardDtoOut)) Implements IResultUseCaseAsync(Of ClMutuelleCardDtoOut).HandleAsync
@@ -46,6 +49,7 @@ Public Class ClSetMutuelleFieldsUseCase
         If updated Is Nothing Then
             Return ClResult(Of ClMutuelleCardDtoOut).Fail(ClError.Application("Carte mutuelle introuvable."))
         End If
+        Await _unitOfWork.CommitAsync(ct)
 
         Return ClResult(Of ClMutuelleCardDtoOut).Ok(updated.ToDtoOut())
     End Function

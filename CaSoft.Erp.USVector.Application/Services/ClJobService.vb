@@ -1,3 +1,4 @@
+﻿Imports CaSoft.Framework.Application
 Imports System.Threading
 
 Public Class ClJobService
@@ -5,14 +6,16 @@ Public Class ClJobService
 
     Private ReadOnly _jobRepository As IJobRepository
     Private ReadOnly _jobTimeRepository As IJobTimeRepository
+    Private ReadOnly _unitOfWork As IUnitOfWork
 
-    Public Sub New(jobRepository As IJobRepository, jobTimeRepository As IJobTimeRepository)
+    Public Sub New(jobRepository As IJobRepository, jobTimeRepository As IJobTimeRepository, unitOfWork As IUnitOfWork)
         _jobRepository = jobRepository
         _jobTimeRepository = jobTimeRepository
+        _unitOfWork = unitOfWork
     End Sub
 
     Public Function MarkMissionSeenAsync(gJobId As Guid, ct As CancellationToken) As Task(Of ClResult(Of Boolean)) Implements IJobService.MarkMissionSeenAsync
-        Return New ClMarkMissionSeenUseCase(gJobId, _jobTimeRepository).HandleAsync(ct)
+        Return New ClMarkMissionSeenUseCase(gJobId, _jobTimeRepository, _unitOfWork).HandleAsync(ct)
     End Function
 
     Public Function GetJobTimeAsync(gJobId As Guid, ct As CancellationToken) As Task(Of ClResult(Of ClJobTimeModel)) Implements IJobService.GetJobTimeAsync
@@ -25,11 +28,11 @@ Public Class ClJobService
 
     Public Function SetJobTimeAsync(gJobId As Guid, jobTimeModel As ClJobTimeModel, ct As CancellationToken) As Task(Of ClResult(Of Boolean)) Implements IJobService.SetJobTimeAsync
         Dim jobTimeCommand = New ClJobTimeCommand(gJobId, jobTimeModel)
-        Return New ClUpdateTimeUseCase(jobTimeCommand, _jobRepository).HandleAsync(ct)
+        Return New ClUpdateTimeUseCase(jobTimeCommand, _jobRepository, _unitOfWork).HandleAsync(ct)
     End Function
 
     Public Function ClearJobTimeAsync(gJobId As Guid, jalon As String, ct As CancellationToken) As Task(Of ClResult(Of Boolean)) Implements IJobService.ClearJobTimeAsync
-        Return New ClClearJobTimeUseCase(gJobId, jalon, _jobRepository).HandleAsync(ct)
+        Return New ClClearJobTimeUseCase(gJobId, jalon, _jobRepository, _unitOfWork).HandleAsync(ct)
     End Function
 
 End Class

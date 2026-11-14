@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Api.Controllers;
+﻿using CaSoft.Erp.USVector.Api.Controllers;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
@@ -50,6 +50,7 @@ public class BatchReadTests
         var mission = Guid.NewGuid();
         var repository = new SignatureRepository(ctx);
         await repository.InsertAsync(mission, "iVBORw0KGgoAAAANSUhEUg==", CancellationToken.None);
+        await UnitOfWorkDoubles.Of(repository).CommitAsync();
 
         var lot = new SignatureQueryService(ctx).ReadMany(new[] { mission });
 

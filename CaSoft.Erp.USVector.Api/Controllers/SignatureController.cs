@@ -1,3 +1,4 @@
+﻿using CaSoft.Framework.Application;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using CaSoft.Erp.USVector.Api.Infrastructure;
@@ -58,7 +59,8 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         // de clé primaire sur MOB_SIGNATURE).
         [HttpPost("{gJobId}")]
         [FreezeOnTransfer]
-        public async Task<ActionResult> PostSignature(Guid gJobId, ClSignatureGetModel signatureModel, [FromServices] ISignatureRepository repository, CancellationToken ct)
+        public async Task<ActionResult> PostSignature(Guid gJobId, ClSignatureGetModel signatureModel, [FromServices] ISignatureRepository repository,
+            [FromServices] IUnitOfWork unitOfWork, CancellationToken ct)
         {
             // Pas d'attrape-tout (04/10) : une panne de la base remonte au gestionnaire (503) au lieu
             // de partir en 400 avec le message technique — 35 fois pendant les coupures.
@@ -66,28 +68,33 @@ namespace CaSoft.Erp.USVector.Api.Controllers
                 await repository.UpdateAsync(gJobId, signatureModel.Data, ct);
             else
                 await repository.InsertAsync(gJobId, signatureModel.Data, ct);
+            await unitOfWork.CommitAsync(ct);
 
             return Ok();
         }
 
         [HttpPatch("{gJobId}")]
         [FreezeOnTransfer]
-        public async Task<ActionResult> PatchSignature(Guid gJobId, ClSignatureGetModel signatureModel, [FromServices] ISignatureRepository repository, CancellationToken ct)
+        public async Task<ActionResult> PatchSignature(Guid gJobId, ClSignatureGetModel signatureModel, [FromServices] ISignatureRepository repository,
+            [FromServices] IUnitOfWork unitOfWork, CancellationToken ct)
         {
             // Rien à modifier : le même 400 qu'avant, avec une phrase au lieu de « Sequence contains no elements ».
             if (!await repository.ExistsAsync(gJobId, ct))
                 return BadRequest("Aucune signature à modifier pour cette mission.");
 
             await repository.UpdateAsync(gJobId, signatureModel.Data, ct);
+            await unitOfWork.CommitAsync(ct);
             return Ok();
         }
 
         [HttpDelete("{gJobId}")]
         [FreezeOnTransfer]
-        public async Task<ActionResult> DeleteSignature(Guid gJobId, [FromServices] ISignatureRepository Repository, CancellationToken ct)
+        public async Task<ActionResult> DeleteSignature(Guid gJobId, [FromServices] ISignatureRepository Repository,
+            [FromServices] IUnitOfWork unitOfWork, CancellationToken ct)
         {
             // Suppression d'une signature absente : sans effet, 200 comme avant.
             await Repository.DeleteAsync(gJobId, string.Empty, ct);
+            await unitOfWork.CommitAsync(ct);
             return Ok();
         }
     }

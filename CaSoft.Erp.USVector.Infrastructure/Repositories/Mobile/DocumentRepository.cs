@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Application.Port;
+﻿using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.Mapping;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
@@ -13,10 +13,11 @@ public class DocumentRepository : IDocumentRepository
 
     public DocumentRepository(MobileDbContext ctx) => _ctx = ctx;
 
-    public async Task SaveAsync(ClDocument document, CancellationToken ct)
+    /// <summary>Prépare l'ajout ; l'enregistrement est celui du cas d'usage (<c>IUnitOfWork.CommitAsync</c>).</summary>
+    public Task SaveAsync(ClDocument document, CancellationToken ct)
     {
         _ctx.Documents.Add(document.ToEntity());
-        await _ctx.SaveChangesAsync(ct);
+        return Task.CompletedTask;
     }
 
     // Projection nommée, SANS DOC_CONTENT : la liste de l'app n'en affiche que les métadonnées, et

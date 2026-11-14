@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Api.Workers;
+﻿using CaSoft.Erp.USVector.Api.Workers;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
@@ -58,6 +58,7 @@ public class MutuelleCardOcrTests
     {
         var services = new ServiceCollection();
         services.AddScoped<IMutuelleCardRepository>(_ => new MutuelleCardRepository(ctx));
+        services.AddScoped(_ => UnitOfWorkDoubles.For(ctx));
         services.AddScoped(_ => ocr);
 
         return new MutuelleCardOcrDispatcher(
@@ -75,6 +76,7 @@ public class MutuelleCardOcrTests
         var repository = new MutuelleCardRepository(ctx);
         var carte = Carte();
         await repository.SaveAsync(carte, CancellationToken.None);
+        await UnitOfWorkDoubles.Of(repository).CommitAsync();
 
         var ocr = new FakeOcr
         {
@@ -121,6 +123,7 @@ public class MutuelleCardOcrTests
         using var ctx = NewContext();
         var repository = new MutuelleCardRepository(ctx);
         await repository.SaveAsync(Carte(), CancellationToken.None);
+        await UnitOfWorkDoubles.Of(repository).CommitAsync();
 
         await Dispatcher(ctx, new FakeOcr { Proposal = new ClMutuelleCardOcrProposal() })
             .ReadPendingAsync(CancellationToken.None);
@@ -143,6 +146,7 @@ public class MutuelleCardOcrTests
         using var ctx = NewContext();
         var repository = new MutuelleCardRepository(ctx);
         await repository.SaveAsync(Carte(), CancellationToken.None);
+        await UnitOfWorkDoubles.Of(repository).CommitAsync();
         var ocr = new FakeOcr { Throws = new HttpRequestException("service indisponible") };
         var dispatcher = Dispatcher(ctx, ocr, new MutuelleCardOcrOptions { MaxAttempts = 3 });
 
@@ -166,8 +170,10 @@ public class MutuelleCardOcrTests
         var repository = new MutuelleCardRepository(ctx);
         var carte = Carte();
         await repository.SaveAsync(carte, CancellationToken.None);
+        await UnitOfWorkDoubles.Of(repository).CommitAsync();
 
         var issue = (await repository.MarkOcrFailureAsync(carte.Id, new string('x', 900), maxAttempts: 5, CancellationToken.None));
+        await UnitOfWorkDoubles.Of(repository).CommitAsync();
 
         issue.Attempts.Should().Be(1);
         issue.GaveUp.Should().BeFalse();
