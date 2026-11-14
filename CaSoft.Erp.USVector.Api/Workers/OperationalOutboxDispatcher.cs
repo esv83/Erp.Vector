@@ -89,15 +89,7 @@ public sealed class OperationalOutboxDispatcher : BackgroundService
             try
             {
                 var outcome = await ProjectEntryAsync(ctx, erpWrite, ob.OOB_MISSION_ID, mst, ct);
-                if (outcome == EnOperationalProjectionOutcome.MissionNotFound)
-                {
-                    // Définitif : la mission n'existe pas (ou plus) chez Orders. La relancer ne la fera pas
-                    // réapparaître — une seule entrée a tourné 55 414 fois avant ce correctif (2026-09-13).
-                    _logger.LogWarning(
-                        "Projection outbox mission {MissionId} abandonnée : mission introuvable chez Orders.Api (404) " +
-                        "après {Attempts} tentative(s). Les jalons et la signature de cette mission ne seront pas projetés.",
-                        ob.OOB_MISSION_ID, ob.OOB_ATTEMPTS + 1);
-                }
+                LogIfAbandoned(ob, outcome);
                 ctx.OperationalOutbox.Remove(ob);   // livré, ou abandonné → retiré de l'outbox
             }
             catch (Exception ex)
@@ -142,6 +134,28 @@ public sealed class OperationalOutboxDispatcher : BackgroundService
         return await erpWrite.ProjectFieldAsync(
             missionId, isSigned, waiver?.SWV_REASON_CODE,
             waiver is null ? null : DateTime.SpecifyKind(waiver.SWV_DECLARED_AT, DateTimeKind.Utc), ct);
+    }
+
+    /// <summary>Une entrée retirée sans avoir été livrée se dit au journal : 404 (mission inconnue) ou refus métier (DR-001).</summary>
+    private void LogIfAbandoned(MOB_OPERATIONAL_OUTBOX ob, EnOperationalProjectionOutcome outcome)
+    {
+        if (outcome == EnOperationalProjectionOutcome.MissionNotFound)
+        {
+            // Définitif : la mission n'existe pas (ou plus) chez Orders. La relancer ne la fera pas
+            // réapparaître — une seule entrée a tourné 55 414 fois avant ce correctif (2026-09-13).
+            _logger.LogWarning(
+                "Projection outbox mission {MissionId} abandonnée : mission introuvable chez Orders.Api (404) " +
+                "après {Attempts} tentative(s). Les jalons et la signature de cette mission ne seront pas projetés.",
+                ob.OOB_MISSION_ID, ob.OOB_ATTEMPTS + 1);
+        }
+        else if (outcome == EnOperationalProjectionOutcome.Refused)
+        {
+            // Refus métier d'Order (motif journalisé par le client) : définitif, jamais relancé.
+            _logger.LogError(
+                "Projection outbox mission {MissionId} abandonnée : état terrain refusé par Orders.Api (400/409). " +
+                "Les jalons sont projetés ; la signature et le motif ne le sont pas.",
+                ob.OOB_MISSION_ID);
+        }
     }
 
     /// <summary>Panne (5xx, réseau) : l'entrée reste dans l'outbox, relancée avec un délai croissant (2, 4, … 60 s).</summary>

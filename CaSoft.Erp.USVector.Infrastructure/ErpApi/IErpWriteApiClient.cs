@@ -27,8 +27,8 @@ public interface IErpWriteApiClient
     /// présence de la signature et motif « ne peut pas signer ». Instantané : un motif absent efface celui
     /// qu'Order détenait. L'heure de signature n'est <b>pas</b> projetée — elle est en heure locale par
     /// convention figée (decided.md), seule sa présence sert à l'alerte signature.
-    /// <para>Même contrat d'échec que <see cref="ProjectOperationalAsync"/> : 404 → <c>MissionNotFound</c>,
-    /// toute autre erreur lève.</para>
+    /// <para>404 → <c>MissionNotFound</c> ; 400/409 → <c>Refused</c>, motif d'Order journalisé ; toute
+    /// autre erreur lève.</para>
     /// </summary>
     Task<EnOperationalProjectionOutcome> ProjectFieldAsync(
         Guid missionId, bool signatureExists, string? waiverCode, DateTime? waiverAtUtc,
@@ -143,7 +143,14 @@ public enum EnOperationalProjectionOutcome
     /// 404 — mission introuvable côté ERP (supprimée, ou jamais connue). Définitif : relancer ne la
     /// fera pas réapparaître.
     /// </summary>
-    MissionNotFound
+    MissionNotFound,
+
+    /// <summary>
+    /// 400/409 — Order refuse l'état terrain (PRJ-2 seulement). Refus métier, donc définitif : le
+    /// relancer le reproduirait toutes les 60 s sans fin (decided.md, 21/09 ; DR-001). Un 400 qui
+    /// cacherait une panne se signale chez Order, il ne se contourne pas ici (04/10).
+    /// </summary>
+    Refused
 }
 
 /// <summary>

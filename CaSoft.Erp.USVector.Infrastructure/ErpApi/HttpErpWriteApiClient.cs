@@ -76,6 +76,16 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
             return EnOperationalProjectionOutcome.MissionNotFound;
         }
 
+        // DR-001 — refus métier : définitif, jamais relancé. Erreur au journal, avec le motif d'Order :
+        // c'est un état que Vector n'aurait pas dû produire, ou un statut qui ment (04/10) — dans les
+        // deux cas, quelqu'un doit le lire.
+        if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Conflict)
+        {
+            _logger.LogError("Orders.Api PUT missions/{MissionId}/field refusé ({Status}) : {Reason} — état terrain non projeté.",
+                missionId, (int)response.StatusCode, ReadProblemDetail(content) ?? content);
+            return EnOperationalProjectionOutcome.Refused;
+        }
+
         _logger.LogError("Orders.Api PUT missions/{MissionId}/field a échoué : {Status} {Body}",
             missionId, (int)response.StatusCode, content);
         throw new HttpRequestException($"Orders.Api PUT missions/{missionId}/field → {(int)response.StatusCode}.", null, response.StatusCode);

@@ -1,4 +1,4 @@
-using CaSoft.Erp.USVector.Api.Workers;
+﻿using CaSoft.Erp.USVector.Api.Workers;
 using CaSoft.Erp.USVector.Infrastructure.ErpApi;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Persistence.Entities;
@@ -182,6 +182,19 @@ public class OperationalOutboxDispatcherTests
 
         write.FieldCalls.Should().BeEmpty("la mission est inconnue d'Orders : inutile d'insister");
         Entry(services).Should().BeNull();
+    }
+
+    /// <summary>DR-001 — un refus métier d'Order n'est jamais relancé : l'entrée sort de l'outbox.</summary>
+    [Fact]
+    public async Task Un_refus_d_Order_sur_l_etat_terrain_est_abandonne_au_lieu_d_etre_relance()
+    {
+        var write = new FakeWrite { FieldProjection = () => EnOperationalProjectionOutcome.Refused };
+        var (sut, services) = Arrange(write, fieldProjection: true);
+
+        await sut.DispatchDueAsync(CancellationToken.None);
+
+        write.FieldCalls.Should().ContainSingle();
+        Entry(services).Should().BeNull("relancer un refus le reproduirait toutes les 60 s sans fin");
     }
 
     [Fact]
