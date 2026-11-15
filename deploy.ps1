@@ -5,7 +5,7 @@
 .DESCRIPTION
   La cible = un profil de publication (.pubxml) qui copie la build Release
   sur le partage UNC du serveur :
-    dev  -> \\192.168.1.112\dev_api\Vector.Api
+    dev  -> \\192.168.1.118\DEV_API\Vector.Api   (SRVDEV01, avec les autres modules, depuis le 15/11)
     prod -> \\192.168.1.112\prod_api\Vector.Api
 
   Le web.config (ASPNETCORE_ENVIRONMENT + secrets) est gere MANUELLEMENT sur le
@@ -32,7 +32,7 @@
   (VectorVersionUrl) ; absente, ce dernier controle est saute et le script le dit.
 
   Prerequis (1re fois) : une session ouverte sur le partage cible
-    net use \\192.168.1.112\dev_api  /user:192.168.1.112\DeployApi *
+    net use \\192.168.1.118\DEV_API  /user:192.168.1.118\DeployApi *
     net use \\192.168.1.112\prod_api /user:192.168.1.112\DeployApi *
 
 .EXAMPLE
@@ -192,8 +192,9 @@ function Publish-Target($key) {
     # (et sur une cible protegee on aurait deja pose app_offline.htm). On tranche avant.
     if (-not (Test-Path -LiteralPath $url)) {
         # Racine du partage = \\serveur\partage (Split-Path -Qualifier ne gere pas l'UNC).
-        $share = if ($url -match '^(\\\\[^\\]+\\[^\\]+)') { $Matches[1] } else { $url }
-        throw "Cible $url inaccessible. Ouvrir la session : net use $share /user:192.168.1.112\DeployApi *"
+        $share   = if ($url -match '^(\\\\([^\\]+)\\[^\\]+)') { $Matches[1] } else { $url }
+        $serveur = if ($Matches -and $Matches[2]) { $Matches[2] } else { '<serveur>' }
+        throw "Cible $url inaccessible. Ouvrir la session : net use $share /user:$serveur\DeployApi *"
     }
 
     Confirm-Target $key $url
