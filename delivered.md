@@ -1,7 +1,7 @@
 # Livré — Vector (module terrain ambulanciers)
 
-> **Mis à jour le** 2026-10-04 (nuit) · **En production** : `9c15f94` (`main`), rechargé le
-> 2026-10-04 à 16:04:21, constaté par `api/version`, sourcelink, journal et état du schéma.
+> **Mis à jour le** 2026-11-15 · **En production** : `653e6d8` (`main`), rechargé le
+> 2026-11-15 à 10:24:28, constaté par `api/version`, `.pdb`, journal et état du schéma (10 sur 10).
 >
 > Ce document porte **ce qui est livré** : ce que le module fait, le journal daté des livraisons,
 > les décisions appliquées, la configuration qui a déjà cassé la production, les pistes retirées.
@@ -101,6 +101,66 @@ Principe constant : **le terrain n'écrase jamais la donnée officielle de l'ERP
 # 2. Journal des livraisons
 
 *Du plus récent au plus ancien.*
+
+## 2026-11-15 (10:24) — Publication : le jeton Keycloak validé par le socle, une seule validation par cas d'usage
+
+*En production — `653e6d8` (`main`), rechargé à 10:24:28. **Constaté par `GET /vector/api/version`** à
+10:27 : commit `653e6d8`, `Tree: clean`, environnement Production. `.pdb` et `.dll` des cinq projets du
+module copiés ensemble à 10:24 ; `deps.json` : `CaSoft.Framework.*` en **2.12.0**. Schéma : « 10
+script(s) inscrit(s) sur 10 attendus · à jour ». Porte quatre commits, chacun compilé et testé seul.*
+
+- **Itération 11 — la validation du jeton est celle du socle** (`AddCaSoftKeycloakJwtBearer`,
+  `CaSoft.Framework.Security` 2.12.0) : émetteur comparé **à l'identique** à `Keycloak:Authority`, azp
+  admis = `ClientId` + `FrontClientIds` + `AllowedAzp`. Vector garde autour le motif du rejet pour les
+  contrôleurs, le journal `Keycloak.Jwt` et le mode `DisableValidation` (`VectorJwtBearerEvents`).
+  Clés renommées (`Audience` → `ClientId`, `ServiceAzp` → `AllowedAzp`, `ScreenAzp` → `FrontClientIds`) ;
+  une ancienne clé encore posée serait reprise et signalée au démarrage (`KeycloakLegacyKeys`).
+- **DR-002 — `IUnitOfWork` du socle** : les six repositories qui enregistraient ne font plus que
+  préparer ; neuf cas d'usage, `SignatureController`, `SignatureWaiverController.Withdraw` et le worker
+  de lecture des cartes valident une fois. Socle `CaSoft.Framework` 2.3.5 → 2.12.0.
+- **DR-001 — un refus d'Order (400/409) sur `PUT missions/{id}/field` n'est plus relancé** : journalisé
+  en erreur avec son motif, l'entrée sort de la file. Les jalons ne changent pas.
+- **CQ-001** : `DispatchDueAsync` de 75 à 39 lignes, sans changement de comportement.
+- **Constaté au journal** (5 min de trafic) : 14 jetons validés, tous `azp=us-ambulance` ; **aucun
+  rejet**, ni sur l'émetteur ni sur l'azp ; aucun avertissement « Clés Keycloak à renommer » ; aucune
+  ligne WARN, ERROR ou FATAL ; aucune exception dans la sortie IIS. **Pas encore vus** : un jeton de la
+  facturation ou de l'écran de régulation sous le socle, une écriture passée par `CommitAsync`.
+- 345 tests verts.
+
+## 2026-11-14 (17:28) — Publication : la saisie du patient par l'équipage, l'option « Autre », la signature vers Order
+
+*En production — `14b554b` (`main`), construit à 17:28 UTC. **Constaté par `GET /vector/api/version`** à
+17:29 UTC : commit `14b554b`, `Tree: clean`, environnement Production. Le journal n'a pas pu être lu ce
+jour-là (partage inaccessible depuis la session). Porte aussi `8af6ff7` (10/11), jamais publié seul ;
+`MOB_012` est dans la base (constaté le 15/11).*
+
+- **L'équipage saisit l'identité (J-144) et le contact du patient** : `PUT
+  api/missions/{id}/beneficiary/identity` et `…/contact`, relayés à la bordure d'Order
+  (`OrdersEdge:BaseUrl`) avec le jeton de service de Vector ; `setBy` tiré du jeton de l'ambulancier ;
+  statuts d'Order rendus tels quels (204, 400, 403, 404, 409) et 503 sur panne.
+- **`JobDetail`** : `CanEditBeneficiary` (mission de moins de deux jours) et
+  `BeneficiaryIdentification` (patient anonyme : état, description, identité saisissable).
+- **Option « Autre » (J-154)** : `TextRequired` par option, `OtherText` par champ, accepté par `JobEdit`
+  et relayé à Order. Note à Jules : [`note_front_jules_saisie_patient_et_autre.md`](note_front_jules_saisie_patient_et_autre.md).
+- **Motif « ne peut pas signer » et projection de la signature vers Order (PRJ-1, PRJ-2)** — de
+  `8af6ff7` : liste des motifs (`MOB_012`), une ligne d'outbox par mission. **La projection reste
+  coupée** (`FieldProjection:Enabled = false`).
+- 330 tests verts.
+
+## 2026-10-04 (17:35) — Publication : tous les cas d'usage asynchrones, la convention des heures figée
+
+*En production — `29b6cc9` (`main`), en service depuis 17:35. **Constaté au relevé du 05/10** par le
+sourcelink du `.pdb` ; `api/version` n'a pas été relevé pour cette publication. Entrée versée au compact
+du 15/11 : l'édition du 05/10 ne l'avait pas faite.*
+
+- **Les dix derniers cas d'usage synchrones passent en `HandleAsync`**, repositories EF compris
+  (`ce59458`) : le contrat `IResultUseCase` n'a plus d'implémentation. JSON et codes HTTP inchangés.
+- **La convention des heures est figée et déclarée** (`2ffeea2`) : « mission vue », signature et prise
+  de volant en heure locale, le reste en UTC — `ClHorloge`, `ClHorlogeConventionTests`, `endPoint.md`.
+- **Un corps vide ne passe plus pour une validation de la carte** (`633cb90`) : premier validateur
+  FluentValidation de Vector, appelé dans le cas d'usage.
+- **Constaté au relevé du 05/10** : routes asynchrones en 200 sous charge, une panne rendue en 503,
+  passe de la facturation par lot, écran de régulation sur la présence par mission (200 depuis 21:01).
 
 ## 2026-10-04 (16:04) — Publication : la carte mutuelle lue par les écrans et annoncée à l'équipage
 

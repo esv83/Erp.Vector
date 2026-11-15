@@ -1,15 +1,16 @@
 # Plan de développement — Erp.Vector
 
-> **Édition du** 2026-10-04 (nuit) · **En production** `9c15f94` — **constaté par
-> `GET /vector/api/version`** à 16:04 : commit, `Tree: clean`, environnement Production ; `.pdb`
-> concordant ; **schéma 9 sur 9** · **287 tests verts** · Dépôt `github.com/esv83/Erp.Vector`
+> **Édition du** 2026-11-15 · **En production** `653e6d8` — **constaté par `GET /vector/api/version`**
+> à 10:27 : commit, `Tree: clean`, environnement Production ; `.pdb` concordant ; **schéma 10 sur 10** ;
+> socle `CaSoft.Framework` **2.12.0** · **345 tests verts** · Dépôt `github.com/esv83/Erp.Vector`
 > (`USVector.sln`) · Prod `\\192.168.1.112\prod_api\Vector.Api` (IIS `/vector`)
 >
-> ✅ **La carte mutuelle sort du terrain** : l'équipage sait qu'elle est connue, les écrans de la
-> régulation et de la certification peuvent la lire — dès qu'on leur aura ouvert la porte.
+> ✅ **Le jeton est validé par le socle commun, et l'équipage peut saisir l'identité et le contact du
+> patient** — dès que le front de Jules sera publié.
 >
-> ⏳ **Ce qui reste est surtout chez les autres** : les clients Keycloak des écrans, le front de Jules, qui
-> reprend aussi l'app terrain d'Alexandre. Chez nous : voir passer la semaine, puis démonter deux échafaudages.
+> ⏳ **Ce qui reste est surtout chez les autres** : le front de Jules, la route d'Order qui allumera la
+> projection de la signature, le client Keycloak de la certification. Chez nous : constater, démonter
+> un échafaudage, solder la dette de la revue du 11/11.
 >
 > Ce document **se régénère** au prompt *« compact devplan »* et ne porte **que l'ouvert**. Le
 > **pourquoi** vit dans [`decided.md`](decided.md), à lire avant de coder ; le **fait**, horodaté et
@@ -17,59 +18,59 @@
 >
 > **Règle de travail** : neutre ou additif, jamais de rupture du contrat que consomme l'app web — elle
 > n'est pas déployée en même temps que l'API. Envers l'amont, une route neuve se consomme avec un
-> repli sur son absence. **Une colonne lue par EF se crée en base avant la publication.**
+> repli sur son absence. **Une colonne lue par EF se crée en base avant la publication.** Un lot
+> découpé en commits **se vérifie commit par commit** avant d'être poussé.
 
 **Cinq rubriques, communes à tous les dépôts de l'ERP.** Le format est partagé ; les données ne le
 sont jamais.
 
-## 📍 Point de reprise — 04/10 dans la nuit : quatre publications, une journée
+## 📍 Point de reprise — 15/11 : deux publications, le socle adopté
 
-**Quatre publications le 04/10** : le 503 quand Orders est à terre, la lecture par lot, l'itération des
-dettes de forme, puis la carte mutuelle — la dernière à 16:04, **`MOB_011` joué avant**, comme il se
-doit : le schéma s'est annoncé « 9 sur 9 ».
+**14/11 à 17:28** : `14b554b` — saisie de l'identité (J-144) et du contact du patient par l'équipage,
+relayée à la bordure d'Order ; option « Autre » (J-154) ; identification du patient anonyme dans le
+détail ; et, publié avec, le motif « ne peut pas signer » du 10/11 (projection vers Order **coupée**).
 
-> ⚖️ **La carte mutuelle est restée où elle naît.** Elle aurait pu partir chez Orders ou dans un module
-> de documents ; le premier n'a aucun champ mutuelle sur un patient souvent tenu par AidesNSoft, le
-> second n'existe pas. Ce sont les écrans qui viennent la lire, avec leur jeton, par mission.
+**15/11 à 10:24** : `653e6d8` — validation du jeton par le socle (Itération 11), `IUnitOfWork` (DR-002),
+abandon des refus d'Order sur l'état terrain (DR-001), CQ-001. **Cinq minutes de journal** : 14 jetons
+mobiles validés, aucun rejet, aucun avertissement, aucune erreur.
 
-**Relevé du lundi 05/10 fait** (« Constater ce qui vient d'être publié ») : `29b6cc9` en service depuis
-le 04/10 à 17:35, la lecture par lot vue, un 503 vu. **L'écran de régulation lit la carte** depuis le
-05/10 à 21:01 (`ScreenAzp = us-regulation`).
-
-**Par quoi reprendre** : retirer le repli de la lecture par lot — il n'est plus bloqué. Puis le client
-Keycloak de l'écran de la certification.
+**Par quoi reprendre** : constater la facturation et l'écran de régulation sous le socle, et une
+écriture passée par `CommitAsync` (rubrique « Constater ce qui vient d'être publié »). Puis retirer le
+repli de la lecture par lot.
 
 ---
 # 1. Fonctionnalités livrées
 
 *Ce que le module sait faire **en production**, en une page. Le récit daté vit dans
-[`delivered.md`](delivered.md), à jour au 04/10 dans la nuit.*
+[`delivered.md`](delivered.md), à jour au 15/11.*
 
 | Domaine | Ce que le module apporte aujourd'hui |
 |---|---|
 | **Se connecter** | Compte d'entreprise · l'app retrouve seule l'équipage du jour et fait choisir quand il y en a plusieurs · missions visibles **30 min avant la prise de service** · un accès refusé **dit pourquoi et quoi faire** |
 | **Confirmer sa prise de service** | L'app dit **qu'une confirmation attend**, même la veille, et l'ambulancier confirme **sans le courriel** |
-| **Voir son travail du jour** | Missions **engagées** par la régulation · détail : patient, adresses, horaires, sens, service destinataire, **carte mutuelle connue et date de sa photo** · affichage des lieux composé par le serveur |
-| **Faire avancer la mission** | Cinq étapes horodatées, **annulables** · « mission vue » · signature · conducteur — **un refus dit pourquoi** · tout remonte à la régulation en quasi temps réel, un envoi en échec est rejoué |
-| **Compléter le dossier** | Type de mission et informations de facturation servis par la régulation, pré-remplis et verrouillés quand la fiche patient les connaît · un refus arrive **avec son motif** · anomalies, documents, photos |
-| **Photographier la carte mutuelle** | Depuis la mission · **une nouvelle photo garde les données validées**, marquées « repris de la photo du … » · **lue par l'écran de régulation, par mission, avec jeton** (certification : dès son client déclaré) · journal des accès · lecture automatique en place, inerte |
-| **Passer à la facturation** | Transfert automatique à la clôture · dossier **par lots de 200**, signatures par lots de 50 · Orders lu par lot (repli mission par mission tant que non vu) · dossier **gelé** après transfert |
-| **Tenir debout** | Le terrain n'écrase jamais la donnée officielle · API fermée par défaut, jetons exigés · délais et disjoncteur vers Orders, **vus sur de vraies pannes** · réessai SQL · **une panne rend 503 et un message ; un refus, son motif** · aucun appel bloquant · publication **depuis `main` propre et poussé**, commit servi et schéma vérifiés |
-| **Se dire** | `api/version` : commit, **état de l'arbre au build**, environnement · `api/version/runtime` : base résolue, drapeaux, **état du schéma** |
+| **Voir son travail du jour** | Missions **engagées** par la régulation · détail : patient, adresses, horaires, sens, service destinataire, carte mutuelle connue · **patient anonyme signalé, et si l'équipage peut encore saisir** (deux jours) · affichage des lieux composé par le serveur |
+| **Faire avancer la mission** | Cinq étapes horodatées, **annulables** · « mission vue » · signature, ou **motif « ne peut pas signer »** · conducteur — **un refus dit pourquoi** · tout remonte à la régulation en quasi temps réel, un envoi en échec est rejoué, **un refus d'Order n'est pas relancé** |
+| **Compléter le dossier** | Type de mission et informations de facturation servis par la régulation, pré-remplis et verrouillés quand la fiche patient les connaît · **option « Autre » avec son texte** · **identité et contact du patient saisis par l'équipage**, règles et refus d'Order · anomalies, documents, photos |
+| **Photographier la carte mutuelle** | Depuis la mission · une nouvelle photo garde les données validées, marquées « repris de la photo du … » · **lue par l'écran de régulation, par mission, avec jeton** · journal des accès · lecture automatique en place, inerte |
+| **Passer à la facturation** | Transfert automatique à la clôture · dossier **par lots de 200**, signatures par lots de 50 · Orders lu par lot (repli mission par mission encore en place) · dossier **gelé** après transfert |
+| **Tenir debout** | Le terrain n'écrase jamais la donnée officielle · API fermée par défaut, **jeton validé par le socle commun** · **une écriture, une validation, au cas d'usage** · délais et disjoncteur vers Orders · réessai SQL · une panne rend 503 et un message ; un refus, son motif · publication **depuis `main` propre et poussé**, commit servi et schéma vérifiés |
+| **Se dire** | `api/version` : commit, état de l'arbre au build, environnement, **azp admis** · `api/version/runtime` : base résolue, drapeaux, état du schéma |
 
 ### Les réserves à ne pas perdre de vue
 
-- ⚠️ **L'écran de la certification ne lit pas encore la carte** : son `azp` n'est jamais apparu au
-  journal. La régulation (`us-regulation`) passe depuis le 05/10 à 21:01, après 4 359 refus en 401.
-- ⚠️ **Deux routes de la carte restent anonymes** — elles ne servent à personne (zéro appel du 21/09 au
-  04/10) — *voir « Fermer les routes anonymes de la carte »*.
-- ⚠️ **Le message du 503 n'atteint l'ambulancier que si l'app l'affiche** — demandé au dev web le 04/10.
-- ⚠️ **Un ambulancier rattaché depuis Employee seul n'entre pas** : 8 membres sur 244 *(13/09, non
-  remesuré)*.
+- ⚠️ **La saisie du patient et l'option « Autre » n'existent que côté API** tant que le front de Jules
+  n'est pas publié *(note du 14/11, statut non revérifié)*.
+- ⚠️ **La signature ne remonte pas encore à Order** : projection coupée (`FieldProjection:Enabled`)
+  — *voir « Allumer la projection de la signature »*.
+- ⚠️ **L'écran de la certification ne lit pas la carte** : son `azp` n'est jamais apparu *(05/10)*.
+- ⚠️ **Deux routes de la carte restent anonymes** (`MutuelleCardController`, l. 196 et 231) — *voir
+  « Fermer les routes anonymes de la carte »*.
+- ⚠️ **Le message du 503 n'atteint l'ambulancier que si l'app l'affiche** *(demandé le 04/10)*.
+- ⚠️ **Un ambulancier rattaché depuis Employee seul n'entre pas** : 8 membres sur 244 *(13/09)*.
 - ⚠️ **Ouvrir l'app avant que l'équipage soit composé échoue** — 23 min d'attente médiane
   *(juillet-août)*. Le message dit quoi faire.
 - ⚠️ **Tous les types de mission sont proposés partout** : 11 au catalogue, tables de restriction vides
-  *(relevé chez Orders le 04/10)*.
+  *(04/10)*.
 - ⚠️ **Un n° de sécurité sociale mal tapé part en facturation** *(demandé au dev web le 26/08)*.
 
 ---
@@ -83,38 +84,29 @@ de difficulté, pas de priorité.** Chaque itération porte entre crochets son *
 
 | | |
 |---|---|
-| **Nature** | Constats et mesures — aucun code |
-| **Effort** | Un relevé lundi, puis au fil de l'eau |
-| **Bloqué par** | **Le trafic de la semaine** |
+| **Nature** | Constats et mesures — aucun code. Journal lu **en agrégats**, rien copié |
+| **Effort** | Un relevé, puis au fil de l'eau |
+| **Bloqué par** | **Le trafic** |
 
-**Constaté au relevé du 05/10** — `29b6cc9` en service depuis le 04/10 à 17:35 (sourcelink du pdb) :
-- ✅ **routes asynchrones sous charge** : sélecteur 4 728, détail 3 233, liste 2 651, conducteur 2 424,
-  timeline 3 640 en 200 ; les seules exceptions non gérées datent de la coupure de 11:26 ;
-- ✅ **une panne rendue en 503** : le 05/10 à 11:26, SQL en arrêt et Orders en 500 ensemble, **14
-  `503 rendu`** ;
-- ✅ **la passe de la facturation par lot** : 14:29 et 17:01, 20 `field-data` et 48 `signatures` en 200,
-  aucun `/full` pendant les lots, aucune ligne « Orders ne porte pas batch-refs » ;
-- ✅ **l'écran de régulation sur la présence par mission** : 200 depuis le 05/10 à 21:01.
+**Sous `653e6d8` (15/11)** :
+- **un jeton de la facturation** (`erp-billinggateway-api`) **et de l'écran de régulation**
+  (`us-regulation`) validés par le socle — 14 jetons vus, tous mobiles ;
+- **une écriture passée par `CommitAsync`** : anomalie, document, signature, « mission vue » en 200,
+  **et la ligne en base** ;
+- **un premier refus d'Order abandonné** sur l'état terrain — attendu seulement une fois la projection
+  allumée.
 
-**Encore à voir passer** :
-- **une deuxième photo d'un patient dont la carte est validée** : `FieldsInheritedFrom` posé — aucune au
-  05/10 (16 photos, toutes premières) ;
-- **un détail de mission dont le patient a une carte** : `MutuelleCardKnown` vrai — le journal ne porte
-  pas les corps, à constater dans l'app ou par la suite `.http` ;
-- **un refus de conducteur** — jamais vu ;
-- **la suite [`Vector.Api.http`](CaSoft.Erp.USVector.Api/Vector.Api.http)** rejouée une fois en entier,
-  identifiants en main — y compris `api/Kilometers` en 404 et la présence par mission.
+**Sous `14b554b` (14/11)**, dès que le front de Jules sera publié : un `PUT …/beneficiary/identity` et
+un `…/contact` en 204, un 403 relayé, un `OtherText` arrivé chez Order.
 
-**À comprendre** :
-- **Une panne de la base Vector rend 500, pas 503** : 8 au 05/10 à 11:26 (`Time` ×7, `Signature` ×1). Le
-  gestionnaire du 503 ne couvre qu'Orders.
-- **Les `403` sur `JobDetail`** : 149 en ~27 h au 05/10, au-dessus du rythme relevé le 04/10 (988 en 14
-  jours) — refus normal ou écran qui insiste ?
-- **Les démarrages du pool** : 04/10 23:37 et 05/10 04:29, clés de protection éphémères à chacun.
-- **Pas de passe de la facturation le jeudi 24/09.**
+**Encore à voir passer** *(non revérifié depuis le 05/10)* : une deuxième photo d'un patient dont la
+carte est validée (`FieldsInheritedFrom`) ; un détail avec `MutuelleCardKnown` vrai ; un refus de
+conducteur ; la suite [`Vector.Api.http`](CaSoft.Erp.USVector.Api/Vector.Api.http) rejouée en entier.
 
-**À mesurer chez Orders** : les **étapes de mission vides** (~3 883 annoncées avant leur repli du
-23/07) — un comptage dans leur base.
+**À comprendre** *(relevés du 05/10, non revérifiés)* : une panne de la base Vector rend **500, pas
+503** (le gestionnaire ne couvre qu'Orders) ; **149 `403` sur `JobDetail`** en ~27 h ; les démarrages du
+pool avec clés de protection éphémères ; pas de passe de la facturation le 24/09. **Chez Orders** : les
+étapes de mission vides (~3 883 annoncées avant le 23/07).
 
 ## Itération 2 — Retirer le repli de la lecture par lot
 
@@ -122,13 +114,25 @@ de difficulté, pas de priorité.** Chaque itération porte entre crochets son *
 |---|---|
 | **Nature** | Échafaudage à démonter |
 | **Effort** | Une courte session |
-| **Bloqué par** | Rien — la passe par lot vue le 05/10 (« Constater ce qui vient d'être publié ») |
+| **Bloqué par** | Rien — la passe par lot vue le 05/10 |
 
-Orders sert la 1.8.5 depuis le 04/10. Retirer `ReadRefsOneByOneAsync`, le **corps par défaut** de
-`IErpReadApiClient.GetMissionBatchRefsAsync` et le traitement 404/405 du client — une route absente
-redevient une panne. Les doubles de test implémentent alors la méthode.
+Toujours en place au 15/11 (`FieldDataReader.cs`, l. 74 et 155). Retirer `ReadRefsOneByOneAsync`, le
+**corps par défaut** de `IErpReadApiClient.GetMissionBatchRefsAsync` et le traitement 404/405 du
+client — une route absente redevient une panne. Les doubles de test implémentent alors la méthode.
 
-## Itération 3 — Fermer les routes anonymes de la carte 🆕 *[ex-M9]*
+## Itération 3 — Publier et lire la recette 🆕 *[relevé le 21/09, cible du 14/11]*
+
+| | |
+|---|---|
+| **Nature** | Outillage de publication |
+| **Effort** | Quelques minutes |
+| **Bloqué par** | **Où vit la recette** : `\\192.168.1.118\DEV_API` comme les autres modules ? `Test-Path` à faire depuis le poste. Et **son URL publique** |
+
+Le 14/11, `deploy.ps1 DEV` a échoué : `\\192.168.1.112\dev_api` inaccessible. Vector vise encore
+`.112` dans `deploy.ps1` (l. 8, 35, 196), `IIS-DevServer.pubxml` et `FolderProfile.pubxml`. Et
+`VectorVersionUrl` est **vide** pour la recette : la publication n'y lit pas `api/version`.
+
+## Itération 4 — Fermer les routes anonymes de la carte *[ex-M9]*
 
 | | |
 |---|---|
@@ -136,52 +140,37 @@ redevient une panne. Les doubles de test implémentent alors la méthode.
 | **Effort** | Une courte session |
 | **Bloqué par** | **Jules** : qu'il confirme ne pas s'en servir et être passé aux routes par mission |
 
-`POST api/mutuelle-card/presence` (par bénéficiaire) et `GET api/beneficiaries/{id}/mutuelle-card/image`
-ont été ouvertes pour un affichage par `<img src>` que personne n'a branché : **zéro appel** du 21/09 au
-04/10. Relancer la mesure (sonde anonyme recoupée au journal principal), puis retirer
-`[AllowAnonymous]`, poser `MutuelleCardRead`, et passer `OuverturesPourLesEcransAmont` à zéro dans
-`AnonymousSurfaceTests`.
+`POST api/mutuelle-card/presence` et `GET api/beneficiaries/{id}/mutuelle-card/image` : **zéro appel**
+du 21/09 au 04/10. Relancer la mesure, puis retirer `[AllowAnonymous]`, poser `MutuelleCardRead`, et
+vider `OuverturesPourLesEcransAmont` dans `AnonymousSurfaceTests`.
 
-## Itération 4 — L'adresse publique de la recette *[relevé le 21/09]*
+## Itération 5 — Allumer la projection de la signature 🆕 *[PRJ-2]*
 
 | | |
 |---|---|
-| **Nature** | Un contrôle à moitié armé |
-| **Effort** | Une minute, dès que l'URL est connue |
-| **Bloqué par** | **L'URL de la recette** *(21/09, non revérifié)* |
+| **Nature** | Interrupteur, puis rattrapage |
+| **Effort** | Une courte session, une publication de configuration |
+| **Bloqué par** | **Orders** : une version qui sert `PUT missions/{id}/field`, **vue en production** *(non revérifié à cette édition)* |
 
-`deploy.ps1` lit `api/version` après la copie ; l'adresse est **vide pour la recette**. Renseigner
-`VectorVersionUrl` dans `IIS-DevServer.pubxml`.
+Chez nous, un 404 veut dire « mission inconnue » et abandonne l'entrée : allumer avant la route ferait
+jeter chaque projection (`decided.md`, 10/11). Ensuite `FieldProjection:Enabled = true`, puis
+`docs/exploitation/PRJ2_rattrapage_signatures.sql`. Depuis DR-001, un 400/409 d'Order s'abandonne avec
+son motif au journal : **lire ces erreurs** les premiers jours.
 
-## Itération 5 — Dire l'heure qu'il est *[ex-E2]*
-
-| | |
-|---|---|
-| **Nature** | Données ambiguës transmises à la facturation |
-| **Effort** | Une session, **à coordonner avec la facturation** |
-| **Bloqué par** | Rien |
-
-Les étapes sont en UTC **sans le déclarer** ; l'heure de signature est écrite **en heure locale**
-(`SignatureRepository.cs`, `Insert` et `Update`). Même motif à examiner dans `ClMarkMissionSeenUseCase`
-et `ClSetDriverUseCase`. **Fin visée** : tout en UTC, fuseau **déclaré** dans le contrat du paquet.
-
-## Itération 6 — Les dettes de forme qui restent *[ex-G2, G5]*
+## Itération 6 — La dette de la revue du 11/11
 
 | | |
 |---|---|
 | **Nature** | Hygiène — aucun changement de contrat |
-| **Effort** | Une session par point |
+| **Effort** | Une session par entrée |
 | **Bloqué par** | Rien |
 
-- **10 cas d'usage sur le contrat synchrone `IResultUseCase`** — ceux qui ne lisent que la base Vector,
-  avec leurs repositories EF synchrones. **Gain faible** : ils ne bloquent pas sur le réseau.
-- **`ClApplicationResult` au lieu de `ClResult`** — **différé le 04/10** (`decided.md`).
-- **Le `PATCH` de la carte remplace les quatre champs et accepte un corps vide**, qu'il marque pourtant
-  validé (`MUTUELLE_CARD_devplan.md`, « Saisie manuelle : deux faiblesses connues ») — une validation
-  à décider.
+Le détail est au registre, rubrique « Dette ». Ordre conseillé : **DR-004** (un cas d'usage pour
+`Withdraw`, qui retire aussi la validation du contrôleur), puis **AR-001** avec le reste de **DR-002**
+(le worker passe par un service d'Infrastructure et l'`IUnitOfWork`), puis **CQ-002**.
 
-⚖️ **Les alias de compatibilité restent** : leur sort est en rubrique « Fonctionnalités envisagées
-en Vn ».
+⚖️ `ClApplicationResult` reste différé (`decided.md`, 04/10) ; les alias de compatibilité restent
+(rubrique « Fonctionnalités envisagées en Vn »).
 
 ## Itération 7 — Le kilométrage dans le dossier transmis *[ex-E1, MOB-10]*
 
@@ -191,8 +180,8 @@ en Vn ».
 | **Effort** | Une session si le km véhicule suffit ; **plusieurs** s'il faut un relevé par mission |
 | **Bloqué par** | 🔴 **Un arbitrage avec la facturation** |
 
-Km du véhicule, ou relevé début/fin par mission ? On repart de zéro : la route `api/Kilometers` est
-retirée depuis le 04/10.
+Km du véhicule, ou relevé début/fin par mission ? On repart de zéro : `api/Kilometers` est retirée
+depuis le 04/10.
 
 ## Itération 8 — Positions et statuts des véhicules *[ex-F3, MOB-16]*
 
@@ -213,58 +202,54 @@ GpsGate (positions, REST) et Sirus (statuts, UDP) sont injectés mais ne servent
 | **Bloqué par** | Rien |
 
 Documents, carte mutuelle et anomalies servis par une API exposée : **rétention et purge** (3 ans —
-l'historique des cartes s'accumule sans limite), chiffrement au repos, **audit des accès** (un journal
-des lectures de carte existe depuis le 04/10, sans identifiant de patient : c'est un début, pas
-l'audit). La fermeture des routes anonymes a son itération propre. ⚠️ Si la lecture automatique est
-activée, ce lot porte aussi le sort de l'image envoyée.
+l'historique des cartes s'accumule sans limite), chiffrement au repos, **audit des accès** (le journal
+des lectures de carte, sans identifiant de patient, est un début). Depuis le 14/11, l'équipage **écrit**
+aussi l'identité et le contact du patient — chez Order, qui en porte l'audit (`setBy`). ⚠️ Si la
+lecture automatique est activée, ce lot porte aussi le sort de l'image envoyée.
 
-## Itération 10 — Ce qui attend ailleurs *[ex-A3, B, C1, C3, E4, F4]*
+## Itération 10 — Ce qui attend ailleurs *[ex-A3, B, C1, C3, E4, F4, E2]*
 
 *Rien à coder ici tant que l'autre partie n'a pas bougé. Non revérifié à cette édition sauf mention,
 et **c'est dit**.*
 
 | Entrée | Qui doit bouger | Dernier relevé | En deux mots |
 |---|---|---|---|
-| **Le client Keycloak de l'écran de la certification** | exploitation Keycloak | **05/10** | La régulation est servie (`us-regulation`, 05/10). Reste l'`azp` de la certification → `Keycloak:ScreenAzp`, **puis redémarrer le pool** : la liste n'est lue qu'au démarrage |
-| **Tout le front, en une note** 🆕 | **Jules** — il reprend l'app terrain d'Alexandre, indisponible | **04/10** | [`note_front_jules_vector.md`](note_front_jules_vector.md) : le nouveau du 04/10 pour l'app (503, carte connue, saisie, kilomètres), **les demandes faites à Alexandre à vérifier** (statut inconnu), la carte dans les listes de régulation et de certification. Sa bascule débloque « Fermer les routes anonymes de la carte » |
-| **Règle d'applicabilité des types** *[B9]* | Orders + décision métier | 04/10 | **11 types proposés partout**, tables de restriction vides. Première de leur plan, **par priorité** |
-| **Exiger un jeton du terrain** | Orders | 04/10 | Rien ne l'en empêche de notre côté. ⚠️ **`POST /missions/batch-refs` répond 200 sans jeton** |
-| **La cause des coupures** | exploitation / réseau | 04/10 | 22/09 et 02/10 : SQL, Orders et DNS **ensemble** ; 04/10, 15:00 : redémarrage du serveur SQL de la base Vector. Hors de ce dépôt |
-| **Rattachement des comptes** *[C1]* | Orders, Identity, **RH** | 13/09 | Vector lit `PER_KEYCLOAK_MAP`, que l'écran d'Employee n'alimente pas ; **273 personnels sans fiche Employee**. [Consigne](docs/auth/consigne-rattachement-ambulancier.md) **à transmettre à la régulation et à la RH** |
-| **Composer les équipages avant la prise de service** *[C3]* | 🔴 régulation — décision | 13/09 | Sans quoi l'accès anticipé de 30 min ne sert à rien. Le filtre d'appartenance est **volontaire** |
+| **Le front : saisie du patient, « Autre », motif de signature** 🆕 | **Jules** | **14/11** | [`note_front_jules_saisie_patient_et_autre.md`](note_front_jules_saisie_patient_et_autre.md), après [`note_front_jules_vector.md`](note_front_jules_vector.md) (04/10). Sa bascule débloque « Fermer les routes anonymes de la carte » |
+| **`OtherTextRequiredForField` chez Order** 🆕 | Order | 14/11 | Devait rester faux tant que Vector ne relayait pas `OtherText` — **c'est fait depuis le 14/11**, à leur dire. Leur réserve : un formulaire renvoyé en entier peut tomber en 400 sur un champ « Autre » sans texte |
+| **La route `PUT missions/{id}/field`** 🆕 | Orders | 10/11 | Débloque « Allumer la projection de la signature » |
+| **Le client Keycloak de l'écran de la certification** | exploitation Keycloak | 05/10 | Son `azp` → **`Keycloak:FrontClientIds`** (ex-`ScreenAzp`), **puis redémarrer le pool** : lu au démarrage |
+| **Basculer les heures en UTC** *[ex-E2]* | **Vector, Orders, facturation ensemble** | 04/10 | Convention figée et déclarée (`ClHorloge`, `endPoint.md`) ; la bascule se fait en une publication coordonnée des trois, avec une date pour l'historique (`decided.md`, 04/10) |
+| **Règle d'applicabilité des types** *[B9]* | Orders + décision métier | 04/10 | 11 types proposés partout, tables de restriction vides |
+| **Exiger un jeton du terrain** | Orders | 04/10 | ⚠️ `POST /missions/batch-refs` répond 200 sans jeton |
+| **La cause des coupures** | exploitation / réseau | 04/10 | 22/09, 02/10 : SQL, Orders et DNS ensemble ; 04/10 : redémarrage du SQL de la base Vector |
+| **Rattachement des comptes** *[C1]* | Orders, Identity, **RH** | 13/09 | `PER_KEYCLOAK_MAP` non alimenté par Employee ; 273 personnels sans fiche. [Consigne](docs/auth/consigne-rattachement-ambulancier.md) à transmettre |
+| **Composer les équipages avant la prise de service** *[C3]* | 🔴 régulation — décision | 13/09 | Sans quoi l'accès anticipé de 30 min ne sert à rien |
 | **`REFERENCE` et `URGENT`** *[B10]* | décision métier | 19/09 | Absents du catalogue |
 | **`Billed` : l'écrire, ou retirer le palier** *[B4, E4]* | 🔴 décision | 13/09 | La facturation est en lecture seule par décision de son module |
 | **Tests du transfert côté Orders** *[B6]* · **Relance des missions terminées non clôturées** *[B7]* | Orders | 13/09 | Des dossiers n'arrivent jamais en facturation |
 | **Présence : qui est connecté** *[F4]* | 🔴 décision + cadrage **RH/RGPD** | 13/09 | [`feadesc_utilisateurs_connectes_vector.md`](feadesc_utilisateurs_connectes_vector.md) |
 
----
-## Itération 11 — Adopter le socle 2.11.0 *[nouvelle]*
-
-📨 *Annoncé par `CaSoft.Framework` le 10/11 : socle **`2.11.0` publié** (tag `v2.11.0`, D-25 à D-28 de son `decided.md`). La migration de chaque apport est dans son `RELEASE-NOTES.md`. Effort : une courte session, et une publication.*
-
-- **Passer les références `CaSoft.Framework.*` à `2.11.0`** (aujourd'hui : 2.3.5 — le saut le plus long de l'ERP : la 2.4.0 fusionne `Data` dans `Infrastructure`, la 2.5.0 change le texte des erreurs). La série 2.x est additive ; lire les notes de version entre les deux, notamment les dépendances nouvelles (JwtBearer ≥ 8.0.10 pour `Security`, Hosting.Abstractions ≥ 8.0.1 pour `Application`).
-- **Validation du jeton Keycloak** : remplacer la configuration JwtBearer de `CaSoft.Erp.USVector.Api/Program.cs` par `AddAuthentication(…).AddCaSoftKeycloakJwtBearer(builder.Configuration)`, et retirer le contrôle local de l'`azp`. Clés : `Keycloak:Authority`, `Keycloak:ClientId` (le front), `Keycloak:FrontClientIds` (les autres fronts), `Keycloak:AllowedAzp` (les **modules** seulement). Les interrupteurs du module (`Keycloak:Enabled`…) restent au module. `Keycloak:Audience` y tient lieu d'`azp` : sa valeur passe dans `Keycloak:ClientId`.
-
 ## Dette
 
 Prochains identifiants : CQ-008 · DR-005 · AR-002
 
-*Rubrique créée le 11/11, sur la revue code-quality de `8af6ff7` (alerte signature, lot 1). Les points DR et AR viennent de la section « hors périmètre » de cette revue : non revus par un agent design-review ou architecture.*
+*Revérifiée dans le code le 15/11. **Soldées et versées dans `delivered.md`** : CQ-001, DR-001 ; DR-002
+pour l'essentiel — il n'en reste que le worker. Rapport d'origine : revue code-quality de `8af6ff7`
+(11/11) ; les points DR et AR viennent de sa section « hors périmètre », non revus par un agent
+design-review ou architecture.*
 
 | ID | P | Fichier | Constat |
 |---|---|---|---|
-| CQ-001 | P2 | `CaSoft.Erp.USVector.Api/Workers/OperationalOutboxDispatcher.cs:63-137` | `DispatchDueAsync` 75 lignes (refactoring 50 ; 59 avant le lot 1), projection terrain inline l. 100-109 → extraire `ProjectFieldStateAsync` |
-| CQ-002 | P2 | `CaSoft.Erp.USVector.Infrastructure/ErpApi/HttpErpWriteApiClient.cs:60-82` | `ProjectFieldAsync` recopie `ProjectOperationalAsync` (règle 404) ; fin d'échec log + `HttpRequestException` ×5 (l. 57, 81, 112, 142, 177) → helpers privés |
-| CQ-003 | P3 | `CaSoft.Erp.USVector.Infrastructure/Repositories/FieldDataReader.cs:201-208` | `ClFieldSignatureWaiverDtoOut` construit inline, seul bloc hors méthode d'extension (règle MAPPING) |
-| CQ-004 | P3 | `CaSoft.Erp.USVector.Api/Workers/OperationalOutboxDispatcher.cs:104-108` | `SpecifyKind(Utc)` du motif en double de `SignatureWaiverMappings.ToDomain` |
-| CQ-005 | P3 | `CaSoft.Erp.USVector.Application/UseCases/SignatureWaiver/ClDeclareSignatureWaiverUseCase.vb:13,33-35,61` | vocabulaire technique en français (`Validateur`, `verdict`, `Refus`) dans du code nouveau |
+| CQ-002 | P2 | `CaSoft.Erp.USVector.Infrastructure/ErpApi/HttpErpWriteApiClient.cs:26-91` | `ProjectFieldAsync` recopie `ProjectOperationalAsync` (règle 404) ; fin d'échec log + `HttpRequestException` ×5 (l. 57, 91, 122, 152, 187) → helpers privés |
+| CQ-003 | P3 | `CaSoft.Erp.USVector.Infrastructure/Repositories/FieldDataReader.cs:202` | `ClFieldSignatureWaiverDtoOut` construit inline, seul bloc hors méthode d'extension (règle MAPPING) |
+| CQ-004 | P3 | `CaSoft.Erp.USVector.Api/Workers/OperationalOutboxDispatcher.cs:136` | `SpecifyKind(Utc)` du motif en double de `SignatureWaiverMappings.ToDomain` |
+| CQ-005 | P3 | `CaSoft.Erp.USVector.Application/UseCases/SignatureWaiver/ClDeclareSignatureWaiverUseCase.vb:14,30,33` | vocabulaire technique en français (`Validateur`, `Refus`) dans du code nouveau |
 | CQ-006 | P3 | `…/UseCases/SignatureWaiver/ClSignatureWaiverDtos.vb`, `Domain/Entities/ClSignatureWaiver.vb` | plusieurs types par fichier, mapping hors `ModXxxMapping.vb`, contre la convention du module |
-| CQ-007 | P3 | `ErpApi/IErpWriteApiClient.cs:33,137`, `Repositories/Mobile/ProjectionOutbox.cs`, `Api/Workers/OperationalOutboxDispatcher.cs` | « Operational » vs « Projection » pour le même mécanisme (`EnOperationalProjectionOutcome` rendu par `ProjectFieldAsync`) ; table `MOB_OPERATIONAL_OUTBOX` inchangée |
-| DR-001 | P2 | `HttpErpWriteApiClient.cs:79-81`, `OperationalOutboxDispatcher.cs:123-133` | un 400/409 d'Order sur `PUT missions/{id}/field` lève et se relance sans fin (60 s), contre « refus métier jamais retentés » (`decided.md`, 21/09) ; risque faible (Vector ne produit pas les données refusées) ; à arbitrer avec le 04/10 |
-| DR-002 | P2 | `SignatureWaiverRepository.cs:53,63`, `SignatureRepository.cs`, repositories du module | `SaveChangesAsync` dans les repositories, pas d'`IUnitOfWork` (absent du socle) ; schéma du module, migrer au fil des modifications |
-| DR-003 | P3 | `CaSoft.Erp.USVector.Api/Controllers/SignatureWaiverController.cs:23-34` | lectures par `ISignatureWaiverRepository` au lieu d'un `IXxxQueryService` ; le contrôleur compose le libellé (deux appels) |
-| DR-004 | P3 | `SignatureWaiverController.cs:44-49` | `Withdraw` appelle le repository sans cas d'usage (ni garde, ni `ClResult`) |
-| AR-001 | P3 | `OperationalOutboxDispatcher.cs:103-105` | le worker (couche Api) interroge `MobileDbContext` directement (`Signatures`, `SignatureWaivers`) au lieu d'un service d'Infrastructure |
+| CQ-007 | P3 | `ErpApi/IErpWriteApiClient.cs:19,33`, `Repositories/Mobile/ProjectionOutbox.cs`, `Api/Workers/OperationalOutboxDispatcher.cs` | « Operational » vs « Projection » pour le même mécanisme (`EnOperationalProjectionOutcome` rendu par `ProjectFieldAsync`) ; table `MOB_OPERATIONAL_OUTBOX` inchangée |
+| DR-002 | P3 | `CaSoft.Erp.USVector.Api/Workers/OperationalOutboxDispatcher.cs:101` | reste : le worker appelle `ctx.SaveChangesAsync` au lieu de l'`IUnitOfWork` (repositories et cas d'usage migrés le 14/11) ; à traiter avec AR-001 |
+| DR-003 | P3 | `CaSoft.Erp.USVector.Api/Controllers/SignatureWaiverController.cs:29-41` | lectures par `ISignatureWaiverRepository` au lieu d'un `IXxxQueryService` ; le contrôleur compose le libellé (deux appels) |
+| DR-004 | P3 | `SignatureWaiverController.cs:51-56` | `Withdraw` appelle le repository et valide lui-même (`CommitAsync`), sans cas d'usage (ni garde, ni `ClResult`) |
+| AR-001 | P3 | `OperationalOutboxDispatcher.cs:131-132` | le worker (couche Api) interroge `MobileDbContext` directement (`Signatures`, `SignatureWaivers`) au lieu d'un service d'Infrastructure |
 
 # 3. Fonctionnalités envisagées en Vn
 
@@ -272,11 +257,12 @@ Prochains identifiants : CQ-008 · DR-005 · AR-002
 
 | Sujet | En deux mots | Ce qui la rouvrirait |
 |---|---|---|
-| **Historique des photos de la carte** | Toutes les photos sont gardées ; les écrans ne montrent que la plus récente (choix du 04/10) | Un transport contesté où la carte d'alors compte |
-| **Activer la lecture automatique des cartes** *[F2, P3]* | En place, **inerte** : une clé à poser, puis l'écran de validation côté web. ~12 cartes/jour, ~1 centime/carte ; code AMC saisi 41 fois sur 85 *(20/09)* ; depuis le 04/10 une nouvelle photo garde les champs validés, la lecture ne servirait qu'aux premières photos | 🔴 **Une décision d'exploitation** : envoyer une **donnée de santé** au fournisseur du modèle |
+| **Historique des photos de la carte** | Toutes gardées ; les écrans ne montrent que la plus récente (04/10) | Un transport contesté où la carte d'alors compte |
+| **Activer la lecture automatique des cartes** *[F2, P3]* | En place, **inerte** : une clé à poser, puis l'écran de validation côté web. ~12 cartes/jour, ~1 centime/carte *(20/09)* | 🔴 **Une décision d'exploitation** : envoyer une **donnée de santé** au fournisseur du modèle |
 | **Retirer les alias de compatibilité** *[G2]* | `IsAck`, champs historiques du détail, `SelectedDriver` jamais nul, champs typés des lieux. **Conservés délibérément** | **La confirmation du front, champ par champ** — [`note_ui_alex.md`](note_ui_alex.md) |
-| **Alerter sur les 500 et les coupures** | La coupure du 22/09 n'a été vue que douze jours après ; le redémarrage SQL du 04/10, par hasard | Une coupure de plus découverte en retard |
-| **Sortir les images du SQL** *[Vd-6]* | ~2 Go/an : la base le porte ; gardé en SQL le 04/10 | Le volume, ou une contrainte de sauvegarde |
+| **`ClApplicationResult` au lieu de `ClResult`** | Différé le 04/10 (`decided.md`) | Un appui de Vector sur le pipeline du socle |
+| **Alerter sur les 500 et les coupures** | La coupure du 22/09 n'a été vue que douze jours après | Une coupure de plus découverte en retard |
+| **Sortir les images du SQL** *[Vd-6]* | ~2 Go/an : la base le porte | Le volume, ou une contrainte de sauvegarde |
 | **Base Vector dédiée** *[Vd-1]* | Seul jalon DMZ non conditionné à la V2 | Pertinent dès maintenant ; personne ne l'a porté |
 | **Accès anticipé à cheval sur minuit** *[CREW-2]* | Correctif connu | Les vacations de nuit ne sont pas concernées *(02/08)* |
 | **Durcissement DMZ événementiel, push temps réel** *[Vd-2 à Vd-8]* | [`spec_architecture_vector_mission_dmz.md`](spec_architecture_vector_mission_dmz.md) | Une exigence d'exposition, ou le polling qui ne suffit plus |
@@ -289,15 +275,16 @@ Prochains identifiants : CQ-008 · DR-005 · AR-002
 # 4. Décisions tranchées
 
 **Dans [`decided.md`](decided.md)**, qui s'ajoute et ne se régénère pas. 🔴 *À lire avant d'écrire du
-code.* Cette édition n'y ajoute rien : les quatre décisions de la carte mutuelle — elle reste chez
-Vector, les écrans entrent par un azp dédié, une nouvelle photo hérite des champs validés, une colonne
-lue par EF se crée avant la publication — y sont entrées avec leur code.
+code.* Cette édition y ajoute sept lignes : la saisie du patient passe par la bordure d'Order, l'arbitrage
+DR-001, la frontière transactionnelle (DR-002), la validation du socle sans rien lui retirer, les
+anciennes clés reprises, l'homonyme `ClKeycloakCallers`, et la vérification commit par commit.
 
 ---
 # 5. Journal des livraisons
 
 **Dans [`delivered.md`](delivered.md)**, horodaté et constaté. Dernière entrée : la publication de
-`9c15f94`, schéma 9 sur 9.
+`653e6d8` le 15/11, schéma 10 sur 10. Cette édition y a aussi versé `29b6cc9` (04/10), que l'édition du
+05/10 n'avait pas inscrit.
 
 ---
 
@@ -313,6 +300,7 @@ lue par EF se crée avant la publication — y sont entrées avec leur code.
 | [`TRACABILITE_SAISIES_VECTOR_EXPORT.md`](TRACABILITE_SAISIES_VECTOR_EXPORT.md) | Des saisies aux 91 colonnes de facturation |
 | [`VECTOR_ORDERS_DECOUPLING_devplan.md`](VECTOR_ORDERS_DECOUPLING_devplan.md) | Authentification de service, résilience |
 | [`endPoint.md`](endPoint.md) | Ce que Vector attend d'Orders.Api |
+| [`docs/deploiement/configuration-keycloak-iis.md`](docs/deploiement/configuration-keycloak-iis.md) | Clés Keycloak (noms du socle depuis le 14/11), validation du jeton |
 | [`CaSoft.Erp.USVector.Api/Vector.Api.http`](CaSoft.Erp.USVector.Api/Vector.Api.http) | La suite de vérification, à rejouer après chaque publication |
 | `note_front_jules_*.md`, `note_web_alexandre_*.md`, `note_ui_alex.md`, `docs/ui-web/*` | Ce qui est promis aux fronts |
 
