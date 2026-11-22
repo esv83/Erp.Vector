@@ -109,13 +109,13 @@ de difficulté, pas de priorité.** Chaque itération porte entre crochets son *
 
 **À comprendre** *(relevé du 22/11)* :
 - 🔧 **deux `PATCH Time` simultanés sur une mission sans état** rendaient **500 brut** (1 fois en 8 jours,
-  20/11 08:28) : **corrigé et publié le 22/11 à 19:38 (`bba6eca`)** — la création perdante devient une
+  20/11 08:28) : **corrigé et publié le 22/11 à 17:47 (`bba6eca`, republié à 19:38)** — la création perdante devient une
   mise à jour (`ClMobileUnitOfWork`). Reste à constater : plus de violation de `PK_MOB_MISSION_STATE` au
-  journal sur une journée pleine (aucune dans les 20 premières minutes, trafic faible) ;
+  journal sur une journée pleine (aucune de 17:47 à 20:15, trafic du soir) ;
 - 🔧 **la saisie de la carte par l'équipage est refusée deux fois sur trois** (`PATCH mutuelle-card` :
-  172 × 400 pour 96 × 200, `us-ambulance`) : **motif journalisé depuis le 22/11 à 19:38 (`bba6eca`)**
-  (« Saisie de carte refusée|azp=…|motif=… ») — aucune saisie dans les 20 premières minutes ; le
-  relever, puis décider avec Jules ;
+  172 × 400 pour 96 × 200, `us-ambulance`) : **motif journalisé depuis le 22/11 à 17:47 (`bba6eca`)**
+  (« Saisie de carte refusée|azp=…|motif=… ») — premier relevé : 1 refus, « Saisie vide » (17:50) ;
+  relever sur une journée pleine, puis décider avec Jules ;
 - **une panne de la base Vector rend 500, pas 503** — aucune panne dans la fenêtre, non revérifié ;
 - **`403` sur `JobDetail`** : 691 en 8 jours (~90/jour), rythme inchangé depuis le 05/10 ;
 - **clés de protection éphémères** à chacun des 28 démarrages du pool en 8 jours, surtout la nuit ;
@@ -154,7 +154,7 @@ Le 14/11, `deploy.ps1 DEV` a échoué : `\\192.168.1.112\dev_api` inaccessible. 
 | | |
 |---|---|
 | **Nature** | Échafaudage à démonter — donnée de santé servie sans jeton |
-| **Effort** | **Fait dans le code le 22/11** : `[AllowAnonymous]` retiré, `MutuelleCardRead` posé sur les deux, surface anonyme des écrans amont vide (tests). **Publié le 22/11 (`1668136`) et constaté** : `401` sans jeton sur les deux routes ; la présence par mission sert toujours les écrans (10 appels dans les 4 premières minutes). À verser dans `delivered.md` au prochain « compact devplan » |
+| **Effort** | **Fait dans le code le 22/11** : `[AllowAnonymous]` retiré, `MutuelleCardRead` posé sur les deux, surface anonyme des écrans amont vide (tests). **Publié le 22/11 (`1668136`) et constaté** : `401` sans jeton sur les deux routes ; la présence par mission sert toujours les écrans (10 appels dans les 4 premières minutes). ✅ **Validé le 22/11 sur 4 h de trafic** (16:25 → 20:15) : aucun `401` sur les deux routes fermées hors les deux sondes du constat (16:24) ; 184 présences par mission de `us-regulation` en 200, une 503 (Orders hors délai, 18:12). À verser dans `delivered.md` au prochain « compact devplan » |
 | **Bloqué par** | **Plus rien** : Jules confirme le 22/11 (J-095) que la régulation et la certification n'appellent plus que `POST api/missions/mutuelle-card/presence`. Mesure relancée le 22/11 : **zéro appel** aux deux routes anonymes du 23/10 au 22/11 (31 journaux), contre des milliers par jour pour la route par mission |
 
 `POST api/mutuelle-card/presence` et `GET api/beneficiaries/{id}/mutuelle-card/image` : **zéro appel**
