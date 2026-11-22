@@ -77,7 +77,8 @@ public class AnonymousSurfaceTests
     private static readonly string[] OuverturesDeDiagnostic =
     {
         "AuthController.WhoAmI",              // doit pouvoir répondre « pas de jeton » — c'est son rôle
-        "DiagController.*"                    // 404 hors dev/staging (Diagnostics:Enabled)
+        "DiagController.*",                   // 404 hors dev/staging (Diagnostics:Enabled)
+        "SimulationController.Personas"       // donne le jeton d'un persona de formation ; 404 hors dev (Simulation:AnonymousPersonas, refusé en Production)
     };
 
     /// <summary>

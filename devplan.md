@@ -218,6 +218,20 @@ Règles arrêtées dans `Erp.Order/docs/features/featDesc_VerrouVu.md` (D10 à D
 | **Refuser les écritures sur une mission non vue** | Après le déploiement de la nouvelle app : d'abord journalisé sans bloquer, puis activé par réglage |
 | **L'heure du clic pour un « vu » hors réseau** | Attend la réponse de Jules (Q1 de la fiche) |
 
+## Itération 12 — Le mode formation 🆕 *[22/11]*
+
+Missions fictives pour former les équipages et faire avancer l'app sans compte Keycloak. Codé le 22/11 :
+`Infrastructure/Simulation/`, `SimulationConfinementFilter`, `api/simulation` (`Status`, `personas`, `reset`),
+purge de la nuit. Le pourquoi est dans `decided.md` (22/11).
+
+| Reste | Note |
+|---|---|
+| **Publier sur le serveur de dev et constater** | `Simulation:Enabled` + `AnonymousPersonas` posés dans `appsettings.Staging.json` : **vérifier que le serveur de dev tourne bien en `Staging`**, sinon rien ne s'ouvre. À constater : `GET api/simulation/personas` → 5 personas, `api/crew/mine` avec `Bearer simulation-persona-1` → équipage `FORMATION` |
+| **Fiche Jules** | Bouton « Mode formation » qui pose `X-Vector-Simulation: 1` sur **chaque** appel, bandeau visible tant qu'il est actif, écran de choix d'un persona en dev, `POST api/simulation/reset`. Le 409 « mode formation non ouvert » est à afficher |
+| **Ouvrir en production** | Décision d'exploitation : `Simulation:Enabled=true` dans `appsettings.Production.json`. Les personas y restent interdits (refus au démarrage) |
+| **Lecture automatique des cartes de formation** | Le worker OCR ne distingue pas une carte de formation : à exclure avant d'activer la lecture, si une vraie carte peut être photographiée en formation |
+| **L'état du faux Orders est en mémoire** | Perdu à un recyclage du pool (statut et context reviennent à l'origine ; les saisies en base Mobile restent). Gêne admise ; à revoir si les formations s'en plaignent |
+
 ## Itération 10 — Ce qui attend ailleurs *[ex-A3, B, C1, C3, E4, F4, E2]*
 
 *Rien à coder ici tant que l'autre partie n'a pas bougé. Non revérifié à cette édition sauf mention,

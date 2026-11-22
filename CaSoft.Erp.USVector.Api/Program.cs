@@ -18,6 +18,10 @@ using NLog.Web;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Mode formation (Simulation:Enabled) : missions fictives pour les équipages en formation, et personas sans
+// compte pour le développement de l'app (Simulation:AnonymousPersonas, refusé en Production).
+var simulation = builder.Services.AddVectorSimulationOptions(builder.Configuration, builder.Environment);
+
 // ── Auth Keycloak (JWT) — gated par config, comme Crew.Api (MOB-4a) ──────────
 // Itération 11 : anciennes clés (Audience, ServiceAzp, ScreenAzp) recopiées sous les noms du socle.
 var keycloakLegacyKeys = KeycloakLegacyKeys.Apply(builder.Configuration);
@@ -54,7 +58,7 @@ if (keycloakEnabled)
     // Ce que Vector ajoute autour, sans rien retirer au socle : le motif d'un rejet déposé pour les
     // contrôleurs (MobileCallerExtensions.GetJwtError), le journal « Keycloak.Jwt », et le mode dégradé.
     builder.Services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme,
-        options => VectorJwtBearerEvents.Apply(options, disableValidation));
+        options => VectorJwtBearerEvents.Apply(options, disableValidation, simulation, audience));
     // ⚠️ FERMÉ PAR DÉFAUT. Jusqu'ici aucun contrôleur ne portait d'attribut d'autorisation et il
     // n'existait aucune politique globale : seuls les cinq endpoints passant par CrewAccess étaient
     // protégés, par leur code. Tout le reste répondait 200 à qui connaissait un identifiant de
@@ -179,7 +183,8 @@ builder.Services.AddHttpClient<IBeneficiaryFieldEntryService, HttpBeneficiaryFie
     .AddOrdersResilience(builder.Configuration);
 
 // Contrat mobile inchangé : PascalCase comme l'ancienne WebApi (pas de camelCase).
-builder.Services.AddControllers()
+// Mode formation : cantonne une requête de formation au jeu fictif (filtre global, cf. la classe).
+builder.Services.AddControllers(options => options.Filters.AddService<SimulationConfinementFilter>())
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = null;
@@ -317,6 +322,9 @@ builder.Services.AddScoped<IEmergencyConnector>(provider =>
 
     return new ClEmergencyPlatformService(platform, geoloc);
 });
+
+// Mode formation : aiguillages devant les clients d'Orders et l'identité. APRÈS leur enregistrement.
+builder.Services.AddVectorSimulationRouting(simulation);
 
 // NLog
 builder.Logging.ClearProviders();

@@ -51,6 +51,8 @@ public sealed class AnonymousSurfaceProbe
     {
         "AuthController.WhoAmI",
         "DiagController.*",
+        // Personas du mode formation : appelée par le développeur de l'app, 404 hors dev.
+        "SimulationController.Personas",
         // Même raison : la version est faite pour être demandée librement, y compris par nous après
         // chaque publication. La mesurer noierait le signal sous nos propres constats.
         "VersionController.Get"

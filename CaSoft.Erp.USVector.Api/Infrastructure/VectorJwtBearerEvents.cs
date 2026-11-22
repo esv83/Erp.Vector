@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using System.Security.Claims;
+using CaSoft.Erp.USVector.Infrastructure.Simulation;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
@@ -13,7 +15,11 @@ namespace CaSoft.Erp.USVector.Api.Infrastructure;
 public static class VectorJwtBearerEvents
 {
     /// <summary>À appeler APRÈS le socle (PostConfigure) : son contrôle de l'azp est conservé et enchaîné.</summary>
-    public static void Apply(JwtBearerOptions options, bool disableValidation)
+    /// <param name="simulation">Mode formation : avec <see cref="SimulationOptions.PersonasEnabled"/>, un jeton
+    /// <c>simulation-persona-{n}</c> authentifie un persona sans compte Keycloak (développement de l'app).</param>
+    /// <param name="mobileAzp">azp posé sur le persona, pour qu'il passe la politique de repli comme l'app mobile.</param>
+    public static void Apply(JwtBearerOptions options, bool disableValidation,
+        SimulationOptions? simulation = null, string? mobileAzp = null)
     {
         var admitCaller = options.Events.OnTokenValidated;
 
@@ -37,6 +43,13 @@ public static class VectorJwtBearerEvents
             log.LogDebug("JWT — requête {Method} {Path} : header Authorization {Present}.",
                 ctx.HttpContext.Request.Method, ctx.HttpContext.Request.Path,
                 ctx.HttpContext.HasAuthorizationHeader() ? "présent" : "ABSENT");
+
+            if (simulation?.PersonasEnabled == true && PersonaFor(ctx.Request.Headers.Authorization.ToString(), mobileAzp) is { } persona)
+            {
+                ctx.Principal = persona;
+                ctx.Success();
+                log.LogInformation("JWT — persona de formation {Sub} sur {Path}.", persona.FindFirst("sub")?.Value, ctx.Request.Path);
+            }
             return Task.CompletedTask;
         };
         options.Events.OnTokenValidated = async ctx =>
@@ -72,5 +85,28 @@ public static class VectorJwtBearerEvents
                 ctx.HttpContext.Request.Path, reason);
             return Task.CompletedTask;
         };
+    }
+
+    /// <summary>
+    /// Principal d'un persona de formation, ou null si l'en-tête n'en porte pas. Le persona n'a de droits que
+    /// sur le jeu de formation : son personnel est dans la plage réservée, et le filtre de cantonnement
+    /// refuse tout identifiant hors de cette plage.
+    /// </summary>
+    internal static ClaimsPrincipal? PersonaFor(string authorization, string? mobileAzp)
+    {
+        const string bearer = "Bearer ";
+        if (!authorization.StartsWith(bearer + SimulationRequest.PersonaTokenPrefix, StringComparison.OrdinalIgnoreCase)) return null;
+        if (!int.TryParse(authorization[(bearer.Length + SimulationRequest.PersonaTokenPrefix.Length)..], out var number)
+            || number < 1 || number > 99) return null;
+
+        var claims = new List<Claim>
+        {
+            new("sub", ClSimulationIds.Persona(number).ToString()),
+            new("preferred_username", $"persona-{number}"),
+            new("name", ClSimulatedOrdersReadClient.PersonaName(number)),
+            new(SimulationRequest.PersonaClaim, "persona"),
+        };
+        if (!string.IsNullOrWhiteSpace(mobileAzp)) claims.Add(new Claim(ClKeycloakCallers.AzpClaim, mobileAzp));
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, JwtBearerDefaults.AuthenticationScheme, "preferred_username", null));
     }
 }
