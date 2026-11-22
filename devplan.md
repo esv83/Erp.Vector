@@ -210,13 +210,13 @@ lecture automatique est activée, ce lot porte aussi le sort de l'image envoyée
 ## Itération 11 — Le verrou « Vu » 🆕 *[22/11]*
 
 Règles arrêtées dans `Erp.Order/docs/features/featDesc_VerrouVu.md` (D10 à D13). Fiche Jules :
-[`docs/sous-traitance-ui/2026-11-22-verrou-vu.md`](docs/sous-traitance-ui/2026-11-22-verrou-vu.md) (J-172, pas encore envoyée).
+[`docs/sous-traitance-ui/2026-11-22-verrou-vu.md`](docs/sous-traitance-ui/2026-11-22-verrou-vu.md) (J-172, envoyée le 22/11 ; réponses de Jules le 22/11).
 
 | Reste | Note |
 |---|---|
 | **Publier le contrôle de périmètre du « vu » et la fermeture de son effacement** | Codés le 22/11 : `PATCH api/JobList` → 403 « Mission hors de vos équipages » (mission inconnue comprise) ; `DELETE api/Time/{id}/seen` → 400. Aucun client n'appelle l'effacement du « vu » ; us-ambulance et us-mobile envoient le « vu » avec le jeton de l'ambulancier |
 | **Refuser les écritures sur une mission non vue** | Après le déploiement de la nouvelle app : d'abord journalisé sans bloquer, puis activé par réglage |
-| **L'heure du clic pour un « vu » hors réseau** | Attend la réponse de Jules (Q1 de la fiche) |
+| **L'heure du clic pour un « vu » hors réseau** | **Jules (22/11, Q1)** : un « vu » rejoué plus tard serait horodaté à son arrivée ; pour débloquer hors réseau, il faudrait que l'API accepte l'heure du clic. En attendant, l'app ne débloque pas sans `200`. **À trancher par l'utilisateur** : accepter l'heure du clic (ajout au contrat de `PATCH api/JobList`, avec une borne de vraisemblance) ou rester sans déblocage hors réseau. **Q2** : l'app ne propose que les étapes de la timeline (En route, Sur place, Disponible), toutes sous le verrou : rien d'autre à couvrir |
 
 ## Itération 12 — Le mode formation 🆕 *[22/11]*
 
@@ -227,7 +227,7 @@ purge de la nuit. Le pourquoi est dans `decided.md` (22/11).
 | Reste | Note |
 |---|---|
 | **Publier sur le serveur de dev et constater** | `Simulation:Enabled` + `AnonymousPersonas` posés dans `appsettings.Staging.json` : **vérifier que le serveur de dev tourne bien en `Staging`**, sinon rien ne s'ouvre. À constater : `GET api/simulation/personas` → 5 personas, `api/crew/mine` avec `Bearer simulation-persona-1` → équipage `FORMATION` |
-| **Fiche Jules** *(J-175, envoyée le 22/11, `docs/sous-traitance-ui/2026-11-22-mode-formation.md`)* | Bouton « Mode formation » qui pose `X-Vector-Simulation: 1` sur **chaque** appel, bandeau visible tant qu'il est actif, écran de choix d'un persona en dev, `POST api/simulation/reset`. Le 409 « mode formation non ouvert » est à afficher |
+| **Fiche Jules** *(J-175, envoyée le 22/11, `docs/sous-traitance-ui/2026-11-22-mode-formation.md`)*. Réponses de Jules le 22/11 : bouton dans « Moi », section Formation (Q1) ; au redémarrage l'app repart en mode normal et purge le cache de la séance (Q2, il propose de garder la règle) ; pas d'appel à `/api/EmergencyPlatform` (Q3) ; plus aucune écriture en file (Q4) ; aucune notification de mission dans l'app (Q5) ; bandeau orange `#FF6B00`, texte presque noir, capitales, **à valider par l'utilisateur** (Q6) | Bouton « Mode formation » qui pose `X-Vector-Simulation: 1` sur **chaque** appel, bandeau visible tant qu'il est actif, écran de choix d'un persona en dev, `POST api/simulation/reset`. Le 409 « mode formation non ouvert » est à afficher |
 | **Ouvrir en production** | Décision d'exploitation : `Simulation:Enabled=true` dans `appsettings.Production.json`. Les personas y restent interdits (refus au démarrage) |
 | **Lecture automatique des cartes de formation** | Le worker OCR ne distingue pas une carte de formation : à exclure avant d'activer la lecture, si une vraie carte peut être photographiée en formation |
 | **L'état du faux Orders est en mémoire** | Perdu à un recyclage du pool (statut et context reviennent à l'origine ; les saisies en base Mobile restent). Gêne admise ; à revoir si les formations s'en plaignent |
