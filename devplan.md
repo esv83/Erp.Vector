@@ -109,11 +109,13 @@ de difficulté, pas de priorité.** Chaque itération porte entre crochets son *
 
 **À comprendre** *(relevé du 22/11)* :
 - 🔧 **deux `PATCH Time` simultanés sur une mission sans état** rendaient **500 brut** (1 fois en 8 jours,
-  20/11 08:28) : **corrigé dans le code le 22/11, à publier** — la création perdante devient une mise à
-  jour (`ClMobileUnitOfWork`). Après publication : plus de violation de `PK_MOB_MISSION_STATE` au journal ;
+  20/11 08:28) : **corrigé et publié le 22/11 à 19:38 (`bba6eca`)** — la création perdante devient une
+  mise à jour (`ClMobileUnitOfWork`). Reste à constater : plus de violation de `PK_MOB_MISSION_STATE` au
+  journal sur une journée pleine (aucune dans les 20 premières minutes, trafic faible) ;
 - 🔧 **la saisie de la carte par l'équipage est refusée deux fois sur trois** (`PATCH mutuelle-card` :
-  172 × 400 pour 96 × 200, `us-ambulance`) : **motif journalisé à partir de la prochaine publication**
-  (« Saisie de carte refusée|azp=…|motif=… ») — le relever, puis décider avec Jules ;
+  172 × 400 pour 96 × 200, `us-ambulance`) : **motif journalisé depuis le 22/11 à 19:38 (`bba6eca`)**
+  (« Saisie de carte refusée|azp=…|motif=… ») — aucune saisie dans les 20 premières minutes ; le
+  relever, puis décider avec Jules ;
 - **une panne de la base Vector rend 500, pas 503** — aucune panne dans la fenêtre, non revérifié ;
 - **`403` sur `JobDetail`** : 691 en 8 jours (~90/jour), rythme inchangé depuis le 05/10 ;
 - **clés de protection éphémères** à chacun des 28 démarrages du pool en 8 jours, surtout la nuit ;
