@@ -32,7 +32,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         public async Task<IActionResult> PatchJobTime(Guid gJobId, [FromBody] ClJobTimeModel JobTime, CancellationToken ct)
             => (await _jobService.SetJobTimeAsync(gJobId, JobTime, ct)).ToActionResult();
 
-        // DELETE api/time/{id}/{jalon} — retour arrière : efface un jalon (seen | go | onsite | terminate).
+        // DELETE api/time/{id}/{jalon} — retour arrière : efface un jalon (go | onsite | terminate). Le « vu » ne s'efface pas (400, 22/11).
         // L'effacement est projeté (Outbox) → régulation resynchronisée dès qu'Orders.Api gère « null = effacé ».
         [HttpDelete("{gJobId}/{jalon}")]
         [FreezeOnTransfer]

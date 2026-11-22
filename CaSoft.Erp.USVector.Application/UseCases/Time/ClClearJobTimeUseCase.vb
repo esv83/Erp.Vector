@@ -22,12 +22,19 @@ Public Class ClClearJobTimeUseCase
 
     Public Async Function HandleAsync(ct As CancellationToken) As Task(Of ClResult(Of Boolean)) Implements IResultUseCaseAsync(Of Boolean).HandleAsync
 
+        ' Le « vu » ne s'efface pas (22/11, verrou « Vu », règle « un seul Vu ») : il prouve que
+        ' l'équipage a lu la mission ; l'effacer rouvrirait le verrou et ferait mentir la régulation.
+        ' Refusé avant toute lecture : aucun client ne l'appelle (la frise ne porte pas l'étape « vu »).
+        Dim jalon = _jalon?.Trim().ToLowerInvariant()
+        If jalon = "seen" OrElse jalon = "read" Then
+            Return ClResult(Of Boolean).Fail(
+                ClError.Application("Le « vu » d'une mission ne s'efface pas."))
+        End If
+
         Dim jobTime As ClJobTimeData = Await _repository.GetJobTimeAsync(_jobId, ct)
 
         'TODO remplacer par enum quand VB.NET le supportera.
-        Select Case _jalon?.Trim().ToLowerInvariant()
-            Case "seen", "read"
-                jobTime.ReadTime = Nothing
+        Select Case jalon
             Case "go", "enroute"
                 jobTime.GoTime = Nothing
             Case "onsite", "surplace"
@@ -36,7 +43,7 @@ Public Class ClClearJobTimeUseCase
                 jobTime.TerminateTime = Nothing
             Case Else
                 Return ClResult(Of Boolean).Fail(
-                    ClError.Application($"Jalon inconnu : « {_jalon} ». Attendu : seen | go | onsite | terminate | disponible."))
+                    ClError.Application($"Jalon inconnu : « {_jalon} ». Attendu : go | onsite | terminate | disponible."))
         End Select
 
         ' Upsert BD Mobile (jalon effacé) + enqueue Outbox → projection consolidée (retour arrière).

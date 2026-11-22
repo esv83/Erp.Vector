@@ -8,7 +8,7 @@ Public Interface IJobService
     ''' <summary>Timeline ordonnée + labellisée des jalons (Option A — contrat riche pour l'UI).</summary>
     Function GetJobTimelineAsync(gJobId As Guid, ct As CancellationToken) As Task(Of ClResult(Of ClJobTimelineDtoOut))
     Function SetJobTimeAsync(gJobId As Guid, jobTime As ClJobTimeModel, ct As CancellationToken) As Task(Of ClResult(Of Boolean))
-    ''' <summary>Retour arrière : efface un jalon (seen | go | onsite | terminate).</summary>
+    ''' <summary>Retour arrière : efface un jalon (go | onsite | terminate). Le « vu » ne s'efface pas.</summary>
     Function ClearJobTimeAsync(gJobId As Guid, jalon As String, ct As CancellationToken) As Task(Of ClResult(Of Boolean))
 
 End Interface

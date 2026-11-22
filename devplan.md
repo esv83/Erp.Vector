@@ -207,6 +207,17 @@ des lectures de carte, sans identifiant de patient, est un début). Depuis le 14
 aussi l'identité et le contact du patient — chez Order, qui en porte l'audit (`setBy`). ⚠️ Si la
 lecture automatique est activée, ce lot porte aussi le sort de l'image envoyée.
 
+## Itération 11 — Le verrou « Vu » 🆕 *[22/11]*
+
+Règles arrêtées dans `Erp.Order/docs/features/featDesc_VerrouVu.md` (D10 à D13). Fiche Jules :
+[`docs/sous-traitance-ui/2026-11-22-verrou-vu.md`](docs/sous-traitance-ui/2026-11-22-verrou-vu.md) (J-172, pas encore envoyée).
+
+| Reste | Note |
+|---|---|
+| **Publier le contrôle de périmètre du « vu » et la fermeture de son effacement** | Codés le 22/11 : `PATCH api/JobList` → 403 « Mission hors de vos équipages » (mission inconnue comprise) ; `DELETE api/Time/{id}/seen` → 400. Aucun client n'appelle l'effacement du « vu » ; us-ambulance et us-mobile envoient le « vu » avec le jeton de l'ambulancier |
+| **Refuser les écritures sur une mission non vue** | Après le déploiement de la nouvelle app : d'abord journalisé sans bloquer, puis activé par réglage |
+| **L'heure du clic pour un « vu » hors réseau** | Attend la réponse de Jules (Q1 de la fiche) |
+
 ## Itération 10 — Ce qui attend ailleurs *[ex-A3, B, C1, C3, E4, F4, E2]*
 
 *Rien à coder ici tant que l'autre partie n'a pas bougé. Non revérifié à cette édition sauf mention,
