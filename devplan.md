@@ -63,7 +63,7 @@ repli de la lecture par lot.
 - ⚠️ **La signature ne remonte pas encore à Order** : projection coupée (`FieldProjection:Enabled`)
   — *voir « Allumer la projection de la signature »*.
 - ⚠️ **L'écran de la certification ne lit pas la carte** : son `azp` n'est jamais apparu *(05/10)*.
-- ⚠️ **Deux routes de la carte restent anonymes** (`MutuelleCardController`, l. 196 et 231) — *voir
+- 🔒 **Les deux routes anonymes de la carte sont fermées dans le code** (22/11) — *à publier, voir
   « Fermer les routes anonymes de la carte »*.
 - ⚠️ **Le message du 503 n'atteint l'ambulancier que si l'app l'affiche** *(demandé le 04/10)*.
 - ⚠️ **Un ambulancier rattaché depuis Employee seul n'entre pas** : 8 membres sur 244 *(13/09)*.
@@ -137,7 +137,7 @@ Le 14/11, `deploy.ps1 DEV` a échoué : `\\192.168.1.112\dev_api` inaccessible. 
 | | |
 |---|---|
 | **Nature** | Échafaudage à démonter — donnée de santé servie sans jeton |
-| **Effort** | Une courte session |
+| **Effort** | **Fait dans le code le 22/11** : `[AllowAnonymous]` retiré, `MutuelleCardRead` posé sur les deux, surface anonyme des écrans amont vide (tests). **Reste : publier**, puis constater un `401` sans jeton sur `POST api/mutuelle-card/presence` |
 | **Bloqué par** | **Plus rien** : Jules confirme le 22/11 (J-095) que la régulation et la certification n'appellent plus que `POST api/missions/mutuelle-card/presence`. Mesure relancée le 22/11 : **zéro appel** aux deux routes anonymes du 23/10 au 22/11 (31 journaux), contre des milliers par jour pour la route par mission |
 
 `POST api/mutuelle-card/presence` et `GET api/beneficiaries/{id}/mutuelle-card/image` : **zéro appel**
