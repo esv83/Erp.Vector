@@ -76,4 +76,52 @@ public class ClMarkMissionSeenUseCaseTests
         result.IsFail.Should().BeTrue();
         result.InnerError!.ErrorText.Should().Be("Identifiant de mission vide.");
     }
+
+    // ── Heure du clic (22/11, J-172 : « Vu » hors réseau, envoyé au retour du réseau) ──────────
+
+    private static async Task<(CaSoft.Framework.ClResult<bool> Resultat, FakeJobTime Repo)> VuAAsync(DateTimeOffset? clic)
+    {
+        var repo = new FakeJobTime(null);
+        var resultat = await new ClMarkMissionSeenUseCase(Guid.NewGuid(), repo, new UnitOfWorkDoubles.Counting(), clic)
+            .HandleAsync(CancellationToken.None);
+        return (resultat, repo);
+    }
+
+    [Fact(DisplayName = "Un « Vu » donné hors réseau porte l'heure du clic, en heure locale")]
+    public async Task Le_vu_porte_l_heure_du_clic()
+    {
+        var clic = DateTimeOffset.Now.AddMinutes(-40);
+
+        var (resultat, repo) = await VuAAsync(clic.ToUniversalTime());
+
+        resultat.IsSucces.Should().BeTrue();
+        repo.Stored!.ReadTime.Should().BeCloseTo(clic.LocalDateTime, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact(DisplayName = "Une horloge de téléphone un peu en avance : ramenée à maintenant")]
+    public async Task Une_heure_legerement_dans_le_futur_est_ramenee_a_maintenant()
+    {
+        var (resultat, repo) = await VuAAsync(DateTimeOffset.Now.AddMinutes(3));
+
+        resultat.IsSucces.Should().BeTrue();
+        repo.Stored!.ReadTime.Should().BeCloseTo(DateTime.Now, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact(DisplayName = "Plus de 5 minutes dans le futur : refusé, rien n'est écrit")]
+    public async Task Une_heure_dans_le_futur_est_refusee()
+    {
+        var (resultat, repo) = await VuAAsync(DateTimeOffset.Now.AddMinutes(10));
+
+        resultat.IsFail.Should().BeTrue();
+        repo.SaveCount.Should().Be(0);
+    }
+
+    [Fact(DisplayName = "Plus de 24 heures en arrière : refusé, rien n'est écrit")]
+    public async Task Une_heure_trop_ancienne_est_refusee()
+    {
+        var (resultat, repo) = await VuAAsync(DateTimeOffset.Now.AddHours(-25));
+
+        resultat.IsFail.Should().BeTrue();
+        repo.SaveCount.Should().Be(0);
+    }
 }

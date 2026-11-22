@@ -3,7 +3,7 @@ Imports System.Threading
 Public Interface IJobService
 
     ''' <summary>« Mission vue » : marque la mission reçue/vue (pose MST_READ_AT + projette MissionSeen à la régulation).</summary>
-    Function MarkMissionSeenAsync(gJobId As Guid, ct As CancellationToken) As Task(Of ClResult(Of Boolean))
+    Function MarkMissionSeenAsync(gJobId As Guid, seenAt As DateTimeOffset?, ct As CancellationToken) As Task(Of ClResult(Of Boolean))
     Function GetJobTimeAsync(gJobId As Guid, ct As CancellationToken) As Task(Of ClResult(Of ClJobTimeModel))
     ''' <summary>Timeline ordonnée + labellisée des jalons (Option A — contrat riche pour l'UI).</summary>
     Function GetJobTimelineAsync(gJobId As Guid, ct As CancellationToken) As Task(Of ClResult(Of ClJobTimelineDtoOut))

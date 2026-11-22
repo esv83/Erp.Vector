@@ -14,8 +14,8 @@ Public Class ClJobService
         _unitOfWork = unitOfWork
     End Sub
 
-    Public Function MarkMissionSeenAsync(gJobId As Guid, ct As CancellationToken) As Task(Of ClResult(Of Boolean)) Implements IJobService.MarkMissionSeenAsync
-        Return New ClMarkMissionSeenUseCase(gJobId, _jobTimeRepository, _unitOfWork).HandleAsync(ct)
+    Public Function MarkMissionSeenAsync(gJobId As Guid, seenAt As DateTimeOffset?, ct As CancellationToken) As Task(Of ClResult(Of Boolean)) Implements IJobService.MarkMissionSeenAsync
+        Return New ClMarkMissionSeenUseCase(gJobId, _jobTimeRepository, _unitOfWork, seenAt).HandleAsync(ct)
     End Function
 
     Public Function GetJobTimeAsync(gJobId As Guid, ct As CancellationToken) As Task(Of ClResult(Of ClJobTimeModel)) Implements IJobService.GetJobTimeAsync

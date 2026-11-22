@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using CaSoft.Erp.USVector.Api.Controllers;
 using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
@@ -42,7 +42,7 @@ public class VerrouVuServeurTests
     private sealed class Missions : IJobService
     {
         public int Vues;
-        public Task<ClResult<bool>> MarkMissionSeenAsync(Guid gJobId, CancellationToken ct)
+        public Task<ClResult<bool>> MarkMissionSeenAsync(Guid gJobId, DateTimeOffset? seenAt, CancellationToken ct)
         {
             Vues++;
             return Task.FromResult(ClResult<bool>.Ok(true));

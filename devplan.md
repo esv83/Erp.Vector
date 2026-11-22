@@ -216,7 +216,7 @@ Règles arrêtées dans `Erp.Order/docs/features/featDesc_VerrouVu.md` (D10 à D
 |---|---|
 | **Publier le contrôle de périmètre du « vu » et la fermeture de son effacement** | Codés le 22/11 : `PATCH api/JobList` → 403 « Mission hors de vos équipages » (mission inconnue comprise) ; `DELETE api/Time/{id}/seen` → 400. Aucun client n'appelle l'effacement du « vu » ; us-ambulance et us-mobile envoient le « vu » avec le jeton de l'ambulancier |
 | **Refuser les écritures sur une mission non vue** | Après le déploiement de la nouvelle app : d'abord journalisé sans bloquer, puis activé par réglage |
-| **L'heure du clic pour un « vu » hors réseau** | **Jules (22/11, Q1)** : un « vu » rejoué plus tard serait horodaté à son arrivée ; pour débloquer hors réseau, il faudrait que l'API accepte l'heure du clic. En attendant, l'app ne débloque pas sans `200`. **À trancher par l'utilisateur** : accepter l'heure du clic (ajout au contrat de `PATCH api/JobList`, avec une borne de vraisemblance) ou rester sans déblocage hors réseau. **Q2** : l'app ne propose que les étapes de la timeline (En route, Sur place, Disponible), toutes sous le verrou : rien d'autre à couvrir |
+| **Publier l'heure du clic du « Vu »** | **Tranché le 22/11 par l'utilisateur : l'API accepte l'heure du clic.** Codé : `SeenAt` facultatif sur `PATCH api/JobList`, refusé au-delà de 5 min d'avance ou 24 h de retard, heure locale (convention `ClHorloge`). Fiche J-172 complétée (« Complément du 22/11 ») : déblocage hors réseau, file locale, rejeu sans `SeenAt` sur 400. Q2 de Jules : rien d'autre à couvrir. Reste : publier, puis envoyer le complément à Jules |
 
 ## Itération 12 — Le mode formation 🆕 *[22/11]*
 

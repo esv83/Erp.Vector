@@ -49,7 +49,8 @@ namespace CaSoft.Erp.USVector.Api.Controllers
 
         // PATCH api/joblist — « Mission vue » (spec §10) : l'ambulancier signale « bien reçu »
         // → pose MST_READ_AT + projette MissionSeen à la régulation. Idempotent.
-        // L'UI masque l'icône quand IsSeen=true.
+        // L'UI masque l'icône quand IsSeen=true. SeenAt (facultatif, 22/11) : l'heure du clic, pour un
+        // « Vu » donné hors réseau et envoyé au retour du réseau ; bornée dans le cas d'usage.
         // Même garde-fou que le détail de mission (22/11, verrou « Vu ») : on ne déclare « vue » que
         // la mission d'un de ses équipages. Une mission inconnue est refusée de la même façon — sans
         // quoi un GUID quelconque créait un état « vu » orphelin.
@@ -65,7 +66,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             if (!await _identity.IsMissionAccessibleAsync(personnelId, ReadModel.JobId, ct))
                 return StatusCode(403, "Mission hors de vos équipages.");
 
-            return (await _jobSce.MarkMissionSeenAsync(ReadModel.JobId, ct)).ToActionResult();
+            return (await _jobSce.MarkMissionSeenAsync(ReadModel.JobId, ReadModel.SeenAt, ct)).ToActionResult();
         }
     }
 }
