@@ -24,6 +24,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         private readonly IMutuelleCardRepository _repository;
         private readonly IMissionBeneficiaryQueryService _beneficiaries;
         private readonly ILogger _acces;
+        private readonly ILogger _refus;
         private readonly IUnitOfWork _unitOfWork;
 
         public MutuelleCardController(IMutuelleCardRepository repository, IMissionBeneficiaryQueryService beneficiaries,
@@ -33,6 +34,7 @@ namespace CaSoft.Erp.USVector.Api.Controllers
             _unitOfWork = unitOfWork;
             _beneficiaries = beneficiaries;
             _acces = loggers.CreateLogger(AccessLoggerName);
+            _refus = loggers.CreateLogger<MutuelleCardController>();
         }
 
         /// <summary>
@@ -239,7 +241,16 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         public async Task<IActionResult> SetFields(Guid cardId, [FromBody] ClMutuelleFieldsDtoIn fields, CancellationToken ct)
         {
             var command = new ClSetMutuelleFieldsCommand(cardId, fields);
-            return (await new ClSetMutuelleFieldsUseCase(command, _repository, _unitOfWork).HandleAsync(ct)).ToActionResult();
+            var result = await new ClSetMutuelleFieldsUseCase(command, _repository, _unitOfWork).HandleAsync(ct);
+
+            // Deux saisies sur trois refusées du 15 au 22/11, sans qu'on sache pourquoi : le motif est
+            // celui du validateur ou « introuvable », jamais une valeur saisie.
+            if (!result.IsSucces)
+                _refus.LogWarning("Saisie de carte refusée|azp={Azp}|motif={Motif}",
+                    User.FindFirst(ClKeycloakCallers.AzpClaim)?.Value ?? "-",
+                    result.InnerError?.ErrorText ?? "-");
+
+            return result.ToActionResult();
         }
 
         /// <summary>Octets de l'image d'une carte (Content-Type d'origine).</summary>

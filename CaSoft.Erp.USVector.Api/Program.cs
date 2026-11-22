@@ -114,8 +114,9 @@ builder.Services.AddHostedService<SchemaCheckAtStartup>();
 // opération. Ouvrir une transaction à la main imposera CreateExecutionStrategy().
 // DR-002 — la frontière transactionnelle appartient au cas d'usage : les repositories préparent,
 // IUnitOfWork.CommitAsync enregistre, une fois. Même DbContext (scoped) que les repositories.
+// Celle du socle, plus la création concurrente de l'état d'une mission résolue (22/11).
 builder.Services.AddScoped<IUnitOfWork>(sp =>
-    new CaSoft.Framework.Infrastructure.Persistence.ClEfUnitOfWork<MobileDbContext>(sp.GetRequiredService<MobileDbContext>()));
+    new CaSoft.Erp.USVector.Infrastructure.Persistence.ClMobileUnitOfWork(sp.GetRequiredService<MobileDbContext>()));
 builder.Services.AddDbContext<MobileDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MobileDb"),
         sql => sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null)));

@@ -86,27 +86,38 @@ de difficulté, pas de priorité.** Chaque itération porte entre crochets son *
 |---|---|
 | **Nature** | Constats et mesures — aucun code. Journal lu **en agrégats**, rien copié |
 | **Effort** | Un relevé, puis au fil de l'eau |
-| **Bloqué par** | **Le trafic** |
+| **Bloqué par** | **Le trafic** et **le front de Jules** |
 
-**Sous `653e6d8` (15/11)** :
-- **un jeton de la facturation** (`erp-billinggateway-api`) **et de l'écran de régulation**
-  (`us-regulation`) validés par le socle — 14 jetons vus, tous mobiles ;
-- **une écriture passée par `CommitAsync`** : anomalie, document, signature, « mission vue » en 200,
-  **et la ligne en base** ;
-- **un premier refus d'Order abandonné** sur l'état terrain — attendu seulement une fois la projection
-  allumée.
+✅ **Relevé du 22/11** (journal du 15/11 au 22/11, ~193 000 requêtes) — **sous `653e6d8`, validé** :
+- **jetons validés par le socle pour les trois appelants** : `us-ambulance` (~30 000/jour),
+  `us-regulation` (~4 400/jour), `erp-billinggateway-api` (chaque jour depuis le 16/11, 2 180 le 19/11).
+  **9 rejets en 8 jours, tous des jetons expirés** — aucun d'émetteur ou d'azp ;
+- **écritures par `CommitAsync` en 200** : 6 886 étapes, 131 annulations, 1 953 « mission vue », 13
+  « ne peut pas signer », 143 photos de carte, 96 saisies de carte. Le 20/11 à 08:28, une collision
+  rejetée **en bloc** (état et file de projection ensemble) montre la transaction unique à l'œuvre.
+  *La ligne en base n'a pas été relue* (pas d'accès à la base de production depuis la session) ;
+- **refus du conducteur vu** : 4 `PUT crews/…/driver` refusés par Order, rendus en 400 avec motif.
 
-**Sous `14b554b` (14/11)**, dès que le front de Jules sera publié : un `PUT …/beneficiary/identity` et
-un `…/contact` en 204, un 403 relayé, un `OtherText` arrivé chez Order.
+**Reste à voir passer** :
+- **anomalie et document** : **aucun appel** en 8 jours (`POST …/anomalies`, `…/documents`) ;
+- **un refus d'Order abandonné** sur l'état terrain — seulement une fois la projection allumée ;
+- **sous `14b554b`**, dès que le front de Jules sera publié : un `PUT …/beneficiary/identity` et un
+  `…/contact` en 204, un 403 relayé, un `OtherText` arrivé chez Order — **aucun appel au 22/11** ;
+- *(non revérifiés depuis le 05/10)* une deuxième photo d'une carte validée (`FieldsInheritedFrom`) ;
+  un détail avec `MutuelleCardKnown` vrai ; la suite [`Vector.Api.http`](CaSoft.Erp.USVector.Api/Vector.Api.http)
+  rejouée en entier.
 
-**Encore à voir passer** *(non revérifié depuis le 05/10)* : une deuxième photo d'un patient dont la
-carte est validée (`FieldsInheritedFrom`) ; un détail avec `MutuelleCardKnown` vrai ; un refus de
-conducteur ; la suite [`Vector.Api.http`](CaSoft.Erp.USVector.Api/Vector.Api.http) rejouée en entier.
-
-**À comprendre** *(relevés du 05/10, non revérifiés)* : une panne de la base Vector rend **500, pas
-503** (le gestionnaire ne couvre qu'Orders) ; **149 `403` sur `JobDetail`** en ~27 h ; les démarrages du
-pool avec clés de protection éphémères ; pas de passe de la facturation le 24/09. **Chez Orders** : les
-étapes de mission vides (~3 883 annoncées avant le 23/07).
+**À comprendre** *(relevé du 22/11)* :
+- 🔧 **deux `PATCH Time` simultanés sur une mission sans état** rendaient **500 brut** (1 fois en 8 jours,
+  20/11 08:28) : **corrigé dans le code le 22/11, à publier** — la création perdante devient une mise à
+  jour (`ClMobileUnitOfWork`). Après publication : plus de violation de `PK_MOB_MISSION_STATE` au journal ;
+- 🔧 **la saisie de la carte par l'équipage est refusée deux fois sur trois** (`PATCH mutuelle-card` :
+  172 × 400 pour 96 × 200, `us-ambulance`) : **motif journalisé à partir de la prochaine publication**
+  (« Saisie de carte refusée|azp=…|motif=… ») — le relever, puis décider avec Jules ;
+- **une panne de la base Vector rend 500, pas 503** — aucune panne dans la fenêtre, non revérifié ;
+- **`403` sur `JobDetail`** : 691 en 8 jours (~90/jour), rythme inchangé depuis le 05/10 ;
+- **clés de protection éphémères** à chacun des 28 démarrages du pool en 8 jours, surtout la nuit ;
+- **chez Orders** : les étapes de mission vides (~3 883 annoncées avant le 23/07).
 
 ## Itération 2 — Retirer le repli de la lecture par lot
 
