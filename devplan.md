@@ -126,12 +126,16 @@ de difficulté, pas de priorité.** Chaque itération porte entre crochets son *
 | | |
 |---|---|
 | **Nature** | Échafaudage à démonter |
-| **Effort** | Une courte session |
-| **Bloqué par** | Rien — la passe par lot vue le 05/10 |
+| **Effort** | **Fait dans le code le 22/11** — reste : publier, puis constater une passe de la facturation |
+| **Bloqué par** | Rien — le repli ne s'est **jamais déclenché** en octobre ni en novembre (aucun « ne porte pas batch-refs » au journal) |
 
-Toujours en place au 15/11 (`FieldDataReader.cs`, l. 74 et 155). Retirer `ReadRefsOneByOneAsync`, le
-**corps par défaut** de `IErpReadApiClient.GetMissionBatchRefsAsync` et le traitement 404/405 du
-client — une route absente redevient une panne. Les doubles de test implémentent alors la méthode.
+Retirés : `ReadRefsOneByOneAsync` et sa lecture bornée, le **corps par défaut** de
+`IErpReadApiClient.GetMissionBatchRefsAsync` (devenue non nullable) et le traitement 404/405 du client —
+une route absente est une panne, la tranche sort en `Error`. Les doubles de test implémentent la méthode ;
+le double du lecteur lève sur `/full` et la commande. 373 tests verts.
+
+**Après publication** : `POST api/missions/field-data` en 200 de `erp-billinggateway-api`, aucun
+`batch-refs impossible` hors panne d'Orders.
 
 ## Itération 3 — Publier et lire la recette 🆕 *[relevé le 21/09, cible du 14/11]*
 

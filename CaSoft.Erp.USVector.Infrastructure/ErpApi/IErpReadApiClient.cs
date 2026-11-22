@@ -20,17 +20,11 @@ public interface IErpReadApiClient
 
     /// <summary>
     /// Mission → commande → bénéficiaire, <b>par lot</b> (<c>POST /missions/batch-refs</c>, Orders
-    /// 1.8.5). Une mission inconnue est <b>absente</b> du résultat. <c>null</c> = la route n'existe pas
-    /// (encore) chez Orders : l'appelant se replie sur la lecture mission par mission.
-    /// <para>
-    /// Le corps par défaut dit « route absente » : un client qui ne la connaît pas — les doubles de test,
-    /// notamment — se replie de lui-même. À retirer avec le repli, une fois la 1.8.5 constatée en
-    /// production.
-    /// </para>
+    /// 1.8.5). Une mission inconnue est <b>absente</b> du résultat. Une route absente est une panne :
+    /// le repli mission par mission est retiré le 22/11, la 1.8.5 servant la facturation depuis le 05/10.
     /// </summary>
-    Task<IReadOnlyList<ErpMissionBatchRefDto>?> GetMissionBatchRefsAsync(
-        IReadOnlyCollection<Guid> missionIds, CancellationToken ct = default)
-        => Task.FromResult<IReadOnlyList<ErpMissionBatchRefDto>?>(null);
+    Task<IReadOnlyList<ErpMissionBatchRefDto>> GetMissionBatchRefsAsync(
+        IReadOnlyCollection<Guid> missionIds, CancellationToken ct = default);
 
     Task<ErpBeneficiaryDetailDto?> GetBeneficiaryAsync(Guid beneficiaryId, CancellationToken ct = default);
 

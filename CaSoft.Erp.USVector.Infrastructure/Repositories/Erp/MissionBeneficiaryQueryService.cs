@@ -32,8 +32,7 @@ public sealed class MissionBeneficiaryQueryService : IMissionBeneficiaryQuerySer
     {
         if (missionIds.Count == 0) return new Dictionary<Guid, Guid?>();
 
-        var rows = await _erp.GetMissionBatchRefsAsync(missionIds, ct)
-            ?? throw new InvalidOperationException("Orders ne porte pas POST /missions/batch-refs.");
+        var rows = await _erp.GetMissionBatchRefsAsync(missionIds, ct);
 
         // Côté Orders, une commande sans patient porte un identifiant vide : ce n'est pas un patient.
         return rows.ToDictionary(

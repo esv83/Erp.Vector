@@ -8,9 +8,8 @@ using Xunit;
 namespace CaSoft.Erp.USVector.Tests;
 
 /// <summary>
-/// <c>POST /missions/batch-refs</c> côté client. Ce qu'il faut tenir : une route ABSENTE (Orders avant
-/// 1.8.5 — la production répondait 405 le 04/10) n'est pas une panne, elle déclenche le repli ; une
-/// panne, elle, reste une panne.
+/// <c>POST /missions/batch-refs</c> côté client. Depuis le retrait du repli (22/11), une route absente
+/// est une panne comme une autre : plus aucun statut n'est traduit en « absence ».
 /// </summary>
 public class HttpErpReadApiClientBatchRefsTests
 {
@@ -36,24 +35,15 @@ public class HttpErpReadApiClientBatchRefsTests
     [Theory]
     [InlineData(HttpStatusCode.NotFound)]
     [InlineData(HttpStatusCode.MethodNotAllowed)]
-    public async Task Une_route_absente_rend_null_pour_le_repli(HttpStatusCode status)
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task Une_route_absente_ou_en_panne_est_une_panne(HttpStatusCode status)
     {
         var orders = new OrdersStub { Status = status };
-
-        var refs = await Client(orders).GetMissionBatchRefsAsync(new[] { Guid.NewGuid() });
-
-        refs.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task Une_panne_reste_une_panne()
-    {
-        var orders = new OrdersStub { Status = HttpStatusCode.ServiceUnavailable };
 
         var act = () => Client(orders).GetMissionBatchRefsAsync(new[] { Guid.NewGuid() });
 
         (await act.Should().ThrowAsync<HttpRequestException>())
-            .Which.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+            .Which.StatusCode.Should().Be(status);
     }
 
     [Fact]

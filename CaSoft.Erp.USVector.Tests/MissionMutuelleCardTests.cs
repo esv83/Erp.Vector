@@ -57,6 +57,7 @@ public class MissionMutuelleCardTests
             => throw new NotSupportedException();
         public Task<int?> GetMissionTransferStatusAsync(Guid id, CancellationToken ct = default)
             => throw new NotSupportedException();
+        public Task<IReadOnlyList<ErpMissionBatchRefDto>> GetMissionBatchRefsAsync(IReadOnlyCollection<Guid> missionIds, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ErpMissionContextOrderDto?> GetMissionContextOrderAsync(Guid id, CancellationToken ct = default)
             => throw new NotSupportedException();
         public Task<IReadOnlyList<ErpContextOrderFieldDto>?> GetContextOrderFormStructureAsync(Guid missionId, CancellationToken ct = default)

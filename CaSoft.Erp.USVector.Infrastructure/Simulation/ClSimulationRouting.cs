@@ -37,20 +37,19 @@ public sealed class ClSimulationRoutingErpReadApiClient : IErpReadApiClient
 
     /// <summary>
     /// Un lot peut mêler les deux mondes (la facturation n'en enverra jamais, mais rien ne l'interdit) :
-    /// chaque moitié part de son côté. Le « null » du vrai Orders (route absente, repli de l'appelant) est
-    /// conservé tel quel quand le lot ne contient que de vraies missions.
+    /// chaque moitié part de son côté.
     /// </summary>
-    public async Task<IReadOnlyList<ErpMissionBatchRefDto>?> GetMissionBatchRefsAsync(IReadOnlyCollection<Guid> missionIds, CancellationToken ct = default)
+    public async Task<IReadOnlyList<ErpMissionBatchRefDto>> GetMissionBatchRefsAsync(IReadOnlyCollection<Guid> missionIds, CancellationToken ct = default)
     {
         var simulated = missionIds.Where(IsSimulated).ToList();
         if (simulated.Count == 0) return await _real.GetMissionBatchRefsAsync(missionIds, ct);
 
-        var simulatedRefs = await _simulated.GetMissionBatchRefsAsync(simulated, ct) ?? Array.Empty<ErpMissionBatchRefDto>();
+        var simulatedRefs = await _simulated.GetMissionBatchRefsAsync(simulated, ct);
         var real = missionIds.Where(id => !IsSimulated(id)).ToList();
         if (real.Count == 0) return simulatedRefs;
 
         var realRefs = await _real.GetMissionBatchRefsAsync(real, ct);
-        return realRefs is null ? null : realRefs.Concat(simulatedRefs).ToList();
+        return realRefs.Concat(simulatedRefs).ToList();
     }
 }
 

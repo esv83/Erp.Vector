@@ -120,7 +120,7 @@ public sealed class ClSimulatedOrdersReadClient : IErpReadApiClient
         });
     }
 
-    public Task<IReadOnlyList<ErpMissionBatchRefDto>?> GetMissionBatchRefsAsync(
+    public Task<IReadOnlyList<ErpMissionBatchRefDto>> GetMissionBatchRefsAsync(
         IReadOnlyCollection<Guid> missionIds, CancellationToken ct = default)
     {
         IReadOnlyList<ErpMissionBatchRefDto> refs = missionIds
@@ -132,7 +132,7 @@ public sealed class ClSimulatedOrdersReadClient : IErpReadApiClient
                 BeneficiaryId = BeneficiaryOf(id, ScenarioOf(id, EnKind.Mission)!),
             })
             .ToList();
-        return Task.FromResult<IReadOnlyList<ErpMissionBatchRefDto>?>(refs);
+        return Task.FromResult(refs);
     }
 
     public Task<ErpBeneficiaryDetailDto?> GetBeneficiaryAsync(Guid beneficiaryId, CancellationToken ct = default)

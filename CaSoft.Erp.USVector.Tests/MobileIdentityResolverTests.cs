@@ -41,6 +41,7 @@ public class MobileIdentityResolverTests
         public Task<ErpBeneficiaryDetailDto?> GetBeneficiaryAsync(Guid beneficiaryId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<Guid?> ResolvePersonnelIdByKeycloakAsync(Guid keycloakSub, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<int?> GetMissionTransferStatusAsync(Guid missionId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<ErpMissionBatchRefDto>> GetMissionBatchRefsAsync(IReadOnlyCollection<Guid> missionIds, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ErpMissionContextOrderDto?> GetMissionContextOrderAsync(Guid missionId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<ErpContextOrderFieldDto>?> GetContextOrderFormStructureAsync(Guid missionId, CancellationToken ct = default) => throw new NotSupportedException();
     }

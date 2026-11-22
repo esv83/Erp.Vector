@@ -294,7 +294,7 @@ public class SimulationTests
         public Task<int?> GetMissionTransferStatusAsync(Guid missionId, CancellationToken ct = default) => Fail<Task<int?>>(missionId);
         public Task<ErpMissionContextOrderDto?> GetMissionContextOrderAsync(Guid missionId, CancellationToken ct = default) => Fail<Task<ErpMissionContextOrderDto?>>(missionId);
         public Task<IReadOnlyList<ErpContextOrderFieldDto>?> GetContextOrderFormStructureAsync(Guid missionId, CancellationToken ct = default) => Fail<Task<IReadOnlyList<ErpContextOrderFieldDto>?>>(missionId);
-        public Task<IReadOnlyList<ErpMissionBatchRefDto>?> GetMissionBatchRefsAsync(IReadOnlyCollection<Guid> missionIds, CancellationToken ct = default) => Fail<Task<IReadOnlyList<ErpMissionBatchRefDto>?>>(missionIds.First());
+        public Task<IReadOnlyList<ErpMissionBatchRefDto>> GetMissionBatchRefsAsync(IReadOnlyCollection<Guid> missionIds, CancellationToken ct = default) => Fail<Task<IReadOnlyList<ErpMissionBatchRefDto>>>(missionIds.First());
     }
 
     /// <summary>Un vrai Orders qui note ce qu'on lui demande et ne connaît rien.</summary>

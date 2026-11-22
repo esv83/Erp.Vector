@@ -1,4 +1,5 @@
-﻿using CaSoft.Erp.USVector.Application;
+﻿using System.Net;
+using CaSoft.Erp.USVector.Application;
 using CaSoft.Erp.USVector.Application.Port;
 using CaSoft.Erp.USVector.Domain;
 using CaSoft.Erp.USVector.Infrastructure.ErpApi;
@@ -137,10 +138,13 @@ public class MissionsMutuelleCardPresenceTests
 
     private sealed class BatchErp : IErpReadApiClient
     {
-        public IReadOnlyList<ErpMissionBatchRefDto>? Rows;
+        public IReadOnlyList<ErpMissionBatchRefDto> Rows = Array.Empty<ErpMissionBatchRefDto>();
+        public HttpStatusCode? Failure;
 
-        public Task<IReadOnlyList<ErpMissionBatchRefDto>?> GetMissionBatchRefsAsync(IReadOnlyCollection<Guid> missionIds, CancellationToken ct = default)
-            => Task.FromResult(Rows);
+        public Task<IReadOnlyList<ErpMissionBatchRefDto>> GetMissionBatchRefsAsync(IReadOnlyCollection<Guid> missionIds, CancellationToken ct = default)
+            => Failure is { } status
+                ? throw new HttpRequestException($"Orders.Api POST missions/batch-refs → {(int)status}.", null, status)
+                : Task.FromResult(Rows);
 
         public Task<ErpMissionFullDto?> GetMissionFullAsync(Guid id, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<ErpMissionListItemDto>> ListMissionsByCrewAsync(Guid crewId, CancellationToken ct = default) => throw new NotSupportedException();
@@ -176,11 +180,12 @@ public class MissionsMutuelleCardPresenceTests
     }
 
     [Fact]
-    public async Task Une_route_absente_chez_Orders_est_un_defaut_pas_une_absence_de_carte()
+    public async Task Une_route_absente_chez_Orders_est_une_panne_pas_une_absence_de_carte()
     {
-        var act = () => new MissionBeneficiaryQueryService(new BatchErp { Rows = null })
+        var act = () => new MissionBeneficiaryQueryService(new BatchErp { Failure = HttpStatusCode.NotFound })
             .GetBeneficiaryIdsAsync(new[] { AvecCarte }, CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        (await act.Should().ThrowAsync<HttpRequestException>())
+            .Which.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 }
