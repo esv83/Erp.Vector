@@ -63,7 +63,7 @@ repli de la lecture par lot.
 - ⚠️ **La signature ne remonte pas encore à Order** : projection coupée (`FieldProjection:Enabled`)
   — *voir « Allumer la projection de la signature »*.
 - ⚠️ **L'écran de la certification ne lit pas la carte** : son `azp` n'est jamais apparu *(05/10)*.
-- 🔒 **Les deux routes anonymes de la carte sont fermées dans le code** (22/11) — *à publier, voir
+- 🔒 **Les deux routes anonymes de la carte sont fermées** (publié et constaté le 22/11) — *voir
   « Fermer les routes anonymes de la carte »*.
 - ⚠️ **Le message du 503 n'atteint l'ambulancier que si l'app l'affiche** *(demandé le 04/10)*.
 - ⚠️ **Un ambulancier rattaché depuis Employee seul n'entre pas** : 8 membres sur 244 *(13/09)*.
@@ -137,7 +137,7 @@ Le 14/11, `deploy.ps1 DEV` a échoué : `\\192.168.1.112\dev_api` inaccessible. 
 | | |
 |---|---|
 | **Nature** | Échafaudage à démonter — donnée de santé servie sans jeton |
-| **Effort** | **Fait dans le code le 22/11** : `[AllowAnonymous]` retiré, `MutuelleCardRead` posé sur les deux, surface anonyme des écrans amont vide (tests). **Reste : publier**, puis constater un `401` sans jeton sur `POST api/mutuelle-card/presence` |
+| **Effort** | **Fait dans le code le 22/11** : `[AllowAnonymous]` retiré, `MutuelleCardRead` posé sur les deux, surface anonyme des écrans amont vide (tests). **Publié le 22/11 (`1668136`) et constaté** : `401` sans jeton sur les deux routes ; la présence par mission sert toujours les écrans (10 appels dans les 4 premières minutes). À verser dans `delivered.md` au prochain « compact devplan » |
 | **Bloqué par** | **Plus rien** : Jules confirme le 22/11 (J-095) que la régulation et la certification n'appellent plus que `POST api/missions/mutuelle-card/presence`. Mesure relancée le 22/11 : **zéro appel** aux deux routes anonymes du 23/10 au 22/11 (31 journaux), contre des milliers par jour pour la route par mission |
 
 `POST api/mutuelle-card/presence` et `GET api/beneficiaries/{id}/mutuelle-card/image` : **zéro appel**
@@ -216,7 +216,7 @@ Règles arrêtées dans `Erp.Order/docs/features/featDesc_VerrouVu.md` (D10 à D
 |---|---|
 | **Publier le contrôle de périmètre du « vu » et la fermeture de son effacement** | Codés le 22/11 : `PATCH api/JobList` → 403 « Mission hors de vos équipages » (mission inconnue comprise) ; `DELETE api/Time/{id}/seen` → 400. Aucun client n'appelle l'effacement du « vu » ; us-ambulance et us-mobile envoient le « vu » avec le jeton de l'ambulancier |
 | **Refuser les écritures sur une mission non vue** | Après le déploiement de la nouvelle app : d'abord journalisé sans bloquer, puis activé par réglage |
-| **Publier l'heure du clic du « Vu »** | **Tranché le 22/11 par l'utilisateur : l'API accepte l'heure du clic.** Codé : `SeenAt` facultatif sur `PATCH api/JobList`, refusé au-delà de 5 min d'avance ou 24 h de retard, heure locale (convention `ClHorloge`). Fiche J-172 complétée (« Complément du 22/11 ») : déblocage hors réseau, file locale, rejeu sans `SeenAt` sur 400. Q2 de Jules : rien d'autre à couvrir. Reste : publier, puis envoyer le complément à Jules |
+| **Publier l'heure du clic du « Vu »** | **Tranché le 22/11 par l'utilisateur : l'API accepte l'heure du clic.** Codé : `SeenAt` facultatif sur `PATCH api/JobList`, refusé au-delà de 5 min d'avance ou 24 h de retard, heure locale (convention `ClHorloge`). Fiche J-172 complétée (« Complément du 22/11 ») : déblocage hors réseau, file locale, rejeu sans `SeenAt` sur 400. Q2 de Jules : rien d'autre à couvrir. **Publié le 22/11 (`1668136`)** ; les « Vu » sans heure répondent toujours 200 après publication. Reste : envoyer le complément à Jules, puis constater le premier `SeenAt` reçu |
 
 ## Itération 12 — Le mode formation 🆕 *[22/11]*
 
