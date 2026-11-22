@@ -86,17 +86,44 @@ public class SignatureWaiverTests
     public async Task Retirer_le_motif_arme_aussi_la_projection_pour_l_effacer_chez_Order()
     {
         await using var ctx = NewDb();
-        var repository = new SignatureWaiverRepository(ctx);
         await Declare(ctx, new ClDeclareSignatureWaiverDtoIn { ReasonCode = "REFUS_PATIENT" });
         ctx.OperationalOutbox.RemoveRange(ctx.OperationalOutbox);
         await ctx.SaveChangesAsync();
 
-        await repository.DeleteAsync(Mission, CancellationToken.None);
-        await UnitOfWorkDoubles.Of(repository).CommitAsync();
+        var result = await Withdraw(ctx, Mission);
 
+        result.IsSucces.Should().BeTrue();
         ctx.SignatureWaivers.Should().BeEmpty();
         ctx.OperationalOutbox.Should().ContainSingle(o => o.OOB_MISSION_ID == Mission);
     }
+
+    [Fact]
+    public async Task Retirer_un_motif_absent_ne_fait_rien()
+    {
+        await using var ctx = NewDb();
+
+        var result = await Withdraw(ctx, Mission);
+
+        result.IsSucces.Should().BeTrue();
+        ctx.OperationalOutbox.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Retirer_sans_mission_est_refuse_et_ne_valide_rien()
+    {
+        await using var ctx = NewDb();
+        var unitOfWork = new UnitOfWorkDoubles.Counting();
+
+        var result = await new ClWithdrawSignatureWaiverUseCase(Guid.Empty, new SignatureWaiverRepository(ctx), unitOfWork)
+            .HandleAsync(CancellationToken.None);
+
+        result.IsFail.Should().BeTrue();
+        result.InnerError.ErrorText.Should().Contain("Mission obligatoire");
+        unitOfWork.Commits.Should().Be(0);
+    }
+
+    private static Task<ClResult<bool>> Withdraw(MobileDbContext ctx, Guid missionId)
+        => new ClWithdrawSignatureWaiverUseCase(missionId, new SignatureWaiverRepository(ctx), UnitOfWorkDoubles.For(ctx)).HandleAsync(CancellationToken.None);
 
     [Fact]
     public async Task La_liste_ne_propose_que_les_motifs_actifs_dans_l_ordre()

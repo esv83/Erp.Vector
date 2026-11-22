@@ -23,7 +23,7 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
         _logger = logger;
     }
 
-    public async Task<EnOperationalProjectionOutcome> ProjectOperationalAsync(
+    public Task<EnOperationalProjectionOutcome> ProjectOperationalAsync(
         Guid missionId,
         DateTime? ackAt, DateTime? readAt, DateTime? goAt,
         DateTime? onsiteAt, DateTime? terminateAt,
@@ -38,26 +38,10 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
             terminate = terminateAt,
             sourceCrewId
         };
-        var response = await _http.PutAsJsonAsync($"missions/{missionId}/operational", body, JsonOptions, ct);
-        if (response.IsSuccessStatusCode) return EnOperationalProjectionOutcome.Applied;
-
-        var content = await response.Content.ReadAsStringAsync(ct);
-
-        // 404 = mission inconnue d'Orders : définitif, pas une panne. L'outbox abandonne l'entrée au
-        // lieu de la relancer sans fin (55 414 tentatives constatées le 2026-09-13 sur une mission).
-        if (response.StatusCode == HttpStatusCode.NotFound)
-        {
-            _logger.LogWarning("Orders.Api PUT missions/{MissionId}/operational : mission introuvable (404) {Body}",
-                missionId, content);
-            return EnOperationalProjectionOutcome.MissionNotFound;
-        }
-
-        _logger.LogError("Orders.Api PUT missions/{MissionId}/operational a échoué : {Status} {Body}",
-            missionId, (int)response.StatusCode, content);
-        throw new HttpRequestException($"Orders.Api PUT missions/{missionId}/operational → {(int)response.StatusCode}.", null, response.StatusCode);
+        return PutProjectionAsync(missionId, "operational", body, isRefusalFinal: false, ct);
     }
 
-    public async Task<EnOperationalProjectionOutcome> ProjectFieldAsync(
+    public Task<EnOperationalProjectionOutcome> ProjectFieldAsync(
         Guid missionId, bool signatureExists, string? waiverCode, DateTime? waiverAtUtc, CancellationToken ct = default)
     {
         var body = new
@@ -65,30 +49,39 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
             signatureExists,
             waiver = waiverCode is null ? null : new { code = waiverCode, at = waiverAtUtc }
         };
-        var response = await _http.PutAsJsonAsync($"missions/{missionId}/field", body, JsonOptions, ct);
+        // DR-001 — un refus métier de l'état terrain est définitif : abandonné, jamais relancé.
+        return PutProjectionAsync(missionId, "field", body, isRefusalFinal: true, ct);
+    }
+
+    /// <summary>
+    /// <c>PUT missions/{id}/{resource}</c>, commun aux deux projections de l'outbox. 404 = mission inconnue
+    /// d'Orders : définitif, pas une panne — l'outbox abandonne l'entrée au lieu de la relancer sans fin
+    /// (55 414 tentatives constatées le 2026-09-13 sur une mission). Avec <paramref name="isRefusalFinal"/>,
+    /// un 400/409 est un refus métier : erreur au journal avec le motif d'Order — c'est un état que Vector
+    /// n'aurait pas dû produire, ou un statut qui ment (04/10) ; quelqu'un doit le lire.
+    /// </summary>
+    private async Task<EnOperationalProjectionOutcome> PutProjectionAsync(
+        Guid missionId, string resource, object body, bool isRefusalFinal, CancellationToken ct)
+    {
+        var operation = $"PUT missions/{missionId}/{resource}";
+        var response = await _http.PutAsJsonAsync($"missions/{missionId}/{resource}", body, JsonOptions, ct);
         if (response.IsSuccessStatusCode) return EnOperationalProjectionOutcome.Applied;
 
         var content = await response.Content.ReadAsStringAsync(ct);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            _logger.LogWarning("Orders.Api PUT missions/{MissionId}/field : mission introuvable (404) {Body}",
-                missionId, content);
+            _logger.LogWarning("Orders.Api {Operation} : mission introuvable (404) {Body}", operation, content);
             return EnOperationalProjectionOutcome.MissionNotFound;
         }
 
-        // DR-001 — refus métier : définitif, jamais relancé. Erreur au journal, avec le motif d'Order :
-        // c'est un état que Vector n'aurait pas dû produire, ou un statut qui ment (04/10) — dans les
-        // deux cas, quelqu'un doit le lire.
-        if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Conflict)
+        if (isRefusalFinal && response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Conflict)
         {
-            _logger.LogError("Orders.Api PUT missions/{MissionId}/field refusé ({Status}) : {Reason} — état terrain non projeté.",
-                missionId, (int)response.StatusCode, ReadProblemDetail(content) ?? content);
+            _logger.LogError("Orders.Api {Operation} refusé ({Status}) : {Reason} — état terrain non projeté.",
+                operation, (int)response.StatusCode, ReadProblemDetail(content) ?? content);
             return EnOperationalProjectionOutcome.Refused;
         }
 
-        _logger.LogError("Orders.Api PUT missions/{MissionId}/field a échoué : {Status} {Body}",
-            missionId, (int)response.StatusCode, content);
-        throw new HttpRequestException($"Orders.Api PUT missions/{missionId}/field → {(int)response.StatusCode}.", null, response.StatusCode);
+        throw Failure(operation, response, content);
     }
 
     public async Task<CrewDriverWriteResult> SetCrewDriverAsync(Guid crewId, Guid driverPersonnelId, DateTime from, CancellationToken ct = default)
@@ -117,9 +110,7 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
             return new CrewDriverWriteResult(outcome.Value, ReadProblemDetail(content));
         }
 
-        _logger.LogError("Orders.Api PUT crews/{CrewId}/driver a échoué : {Status} {Body}",
-            crewId, (int)response.StatusCode, content);
-        throw new HttpRequestException($"Orders.Api PUT crews/{crewId}/driver → {(int)response.StatusCode}.", null, response.StatusCode);
+        throw Failure($"PUT crews/{crewId}/driver", response, content);
     }
 
     public async Task<EnContextOrderWriteOutcome> SetMissionContextOrderAsync(
@@ -147,9 +138,7 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
             return outcome.Value;
         }
 
-        _logger.LogError("Orders.Api PATCH missions/{MissionId}/contextOrder a échoué : {Status} {Body}",
-            missionId, (int)response.StatusCode, content);
-        throw new HttpRequestException($"Orders.Api PATCH missions/{missionId}/contextOrder → {(int)response.StatusCode}.", null, response.StatusCode);
+        throw Failure($"PATCH missions/{missionId}/contextOrder", response, content);
     }
 
     public async Task<ContextOrderValuesWriteResult> SetContextOrderValuesAsync(
@@ -182,9 +171,17 @@ public sealed class HttpErpWriteApiClient : IErpWriteApiClient
             return new ContextOrderValuesWriteResult(outcome.Value, ReadProblemDetail(content));
         }
 
-        _logger.LogError("Orders.Api PATCH missions/{MissionId}/contextOrder/values a échoué : {Status} {Body}",
-            missionId, (int)response.StatusCode, content);
-        throw new HttpRequestException($"Orders.Api PATCH missions/{missionId}/contextOrder/values → {(int)response.StatusCode}.", null, response.StatusCode);
+        throw Failure($"PATCH missions/{missionId}/contextOrder/values", response, content);
+    }
+
+    /// <summary>
+    /// Panne d'Orders.Api (ni succès, ni réponse métier) : journalisée en erreur avec le corps, rendue
+    /// en <see cref="HttpRequestException"/> porteuse du statut — l'appelant la lève, l'outbox la relance.
+    /// </summary>
+    private HttpRequestException Failure(string operation, HttpResponseMessage response, string content)
+    {
+        _logger.LogError("Orders.Api {Operation} a échoué : {Status} {Body}", operation, (int)response.StatusCode, content);
+        return new HttpRequestException($"Orders.Api {operation} → {(int)response.StatusCode}.", null, response.StatusCode);
     }
 
     /// <summary>

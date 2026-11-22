@@ -182,12 +182,23 @@ vider `OuverturesPourLesEcransAmont` dans `AnonymousSurfaceTests`.
 | | |
 |---|---|
 | **Nature** | Hygiène — aucun changement de contrat |
-| **Effort** | Une session par entrée |
+| **Effort** | **Fait dans le code le 22/11** pour DR-004, AR-001, DR-002, CQ-002 — et CQ-004 au passage. Reste : publier |
 | **Bloqué par** | Rien |
 
-Le détail est au registre, rubrique « Dette ». Ordre conseillé : **DR-004** (un cas d'usage pour
-`Withdraw`, qui retire aussi la validation du contrôleur), puis **AR-001** avec le reste de **DR-002**
-(le worker passe par un service d'Infrastructure et l'`IUnitOfWork`), puis **CQ-002**.
+Le détail est au registre, rubrique « Dette ». Fait le 22/11, 375 tests verts, contrats inchangés :
+- **DR-004** : `ClWithdrawSignatureWaiverUseCase` (garde, `ClResult`, `CommitAsync`) ; le contrôleur rend
+  toujours 204 ;
+- **AR-001 + DR-002** : le cycle de l'outbox passe dans `ClProjectionOutboxDispatcher` (Infrastructure),
+  validé par l'`IUnitOfWork` ; le worker ne garde que sa boucle. Une annulation à l'arrêt du pool n'est
+  plus comptée comme tentative ni journalisée en erreur ;
+- **CQ-002** : `PutProjectionAsync` commun aux deux projections, `Failure` pour les cinq fins d'échec —
+  texte des journaux inchangé ;
+- **CQ-004** : le motif projeté passe par `ToDomain`, plus de second `SpecifyKind`.
+
+**Après publication** : la projection (jalons et signature) se vit au journal comme avant — aucune
+« erreur de cycle », abandons et relances au même format.
+
+Restent au registre, sans urgence : CQ-003, CQ-005 à CQ-007, DR-003.
 
 ⚖️ `ClApplicationResult` reste différé (`decided.md`, 04/10) ; les alias de compatibilité restent
 (rubrique « Fonctionnalités envisagées en Vn »).
@@ -285,16 +296,16 @@ design-review ou architecture.*
 
 | ID | P | Fichier | Constat |
 |---|---|---|---|
-| CQ-002 | P2 | `CaSoft.Erp.USVector.Infrastructure/ErpApi/HttpErpWriteApiClient.cs:26-91` | `ProjectFieldAsync` recopie `ProjectOperationalAsync` (règle 404) ; fin d'échec log + `HttpRequestException` ×5 (l. 57, 91, 122, 152, 187) → helpers privés |
+| CQ-002 | P2 | ✅ **corrigé dans le code le 22/11, à publier** — `CaSoft.Erp.USVector.Infrastructure/ErpApi/HttpErpWriteApiClient.cs:26-91` | `ProjectFieldAsync` recopie `ProjectOperationalAsync` (règle 404) ; fin d'échec log + `HttpRequestException` ×5 (l. 57, 91, 122, 152, 187) → helpers privés |
 | CQ-003 | P3 | `CaSoft.Erp.USVector.Infrastructure/Repositories/FieldDataReader.cs:202` | `ClFieldSignatureWaiverDtoOut` construit inline, seul bloc hors méthode d'extension (règle MAPPING) |
-| CQ-004 | P3 | `CaSoft.Erp.USVector.Api/Workers/OperationalOutboxDispatcher.cs:136` | `SpecifyKind(Utc)` du motif en double de `SignatureWaiverMappings.ToDomain` |
+| CQ-004 | P3 | ✅ **corrigé dans le code le 22/11, à publier** — `CaSoft.Erp.USVector.Api/Workers/OperationalOutboxDispatcher.cs:136` | `SpecifyKind(Utc)` du motif en double de `SignatureWaiverMappings.ToDomain` |
 | CQ-005 | P3 | `CaSoft.Erp.USVector.Application/UseCases/SignatureWaiver/ClDeclareSignatureWaiverUseCase.vb:14,30,33` | vocabulaire technique en français (`Validateur`, `Refus`) dans du code nouveau |
 | CQ-006 | P3 | `…/UseCases/SignatureWaiver/ClSignatureWaiverDtos.vb`, `Domain/Entities/ClSignatureWaiver.vb` | plusieurs types par fichier, mapping hors `ModXxxMapping.vb`, contre la convention du module |
 | CQ-007 | P3 | `ErpApi/IErpWriteApiClient.cs:19,33`, `Repositories/Mobile/ProjectionOutbox.cs`, `Api/Workers/OperationalOutboxDispatcher.cs` | « Operational » vs « Projection » pour le même mécanisme (`EnOperationalProjectionOutcome` rendu par `ProjectFieldAsync`) ; table `MOB_OPERATIONAL_OUTBOX` inchangée |
-| DR-002 | P3 | `CaSoft.Erp.USVector.Api/Workers/OperationalOutboxDispatcher.cs:101` | reste : le worker appelle `ctx.SaveChangesAsync` au lieu de l'`IUnitOfWork` (repositories et cas d'usage migrés le 14/11) ; à traiter avec AR-001 |
+| DR-002 | P3 | ✅ **corrigé dans le code le 22/11, à publier** — `CaSoft.Erp.USVector.Api/Workers/OperationalOutboxDispatcher.cs:101` | reste : le worker appelle `ctx.SaveChangesAsync` au lieu de l'`IUnitOfWork` (repositories et cas d'usage migrés le 14/11) ; à traiter avec AR-001 |
 | DR-003 | P3 | `CaSoft.Erp.USVector.Api/Controllers/SignatureWaiverController.cs:29-41` | lectures par `ISignatureWaiverRepository` au lieu d'un `IXxxQueryService` ; le contrôleur compose le libellé (deux appels) |
-| DR-004 | P3 | `SignatureWaiverController.cs:51-56` | `Withdraw` appelle le repository et valide lui-même (`CommitAsync`), sans cas d'usage (ni garde, ni `ClResult`) |
-| AR-001 | P3 | `OperationalOutboxDispatcher.cs:131-132` | le worker (couche Api) interroge `MobileDbContext` directement (`Signatures`, `SignatureWaivers`) au lieu d'un service d'Infrastructure |
+| DR-004 | P3 | ✅ **corrigé dans le code le 22/11, à publier** — `SignatureWaiverController.cs:51-56` | `Withdraw` appelle le repository et valide lui-même (`CommitAsync`), sans cas d'usage (ni garde, ni `ClResult`) |
+| AR-001 | P3 | ✅ **corrigé dans le code le 22/11, à publier** — `OperationalOutboxDispatcher.cs:131-132` | le worker (couche Api) interroge `MobileDbContext` directement (`Signatures`, `SignatureWaivers`) au lieu d'un service d'Infrastructure |
 
 # 3. Fonctionnalités envisagées en Vn
 

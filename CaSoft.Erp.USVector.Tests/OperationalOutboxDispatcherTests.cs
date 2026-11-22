@@ -2,6 +2,8 @@
 using CaSoft.Erp.USVector.Infrastructure.ErpApi;
 using CaSoft.Erp.USVector.Infrastructure.Persistence;
 using CaSoft.Erp.USVector.Infrastructure.Persistence.Entities;
+using CaSoft.Erp.USVector.Infrastructure.Repositories.Mobile;
+using CaSoft.Framework.Application;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -48,6 +50,9 @@ public class OperationalOutboxDispatcherTests
         var services = new ServiceCollection()
             .AddDbContext<MobileDbContext>(o => o.UseInMemoryDatabase(dbName))
             .AddSingleton<IErpWriteApiClient>(write)
+            .AddScoped<IUnitOfWork>(sp => new ClMobileUnitOfWork(sp.GetRequiredService<MobileDbContext>()))
+            .AddScoped<ClProjectionOutboxDispatcher>()
+            .AddLogging()
             .BuildServiceProvider();
 
         using (var scope = services.CreateScope())

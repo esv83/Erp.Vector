@@ -45,14 +45,13 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         public async Task<IActionResult> Declare(Guid gJobId, [FromBody] ClDeclareSignatureWaiverDtoIn input, CancellationToken ct)
             => (await new ClDeclareSignatureWaiverUseCase(gJobId, input, _repository, _unitOfWork).HandleAsync(ct)).ToActionResult();
 
-        /// <summary>Retire le motif (le patient a finalement signé, ou erreur de saisie).</summary>
+        /// <summary>Retire le motif (le patient a finalement signé, ou erreur de saisie). 204, contrat inchangé.</summary>
         [HttpDelete("missions/{gJobId:guid}/signature-waiver")]
         [FreezeOnTransfer("gJobId")]
         public async Task<IActionResult> Withdraw(Guid gJobId, CancellationToken ct)
         {
-            await _repository.DeleteAsync(gJobId, ct);
-            await _unitOfWork.CommitAsync(ct);   // pas de cas d'usage ici : DR-004
-            return NoContent();
+            var result = await new ClWithdrawSignatureWaiverUseCase(gJobId, _repository, _unitOfWork).HandleAsync(ct);
+            return result.IsSucces ? NoContent() : result.ToActionResult();
         }
     }
 }

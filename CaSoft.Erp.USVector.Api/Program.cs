@@ -227,10 +227,12 @@ builder.Services.AddSwaggerGen(c =>
 // ── Ports BD Mobile → implémentations réelles (MOB-2) ────────────────────────
 builder.Services.AddScoped<ISignatureRepository, SignatureRepository>();
 builder.Services.AddScoped<IJobTimeRepository, JobTimeRepository>();
-// Synchro régulation garantie : worker qui vide l'Outbox de projection opérationnelle (debounce + retry).
-// PRJ-2 — la même entrée projette aussi la signature (présence, motif) vers Orders : coupé par défaut.
+// Synchro régulation garantie : worker qui vide l'Outbox de projection opérationnelle (debounce + retry) ;
+// le cycle lui-même est en Infrastructure (AR-001). PRJ-2 — la même entrée projette aussi la signature
+// (présence, motif) vers Orders : FieldProjection:Enabled, allumé le 22/11 dans appsettings.json.
 builder.Services.AddSingleton(builder.Configuration.GetSection(FieldProjectionOptions.SectionName).Get<FieldProjectionOptions>()
     ?? new FieldProjectionOptions());
+builder.Services.AddScoped<ClProjectionOutboxDispatcher>();
 builder.Services.AddHostedService<OperationalOutboxDispatcher>();
 // Motif « le patient ne peut pas signer » (MOB_012) : stockage BD Mobile, arme la projection.
 builder.Services.AddScoped<ISignatureWaiverRepository, SignatureWaiverRepository>();
