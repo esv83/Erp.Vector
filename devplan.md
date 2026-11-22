@@ -138,7 +138,7 @@ Le 14/11, `deploy.ps1 DEV` a échoué : `\\192.168.1.112\dev_api` inaccessible. 
 |---|---|
 | **Nature** | Échafaudage à démonter — donnée de santé servie sans jeton |
 | **Effort** | Une courte session |
-| **Bloqué par** | **Jules** : qu'il confirme ne pas s'en servir et être passé aux routes par mission |
+| **Bloqué par** | **Plus rien** : Jules confirme le 22/11 (J-095) que la régulation et la certification n'appellent plus que `POST api/missions/mutuelle-card/presence`. Mesure relancée le 22/11 : **zéro appel** aux deux routes anonymes du 23/10 au 22/11 (31 journaux), contre des milliers par jour pour la route par mission |
 
 `POST api/mutuelle-card/presence` et `GET api/beneficiaries/{id}/mutuelle-card/image` : **zéro appel**
 du 21/09 au 04/10. Relancer la mesure, puis retirer `[AllowAnonymous]`, poser `MutuelleCardRead`, et
