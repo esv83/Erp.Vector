@@ -34,11 +34,7 @@ public class AnonymousSurfaceProbeTests
     /// écrans amont (M9). Les quatre de la facturation, mesurées du 15 au 19/09, sont fermées depuis
     /// — c'est la sonde qui a établi qu'elles pouvaient l'être.
     /// </summary>
-    private static readonly string[] SurfaceMesuree =
-    {
-        "MutuelleCardController.GetCurrentImage",
-        "MutuelleCardController.ListPresence"
-    };
+    private static readonly string[] SurfaceMesuree = Array.Empty<string>(); // fermées le 22/11/2026
 
     [Fact]
     public void La_sonde_couvre_exactement_la_surface_anonyme_hors_diagnostic()

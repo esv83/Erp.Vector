@@ -163,8 +163,8 @@ namespace CaSoft.Erp.USVector.Api.Controllers
 
         /// <summary>Nombre maximal de bénéficiaires sondés en un appel.</summary>
         /// <remarks>
-        /// La route est ouverte : sans plafond, un corps de cent mille identifiants ferait travailler
-        /// la base pour rien, sans qu'aucun compte soit en jeu. 500 couvre très largement une page
+        /// Sans plafond, un corps de cent mille identifiants ferait travailler la base pour rien.
+        /// 500 couvre très largement une page
         /// d'écran — au-delà, c'est l'appelant qui pagine, et il sait le faire.
         /// </remarks>
         public const int MaxBeneficiairesParLot = 500;
@@ -181,19 +181,18 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         /// </summary>
         /// <remarks>
         /// <para>
-        /// ⛔ <b>Ouvert, comme l'image qu'il annonce.</b> Un écran qui affiche une pastille « carte
-        /// disponible » ne peut pas la conditionner à un appel authentifié quand l'image elle-même
-        /// s'affiche par une balise <c>&lt;img&gt;</c> sans jeton : ce serait fermer la serrure en
-        /// laissant la porte. Ce que la réponse divulgue est borné à *« ce bénéficiaire a une
-        /// photo »* — ni nom de mutuelle, ni code AMC — et reste protégé par le même identifiant non
-        /// énumérable que l'image. Se referme avec DEC-6, en même temps qu'elle.
+        /// 🔒 <b>Fermé le 22/11/2026</b> (DEVPLAN, « Fermer les routes anonymes de la carte ») : ouvert
+        /// jusque-là pour les écrans qui affichaient la carte par une balise <c>&lt;img&gt;</c>. Jules
+        /// confirme (J-095) que la régulation et la certification n'appellent plus que la route par
+        /// mission, <see cref="ListPresenceForMissions"/> ; zéro appel du 23/10 au 22/11. Il exige
+        /// désormais le jeton d'un lecteur de la carte, comme les autres lectures.
         /// </para>
         /// <para>
         /// <b>POST et non GET</b> : une liste de plusieurs centaines de Guid dépasse la longueur d'URL
         /// admise par IIS. L'appel reste une lecture — il n'écrit rien et peut être rejoué.
         /// </para>
         /// </remarks>
-        [AllowAnonymous]
+        [Authorize(Policy = ClKeycloakCallers.MutuelleCardReadPolicy)]
         [HttpPost("mutuelle-card/presence")]
         public async Task<IActionResult> ListPresence([FromBody] MutuelleCardPresenceQuery query, CancellationToken ct)
         {
@@ -218,17 +217,16 @@ namespace CaSoft.Erp.USVector.Api.Controllers
         /// captures. <c>404</c> s'il n'en a aucune.
         /// </summary>
         /// <remarks>
-        /// ⛔ Ouverte pour la même raison que <see cref="GetImage"/>, et une de plus : les écrans
-        /// d'Order et de la facturation l'affichent par une balise <c>&lt;img src&gt;</c>, qui ne
-        /// portera **jamais** de jeton. ⚠️ Donnée de santé — se referme avec DEC-6, et ce jour-là ces
-        /// écrans devront passer par un <c>fetch</c> authentifié.
+        /// 🔒 <b>Fermée le 22/11/2026</b>, avec le sondage de présence : elle servait une balise
+        /// <c>&lt;img src&gt;</c> sans jeton. Zéro appel du 23/10 au 22/11 ; les écrans lisent l'image
+        /// par mission (<see cref="GetCurrentImageForMission"/>), avec leur jeton. ⚠️ Donnée de santé.
         /// <para>
         /// Indexée par bénéficiaire et non par carte : l'appelant connaît son patient, pas l'identifiant
         /// d'une photo qu'il n'a pas prise. Un identifiant de carte l'obligerait à relire des
         /// métadonnées avant chaque affichage, et deviendrait périmé à la capture suivante.
         /// </para>
         /// </remarks>
-        [AllowAnonymous]
+        [Authorize(Policy = ClKeycloakCallers.MutuelleCardReadPolicy)]
         [HttpGet("beneficiaries/{beneficiaryId:guid}/mutuelle-card/image")]
         public async Task<IActionResult> GetCurrentImage(Guid beneficiaryId, CancellationToken ct)
             => ServirImage(await _repository.GetCurrentImageAsync(beneficiaryId, ct));

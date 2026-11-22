@@ -50,7 +50,9 @@ public class AnonymousSurfaceTests
         "MutuelleCardController.GetCurrentForMission",       // métadonnées (nom, AMC…)
         "MutuelleCardController.GetCurrentImageForMission",  // ⚠️ donnée de santé
         "MutuelleCardController.GetImage",                   // ⚠️ donnée de santé — aussi la facturation (D8)
-        "MutuelleCardController.ListPresenceForMissions"     // présence, pour une liste de missions
+        "MutuelleCardController.ListPresenceForMissions",    // présence, pour une liste de missions
+        "MutuelleCardController.GetCurrentImage",            // ⚠️ donnée de santé — anonyme jusqu'au 22/11
+        "MutuelleCardController.ListPresence"                // présence par bénéficiaire — anonyme jusqu'au 22/11
     };
 
     /// <summary>
@@ -64,11 +66,11 @@ public class AnonymousSurfaceTests
     /// Ni nom de mutuelle, ni code AMC — le sondage de présence les tait délibérément.
     /// </para>
     /// </summary>
-    private static readonly string[] OuverturesPourLesEcransAmont =
-    {
-        "MutuelleCardController.GetCurrentImage",  // ⚠️ donnée de santé — <img src> côté Order
-        "MutuelleCardController.ListPresence"      // présence seule, pour une liste de bénéficiaires
-    };
+    /// <para>
+    /// <b>Vide depuis le 22/11/2026</b> : les deux routes de la carte mutuelle ouvertes pour une balise
+    /// <c>&lt;img&gt;</c> sont fermées (zéro appel du 23/10 au 22/11, Jules passé aux routes par mission).
+    /// </para>
+    private static readonly string[] OuverturesPourLesEcransAmont = Array.Empty<string>();
 
     /// <summary>
     /// Outils de diagnostic : l'un doit pouvoir <i>dire</i> pourquoi l'authentification échoue,
@@ -163,10 +165,10 @@ public class AnonymousSurfaceTests
     /// d'autre.
     /// </summary>
     [Fact]
-    public void Les_ouvertures_pour_les_ecrans_amont_sont_au_nombre_de_deux()
+    public void Aucune_route_n_est_plus_ouverte_pour_les_ecrans_amont()
     {
-        SurfaceAnonyme().Intersect(OuverturesPourLesEcransAmont)
-            .Should().HaveCount(2, "seule la carte mutuelle est consultable depuis les écrans amont");
+        SurfaceAnonyme().Where(r => r.StartsWith("MutuelleCardController.", StringComparison.Ordinal))
+            .Should().BeEmpty("la carte mutuelle est une donnée de santé : elle ne se lit plus qu'avec un jeton (22/11)");
     }
 
     /// <summary>
