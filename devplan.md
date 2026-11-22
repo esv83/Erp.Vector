@@ -166,13 +166,16 @@ vider `OuverturesPourLesEcransAmont` dans `AnonymousSurfaceTests`.
 | | |
 |---|---|
 | **Nature** | Interrupteur, puis rattrapage |
-| **Effort** | Une courte session, une publication de configuration |
-| **Bloqué par** | **Orders** : une version qui sert `PUT missions/{id}/field`, **vue en production** *(non revérifié à cette édition)* |
+| **Effort** | **Allumé dans le code le 22/11** (`FieldProjection:Enabled = true`, `appsettings.json` versionné) — reste : publier, constater, puis jouer le rattrapage |
+| **Bloqué par** | **Plus rien côté Orders** : 1.19.1 (`dad58a3`) en production le 22/11 sert la route — un `GET` sans jeton sur `missions/{id}/field` rend **405**, contre 404 pour une route inexistante. Contrat vérifié dans le code d'Orders : `signatureExists`, `waiver { code, at }`, motif porté sans être jugé (30 caractères) |
 
-Chez nous, un 404 veut dire « mission inconnue » et abandonne l'entrée : allumer avant la route ferait
-jeter chaque projection (`decided.md`, 10/11). Ensuite `FieldProjection:Enabled = true`, puis
-`docs/exploitation/PRJ2_rattrapage_signatures.sql`. Depuis DR-001, un 400/409 d'Order s'abandonne avec
-son motif au journal : **lire ces erreurs** les premiers jours.
+**Dans l'ordre** :
+1. **Publier** Vector, puis constater au journal « projection signature **active** » au démarrage du
+   dispatcher, et les premiers `PUT missions/{id}/field` en 204 ;
+2. **lire les erreurs** les premiers jours : un 404 abandonne l'entrée (mission inconnue), un 400/409
+   s'abandonne avec son motif (DR-001) ;
+3. **puis seulement**, jouer `docs/exploitation/PRJ2_rattrapage_signatures.sql` (depuis le 13/10, 10
+   entrées par seconde) — désormais précédé de `USE [BD_ERP_MOBILE_APP]` / `GO`.
 
 ## Itération 6 — La dette de la revue du 11/11
 
